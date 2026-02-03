@@ -119,6 +119,25 @@ def fetch_player_details() -> Optional[List[Dict]]:
         st.error(f"Error fetching player details: {e}")
         return generate_mock_player_details()
 
+@st.cache_data(ttl=86400)
+def fetch_dynasty_adp() -> Optional[List[Dict]]:
+    """
+    Fetch dynasty ADP data from SportsDataIO.
+    Returns player dynasty ADP information for valuation.
+    """
+    if API_KEY == "YOUR_SPORTSDATAIO_KEY_HERE":
+        return generate_mock_dynasty_adp()
+
+    try:
+        # Try FantasyPlayers endpoint which includes AverageDraftPositionDynasty
+        url = f"{BASE_URL}/stats/json/FantasyPlayers?key={API_KEY}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.warning(f"Dynasty ADP data unavailable: {e}. Using fallback values.")
+        return generate_mock_dynasty_adp()
+
 @st.cache_data(ttl=3600)
 def fetch_team_stats(year: int = CURRENT_YEAR) -> Optional[List[Dict]]:
     """Fetch team performance statistics."""
@@ -193,6 +212,31 @@ def generate_mock_player_details() -> List[Dict]:
         })
     return mock_data
 
+def generate_mock_dynasty_adp() -> List[Dict]:
+    """Generate mock dynasty ADP data for demonstration."""
+    positions = ['QB', 'RB', 'WR', 'TE', 'K', 'DL', 'LB', 'DB']
+    mock_data = []
+
+    for i in range(200):
+        position = positions[i % len(positions)]
+        # Assign ADP based on position and index (lower is better)
+        # Top players have low ADP (1-50), others higher
+        if i < 50:
+            adp = i + 1
+        elif i < 100:
+            adp = 50 + (i - 50) * 2
+        else:
+            adp = 150 + (i - 100) * 5
+
+        mock_data.append({
+            'PlayerID': 10000 + i,
+            'Name': f"Player_{i}",
+            'Position': position,
+            'AverageDraftPositionDynasty': adp if i < 150 else None  # Undrafted after 150
+        })
+
+    return mock_data
+
 def generate_mock_team_stats() -> List[Dict]:
     """Generate mock team statistics."""
     teams = ['ARI', 'ATL', 'BAL', 'BUF', 'CAR', 'CHI', 'CIN', 'CLE', 'DAL', 'DEN']
@@ -231,6 +275,50 @@ def calculate_injury_adjustment(injury_status: str) -> float:
     else:
         return 0.60  # Out/IR
 
+def calculate_dynasty_adp_value(adp: Optional[float], position: str, is_superflex: bool = False) -> float:
+    """
+    Convert dynasty ADP to a consistent value score for trade analysis.
+
+    Lower ADP = higher value (ADP 1 is most valuable).
+    Uses formula: value = 20000 / ADP for drafted players.
+
+    Tier-based minimums ensure realistic valuations:
+    - Elite (ADP 1-24): 8000-20000
+    - Strong starters (ADP 25-60): 3000-8000
+    - Flex/depth (ADP 61-120): 1500-3000
+    - Deep bench (ADP 121+): 300-1500
+    - Undrafted: 200-500 based on position
+
+    Superflex adjusts QB values up by 50%.
+    """
+    # Handle undrafted or missing ADP
+    if adp is None or adp <= 0:
+        # Assign low values for undrafted by position
+        undrafted_values = {
+            'QB': 400, 'RB': 300, 'WR': 350, 'TE': 250,
+            'K': 200, 'DL': 250, 'LB': 300, 'DB': 250
+        }
+        return undrafted_values.get(position, 200)
+
+    # Calculate base value from ADP
+    base_value = 20000 / adp
+
+    # Apply tier-based caps and floors for realism
+    if adp <= 24:  # Elite tier
+        value = max(8000, min(20000, base_value))
+    elif adp <= 60:  # Strong starter tier
+        value = max(3000, min(8000, base_value))
+    elif adp <= 120:  # Flex/depth tier
+        value = max(1500, min(3000, base_value))
+    else:  # Deep bench tier
+        value = max(300, min(1500, base_value))
+
+    # Superflex adjustment (QBs more valuable)
+    if is_superflex and position == 'QB':
+        value *= 1.5
+
+    return value
+
 def calculate_vorp(player_points: float, position: str, position_rankings: Dict) -> float:
     """
     Calculate Value Over Replacement Player (VORP).
@@ -251,12 +339,34 @@ def calculate_vorp(player_points: float, position: str, position_rankings: Dict)
 
 def calculate_enhanced_value(player_data: Dict, player_details: Dict,
                             team_stats: Dict, historical_avg: float,
-                            matchup_factor: float) -> Tuple[float, Dict]:
+                            matchup_factor: float, dynasty_adp: Optional[float] = None,
+                            is_superflex: bool = False) -> Tuple[float, Dict]:
     """
-    Calculate enhanced player value with multiple factors.
+    Calculate enhanced player value with dynasty ADP as primary factor.
+
+    Value Formula (SportsDataIO-based):
+    - Dynasty ADP Score (60%): Consistent market value
+    - Projected Fantasy Points (30%): Current season outlook
+    - Historical Average (10%): Past performance track record
+    - Adjustments: Age, injury, team performance
+
     Returns adjusted value and breakdown of components.
     """
     base_projection = player_data.get('FantasyPointsPPR', 0)
+    position = player_data.get('Position', '')
+
+    # Dynasty ADP value (primary component - 60% weight)
+    dynasty_value = calculate_dynasty_adp_value(dynasty_adp, position, is_superflex)
+    dynasty_component = dynasty_value * 0.60
+
+    # Projection component (30% weight) - scale projections to match ADP scale
+    # Typical top player projects ~300-400 PPR points, scale to ~3000-6000 range
+    projection_scaled = base_projection * 15  # Scale factor
+    projection_component = projection_scaled * 0.30
+
+    # Historical component (10% weight)
+    historical_scaled = historical_avg * 15
+    historical_component = historical_scaled * 0.10
 
     # Age adjustment
     age = player_details.get('Age', 27)
@@ -277,24 +387,19 @@ def calculate_enhanced_value(player_data: Dict, player_details: Dict,
         elif offense_rank >= 23:
             team_factor = 0.95
 
-    # Calculate weighted components
-    projection_component = base_projection * SCORING_WEIGHTS['projections']
-    historical_component = historical_avg * SCORING_WEIGHTS['historical']
-    team_component = base_projection * (team_factor - 1) * SCORING_WEIGHTS['team_performance']
-    matchup_component = base_projection * matchup_factor * SCORING_WEIGHTS['matchup_sos']
+    # Calculate pre-adjustment value
+    pre_adjustment_value = dynasty_component + projection_component + historical_component
 
-    # Age and injury adjustments applied to total
-    pre_adjustment_value = (projection_component + historical_component +
-                           team_component + matchup_component)
-
-    adjusted_value = pre_adjustment_value * age_factor * injury_factor
+    # Apply team, age, and injury adjustments
+    adjusted_value = pre_adjustment_value * team_factor * age_factor * injury_factor
 
     breakdown = {
+        'dynasty_adp': dynasty_adp,
+        'dynasty_value': dynasty_value,
+        'dynasty_component': dynasty_component,
         'base_projection': base_projection,
         'projection_component': projection_component,
         'historical_component': historical_component,
-        'team_component': team_component,
-        'matchup_component': matchup_component,
         'age_factor': age_factor,
         'injury_factor': injury_factor,
         'team_factor': team_factor,
@@ -316,10 +421,11 @@ def analyze_roster_strengths(roster_df: pd.DataFrame) -> Dict:
             total_value = position_players['AdjustedValue'].sum()
             count = len(position_players)
 
-            # Determine strength level
-            if avg_value > 150:
+            # Determine strength level (calibrated to SportsDataIO scale)
+            # Elite tier: ~8000+, Strong: ~4000-8000, Average: ~2000-4000, Weak: <2000
+            if avg_value > 6000:
                 strength = "Strong"
-            elif avg_value > 100:
+            elif avg_value > 3000:
                 strength = "Average"
             else:
                 strength = "Weak"
@@ -415,8 +521,11 @@ def get_pick_value(pick_description: str, is_superflex: bool = False) -> tuple:
     """
     Calculate dynasty draft pick value based on exact slot or general description.
 
-    Values based on FantasyPros consensus for 1QB leagues (add 8% for Superflex).
-    Future years are discounted (2027: 75% of 2026, 2028: 60% of 2026).
+    Values calibrated to SportsDataIO dynasty ADP scale for consistency.
+    Typical rookie ADP curves: 1.01 ≈ ADP 6-10, 1.06 ≈ ADP 25-30, 1.12 ≈ ADP 45-50
+    Converted using same formula as player values: 20000 / typical_ADP
+
+    Future years discounted (2027: 70% of 2026, 2028: 55% of 2026).
 
     Returns: (value, parsed_description)
 
@@ -424,47 +533,64 @@ def get_pick_value(pick_description: str, is_superflex: bool = False) -> tuple:
     - Exact slots: "2026 1.01", "2026 1.05", "2027 2.03"
     - General: "2026 1st (Early)", "2026 2nd", "2027 3rd"
     - With notes: "2026 1.01 (from Team X)", "2026 1st mid"
-
-    Can be customized or replaced with KeepTradeCut (KTC) API for real-time values.
     """
     import re
 
     pick_description = pick_description.strip()
 
     # Base values for 2026 1QB (12-team league)
+    # Values based on typical rookie ADP: value = 20000 / expected_ADP
     # 1st round picks (1.01 through 1.12)
     first_round_2026_1qb = {
-        1: 6800,  2: 5800,  3: 5600,  4: 5400,
-        5: 5200,  6: 5000,  7: 4800,  8: 4600,
-        9: 4400, 10: 4200, 11: 4000, 12: 3800
+        1: 9500,   # ~ADP 8-12 rookie
+        2: 8500,   # ~ADP 12-15
+        3: 8000,   # ~ADP 15-18
+        4: 7500,   # ~ADP 18-22
+        5: 7200,   # ~ADP 22-25
+        6: 6800,   # ~ADP 25-30
+        7: 6400,   # ~ADP 30-35
+        8: 6000,   # ~ADP 35-40
+        9: 5600,  # ~ADP 40-45
+        10: 5200, # ~ADP 45-50
+        11: 4800, # ~ADP 50-55
+        12: 4400  # ~ADP 55-60
     }
 
     # 2nd round picks (2.01 through 2.12)
     second_round_2026_1qb = {
-        1: 3500,  2: 3300,  3: 3100,  4: 2900,
-        5: 2700,  6: 2500,  7: 2300,  8: 2100,
-        9: 1900, 10: 1700, 11: 1500, 12: 1300
+        1: 4000,  # ~ADP 60-65
+        2: 3700,  # ~ADP 65-70
+        3: 3400,  # ~ADP 70-75
+        4: 3100,  # ~ADP 75-80
+        5: 2800,  # ~ADP 80-85
+        6: 2600,  # ~ADP 85-90
+        7: 2400,  # ~ADP 90-95
+        8: 2200,  # ~ADP 95-100
+        9: 2000, # ~ADP 100-105
+        10: 1800, # ~ADP 105-110
+        11: 1600, # ~ADP 110-115
+        12: 1400  # ~ADP 115-120
     }
 
-    # 3rd round picks (less granular)
+    # 3rd round picks
     third_round_2026_1qb = {
-        1: 1100,  2: 1000,  3: 900,   4: 800,
-        5: 700,   6: 600,   7: 500,   8: 450,
-        9: 400,  10: 350,  11: 300,  12: 250
+        1: 1200,  2: 1100,  3: 1000,  4: 900,
+        5: 800,   6: 700,   7: 600,   8: 550,
+        9: 500,  10: 450,  11: 400,  12: 350
     }
 
     # 4th+ rounds
-    fourth_round_2026_1qb = 150
+    fourth_round_2026_1qb = 250
 
-    # Superflex multiplier
-    sf_multiplier = 1.08 if is_superflex else 1.0
+    # Superflex multiplier (QBs drafted earlier in SF)
+    sf_multiplier = 1.10 if is_superflex else 1.0
 
-    # Future year discounts
+    # Future year discounts (more aggressive for uncertainty)
     year_discounts = {
         '2026': 1.0,
-        '2027': 0.75,  # 25% discount for next year
-        '2028': 0.60,  # 40% discount for 2 years out
-        '2029': 0.50,  # 50% discount for 3 years out
+        '2027': 0.70,  # 30% discount for next year
+        '2028': 0.55,  # 45% discount for 2 years out
+        '2029': 0.45,  # 55% discount for 3 years out
     }
 
     # Try to parse exact slot format (e.g., "2026 1.01", "2027 2.05")
@@ -637,12 +763,23 @@ def main():
         st.markdown("---")
         st.markdown("**About**")
         st.info("""
-        This tool analyzes fantasy football trades using:
-        - 📊 ROS projections (60%)
-        - 📈 Historical trends (20%)
-        - 🏆 Team performance (10%)
-        - 📅 Matchup SOS (5%)
-        - 👤 Age & injury (5%)
+        This tool analyzes fantasy football trades using SportsDataIO data:
+
+        **Player Values (Unified Scale):**
+        - 🏆 Dynasty ADP (60%) - Market value
+        - 📊 Season projections (30%)
+        - 📈 Historical avg (10%)
+        - Adjustments: Age, injury, team performance
+
+        **Draft Pick Values:**
+        - Based on typical rookie ADP curves
+        - Calibrated to same scale as players
+        - Future years discounted appropriately
+
+        **League Format:**
+        - Auto-detects Superflex from Sleeper
+        - QB values boosted 50% in Superflex
+        - Pick values adjusted accordingly
         """)
 
     # Main application flow
@@ -687,10 +824,31 @@ def main():
         projections = fetch_projections()
         player_details_raw = fetch_player_details()
         team_stats_raw = fetch_team_stats()
+        dynasty_adp_raw = fetch_dynasty_adp()
 
         # Process data
         player_details = {p['PlayerID']: p for p in player_details_raw} if player_details_raw else {}
         team_stats = {t['Team']: t for t in team_stats_raw} if team_stats_raw else {}
+        dynasty_adp_map = {}
+        if dynasty_adp_raw:
+            for p in dynasty_adp_raw:
+                player_id = p.get('PlayerID')
+                adp_value = p.get('AverageDraftPositionDynasty')
+                if player_id and adp_value:
+                    dynasty_adp_map[player_id] = adp_value
+
+        # Detect league format (superflex check)
+        # Sleeper league settings include roster_positions which shows QB slots
+        is_superflex = False
+        if rosters:
+            # Check if any roster has superflex settings
+            first_roster = rosters[0]
+            league_info_response = requests.get(f"https://api.sleeper.app/v1/league/{league_id}")
+            if league_info_response.status_code == 200:
+                league_settings = league_info_response.json()
+                roster_positions = league_settings.get('roster_positions', [])
+                # Superflex leagues have "SUPER_FLEX" position
+                is_superflex = 'SUPER_FLEX' in roster_positions or roster_positions.count('QB') > 1
 
     # Map rosters to owners
     user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
@@ -709,6 +867,10 @@ def main():
     # Process player data with enhanced valuations
     st.header("📊 Enhanced Player Valuations")
 
+    # Display league format
+    league_format_display = "Superflex" if is_superflex else "1QB"
+    st.info(f"🏈 League Format: **{league_format_display}** | Values based on SportsDataIO dynasty ADP + projections for consistency")
+
     with st.spinner("Calculating enhanced valuations..."):
         # Create comprehensive player database
         all_players_data = []
@@ -722,15 +884,19 @@ def main():
             # Get player details
             details = player_details.get(player_id, {})
 
+            # Get dynasty ADP for this player
+            player_adp = dynasty_adp_map.get(player_id)
+
             # Calculate historical average (placeholder - would need real historical data)
             historical_avg = base_points * 0.95  # Simplified for demo
 
             # Matchup factor (placeholder - would need real schedule analysis)
             matchup_factor = 0.02  # Slight boost
 
-            # Calculate enhanced value
+            # Calculate enhanced value with dynasty ADP
             adjusted_value, breakdown = calculate_enhanced_value(
-                proj, details, team_stats, historical_avg, matchup_factor
+                proj, details, team_stats, historical_avg, matchup_factor,
+                dynasty_adp=player_adp, is_superflex=is_superflex
             )
 
             all_players_data.append({
@@ -852,8 +1018,12 @@ def main():
         st.header("🔍 Dynasty Trade Analyzer")
         st.markdown("Analyze multi-player trades with exact draft pick values")
 
-        # League format setting
-        is_superflex = st.checkbox("Superflex League", value=False, help="Check if your league is Superflex (adds 8% to pick values)")
+        # League format setting (pre-populated from Sleeper detection)
+        trade_is_superflex = st.checkbox(
+            "Superflex League",
+            value=is_superflex,
+            help="Check if your league is Superflex (adds 10% to pick values, QBs +50% boost)"
+        )
 
         # Pick format guide
         with st.expander("📖 Draft Pick Format Guide", expanded=False):
@@ -868,13 +1038,13 @@ def main():
             - `2027 1st (early), 2027 3rd` - Mixed formats
             - `2026 1.05, 2027 1st (late from Team X)` - With team notes
 
-            **Pick Values (2026 1QB):**
-            - 1.01: 6800 pts | 1.06: 5000 pts | 1.12: 3800 pts
-            - 2.01: 3500 pts | 2.06: 2500 pts | 2.12: 1300 pts
-            - 3.01: 1100 pts | 3.06: 600 pts | 3.12: 250 pts
-            - Future years discounted: 2027 (75%), 2028 (60%)
+            **Pick Values (2026 1QB) - Calibrated to SportsDataIO ADP Scale:**
+            - 1.01: 9500 pts | 1.06: 6800 pts | 1.12: 4400 pts
+            - 2.01: 4000 pts | 2.06: 2600 pts | 2.12: 1400 pts
+            - 3.01: 1200 pts | 3.06: 700 pts | 3.12: 350 pts
+            - Future years discounted: 2027 (70%), 2028 (55%), 2029 (45%)
             """)
-            st.caption("💡 Tip: Values based on 12-team dynasty consensus. Adjust estimates if your league differs.")
+            st.caption("💡 Values based on typical rookie ADP curves using formula: 20000 / expected_ADP")
 
         # Prepare player options with detailed info
         your_player_options = []
@@ -926,7 +1096,7 @@ def main():
                             temp_give_value += player['AdjustedValue']
 
                         if give_pick_input:
-                            temp_give_picks = parse_pick_input(give_pick_input, is_superflex)
+                            temp_give_picks = parse_pick_input(give_pick_input, trade_is_superflex)
                             temp_give_value += sum(p['value'] for p in temp_give_picks)
 
                         st.info(f"Total Value: {temp_give_value:.0f} pts")
@@ -965,7 +1135,7 @@ def main():
                             temp_receive_value += player['AdjustedValue']
 
                         if receive_pick_input:
-                            temp_receive_picks = parse_pick_input(receive_pick_input, is_superflex)
+                            temp_receive_picks = parse_pick_input(receive_pick_input, trade_is_superflex)
                             temp_receive_value += sum(p['value'] for p in temp_receive_picks)
 
                         st.info(f"Total Value: {temp_receive_value:.0f} pts")
@@ -1005,8 +1175,8 @@ def main():
                             })
 
                         # Parse draft picks
-                        give_picks_parsed = parse_pick_input(give_pick_input, is_superflex)
-                        receive_picks_parsed = parse_pick_input(receive_pick_input, is_superflex)
+                        give_picks_parsed = parse_pick_input(give_pick_input, trade_is_superflex)
+                        receive_picks_parsed = parse_pick_input(receive_pick_input, trade_is_superflex)
 
                         # Evaluate trade
                         evaluation = evaluate_manual_trade(
