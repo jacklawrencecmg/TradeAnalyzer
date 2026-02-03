@@ -11,6 +11,22 @@ from datetime import datetime
 
 SLEEPER_BASE_URL = "https://api.sleeper.app/v1"
 
+@st.cache_data(ttl=86400)
+def fetch_all_nfl_players() -> Dict:
+    """
+    Fetch all NFL players from Sleeper API.
+    Returns: dict with player_id as key, player data as value
+    Cached for 24 hours since player data doesn't change frequently
+    """
+    try:
+        response = requests.get(f"{SLEEPER_BASE_URL}/players/nfl")
+        if response.status_code == 200:
+            return response.json()
+        return {}
+    except Exception as e:
+        st.error(f"Error fetching NFL players: {e}")
+        return {}
+
 @st.cache_data(ttl=1800)
 def fetch_league_details(league_id: str) -> Optional[Dict]:
     """

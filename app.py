@@ -10,7 +10,7 @@ import pandas as pd
 from typing import Dict, List, Optional, Tuple
 import json
 from datetime import datetime
-from fuzzywuzzy import fuzz
+from fuzzywuzzy import fuzz, process
 import altair as alt
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -34,7 +34,8 @@ from sleeper_api import (
     get_roster_positions_summary, get_scoring_summary,
     get_future_picks_inventory, adjust_value_for_league_scoring,
     get_team_roster_composition, calculate_optimal_starter_count,
-    get_recent_transactions_summary, format_roster_positions, is_superflex_league
+    get_recent_transactions_summary, format_roster_positions, is_superflex_league,
+    fetch_all_nfl_players
 )
 
 # Configuration
@@ -57,6 +58,246 @@ SCORING_WEIGHTS = {
     'matchup_sos': 0.05,
     'age_injury': 0.05
 }
+
+# ============================================================================
+# PREDICTIVE TEXT / AUTOCOMPLETE HELPER FUNCTIONS
+# ============================================================================
+
+def format_player_display_name(player_data: Dict, player_id: str = None) -> str:
+    """
+    Format player data into searchable display name.
+    Format: "Full Name (Position - Team) - Age X"
+    Example: "Patrick Mahomes (QB - KC) - Age 29"
+    """
+    full_name = player_data.get('full_name') or player_data.get('display_name', 'Unknown')
+    first_name = player_data.get('first_name', '')
+    last_name = player_data.get('last_name', '')
+
+    if not full_name or full_name == 'Unknown':
+        full_name = f"{first_name} {last_name}".strip()
+
+    position = player_data.get('position', 'UNK')
+    team = player_data.get('team', 'FA')
+    age = player_data.get('age', '')
+
+    age_str = f" - Age {age}" if age else ""
+    return f"{full_name} ({position} - {team}){age_str}"
+
+def build_searchable_player_list(all_nfl_players: Dict, active_only: bool = True) -> Dict[str, str]:
+    """
+    Build a searchable player list with formatted names.
+    Returns: dict mapping display_name -> player_id
+    """
+    player_options = {}
+
+    for player_id, player_data in all_nfl_players.items():
+        if active_only and player_data.get('status') not in ['Active', 'Inactive', 'Questionable', 'Doubtful', 'Out', 'PUP', 'IR']:
+            continue
+
+        position = player_data.get('position', '')
+        if position in ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB']:
+            display_name = format_player_display_name(player_data, player_id)
+            player_options[display_name] = player_id
+
+    return player_options
+
+def fuzzy_search_players(search_query: str, player_options: Dict[str, str], limit: int = 20) -> List[str]:
+    """
+    Perform fuzzy search on player names.
+    Returns top matches sorted by similarity score.
+    """
+    if not search_query:
+        return []
+
+    results = process.extract(search_query, player_options.keys(), limit=limit, scorer=fuzz.token_sort_ratio)
+
+    return [match[0] for match in results if match[1] > 40]
+
+def build_pick_options(num_teams: int = 12, years: List[int] = None, num_rounds: int = 5) -> List[str]:
+    """
+    Build comprehensive pick options for autocomplete.
+    Includes specific slots (1.01, 1.02) and general picks (Early 1st, Mid 2nd, Late 3rd).
+    """
+    if years is None:
+        current_year = datetime.now().year
+        years = [current_year + i for i in range(1, 4)]
+
+    pick_options = []
+
+    for year in years:
+        for round_num in range(1, num_rounds + 1):
+            for slot in range(1, num_teams + 1):
+                pick_options.append(f"{year} {round_num}.{slot:02d}")
+
+            for timing in ['Early', 'Mid', 'Late']:
+                round_suffix = {1: '1st', 2: '2nd', 3: '3rd'}.get(round_num, f'{round_num}th')
+                pick_options.append(f"{year} {timing} {round_suffix}")
+
+    return sorted(pick_options)
+
+def fuzzy_search_picks(search_query: str, pick_options: List[str], limit: int = 20) -> List[str]:
+    """
+    Perform fuzzy search on draft picks.
+    Returns top matches sorted by relevance.
+    """
+    if not search_query:
+        return []
+
+    results = process.extract(search_query, pick_options, limit=limit, scorer=fuzz.partial_ratio)
+
+    return [match[0] for match in results if match[1] > 50]
+
+def render_searchable_player_multiselect(
+    label: str,
+    player_display_to_id: Dict[str, str],
+    roster_df: pd.DataFrame,
+    key: str,
+    help_text: str = None
+) -> List[str]:
+    """
+    Render a searchable multiselect for players with fuzzy matching.
+    Returns list of selected player display names.
+    """
+    col_search, col_clear = st.columns([4, 1])
+
+    with col_search:
+        search_query = st.text_input(
+            f"🔍 Search {label}",
+            key=f"{key}_search",
+            placeholder="Type player name (e.g., 'Mah' for Mahomes)...",
+            help="Use fuzzy search to find players quickly"
+        )
+
+    filtered_options = []
+
+    if search_query:
+        matched_names = fuzzy_search_players(search_query, player_display_to_id, limit=30)
+
+        roster_player_names = set(roster_df['Name'].tolist())
+        filtered_options = []
+
+        for display_name in matched_names:
+            player_name = display_name.split(' (')[0]
+            if player_name in roster_player_names:
+                player = roster_df[roster_df['Name'] == player_name].iloc[0]
+                option = f"{player['Name']} ({player['Position']}, {player['Team']}, Age {player['Age']}) - {player['AdjustedValue']:.0f} pts"
+                filtered_options.append(option)
+
+        if filtered_options:
+            st.caption(f"Found {len(filtered_options)} matches")
+        else:
+            st.caption("No matches found in roster")
+    else:
+        for _, player in roster_df.iterrows():
+            option = f"{player['Name']} ({player['Position']}, {player['Team']}, Age {player['Age']}) - {player['AdjustedValue']:.0f} pts"
+            filtered_options.append(option)
+
+    selections = st.multiselect(
+        label,
+        options=filtered_options,
+        key=f"{key}_select",
+        help=help_text or "Select multiple players"
+    )
+
+    return selections
+
+def render_searchable_pick_input(
+    label: str,
+    pick_options: List[str],
+    key: str,
+    help_text: str = None
+) -> str:
+    """
+    Render a searchable text input for draft picks with autocomplete suggestions.
+    Returns the input string.
+    """
+    search_query = st.text_input(
+        f"🔍 {label}",
+        key=f"{key}_search",
+        placeholder="Type pick (e.g., '2026 1' or 'Early 1st')...",
+        help="Use predictive search for picks"
+    )
+
+    if search_query:
+        matched_picks = fuzzy_search_picks(search_query, pick_options, limit=15)
+
+        if matched_picks:
+            st.caption("💡 Suggestions (click to copy):")
+            suggestion_cols = st.columns(min(5, len(matched_picks)))
+
+            for idx, pick in enumerate(matched_picks[:15]):
+                col_idx = idx % 5
+                with suggestion_cols[col_idx]:
+                    if st.button(pick, key=f"{key}_suggestion_{idx}", use_container_width=True):
+                        st.session_state[f"{key}_value"] = st.session_state.get(f"{key}_value", "") + f"{pick}, "
+                        st.rerun()
+
+    current_value = st.session_state.get(f"{key}_value", "")
+
+    pick_input = st.text_area(
+        "Draft Picks (comma-separated):",
+        value=current_value,
+        placeholder="Examples:\n2026 1.01, 2026 2.08\n2027 1st (late), 2027 2nd\n2028 1.05 (from Team X)",
+        height=100,
+        key=key,
+        help=help_text or "Enter picks separated by commas"
+    )
+
+    st.session_state[f"{key}_value"] = pick_input
+
+    return pick_input
+
+def parse_pick_description(pick_str: str, default_value: float = 50.0) -> float:
+    """
+    Parse a pick description and return its approximate value.
+    Examples:
+      - "2026 1.01" -> 300 pts
+      - "2026 Early 1st" -> 280 pts
+      - "2027 Mid 2nd" -> 120 pts
+    """
+    pick_str = pick_str.lower()
+
+    year_offset = 0
+    if '2026' in pick_str:
+        year_offset = 1
+    elif '2027' in pick_str:
+        year_offset = 2
+    elif '2028' in pick_str:
+        year_offset = 3
+
+    base_values = {
+        '1st': 250, '1.': 250,
+        '2nd': 150, '2.': 150,
+        '3rd': 75, '3.': 75,
+        '4th': 40, '4.': 40,
+        '5th': 25, '5.': 25
+    }
+
+    pick_value = default_value
+
+    for key, value in base_values.items():
+        if key in pick_str:
+            pick_value = value
+            break
+
+    if 'early' in pick_str:
+        pick_value *= 1.2
+    elif 'mid' in pick_str:
+        pick_value *= 1.0
+    elif 'late' in pick_str:
+        pick_value *= 0.8
+
+    if '1.01' in pick_str or '1.1' in pick_str:
+        pick_value = 350
+    elif '1.02' in pick_str or '1.2' in pick_str:
+        pick_value = 330
+    elif '1.03' in pick_str or '1.3' in pick_str:
+        pick_value = 310
+
+    discount_factor = 0.85 ** year_offset
+    pick_value *= discount_factor
+
+    return pick_value
 
 # Cache for API responses
 @st.cache_data(ttl=3600)
@@ -1755,6 +1996,9 @@ def main():
         traded_picks = fetch_traded_picks(league_id)
         league_drafts = fetch_league_drafts(league_id)
 
+        # Fetch all NFL players for autocomplete (cached 24 hours)
+        all_nfl_players = fetch_all_nfl_players()
+
         if not all([users, rosters, sleeper_players]):
             st.error("Failed to load league data. Please check your League ID.")
             return
@@ -1817,6 +2061,18 @@ def main():
 
         # Detect league format (superflex check) using comprehensive league data
         is_superflex = is_superflex_league(league_details) if league_details else False
+
+    # Build searchable player and pick lists for autocomplete
+    if all_nfl_players:
+        st.success(f"✅ Loaded {len(all_nfl_players):,} NFL players for predictive search")
+        player_display_to_id = build_searchable_player_list(all_nfl_players, active_only=True)
+    else:
+        st.warning("⚠️ Could not load NFL player database. Autocomplete may be limited.")
+        player_display_to_id = {}
+
+    num_teams = len(rosters) if rosters else 12
+    num_rounds = league_details.get('settings', {}).get('draft_rounds', 5) if league_details else 5
+    pick_options = build_pick_options(num_teams=num_teams, num_rounds=num_rounds)
 
     # Map rosters to owners (including FAAB)
     user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
@@ -2207,19 +2463,19 @@ def main():
                 with col1:
                     st.subheader(f"📤 {your_team} Gives")
 
-                    give_player_selections = st.multiselect(
+                    give_player_selections = render_searchable_player_multiselect(
                         "Players:",
-                        options=your_player_options,
-                        key="give_players",
-                        help="Select multiple players to trade away"
+                        player_display_to_id,
+                        your_roster_df,
+                        "give_players",
+                        help_text="Type to search and select multiple players to trade away"
                     )
 
-                    give_pick_input = st.text_area(
-                        "Draft Picks (comma-separated):",
-                        placeholder="Examples:\n2026 1.01, 2026 2.08\n2027 1st (late), 2027 2nd\n2028 1.05 (from Team X)",
-                        height=100,
-                        key="give_picks",
-                        help="Enter picks separated by commas. Formats: '2026 1.01', '2027 1st (early)', '2026 2.05'"
+                    give_pick_input = render_searchable_pick_input(
+                        "Draft Picks",
+                        pick_options,
+                        "give_picks",
+                        help_text="Type to search picks. Click suggestions to add. Formats: '2026 1.01', '2027 Early 1st'"
                     )
 
                     # FAAB input for Side A
@@ -2267,19 +2523,19 @@ def main():
                 with col2:
                     st.subheader(f"📥 {selected_team} Gives")
 
-                    receive_player_selections = st.multiselect(
+                    receive_player_selections = render_searchable_player_multiselect(
                         "Players:",
-                        options=other_player_options,
-                        key="receive_players",
-                        help="Select multiple players to receive"
+                        player_display_to_id,
+                        other_roster_df,
+                        "receive_players",
+                        help_text="Type to search and select multiple players to receive"
                     )
 
-                    receive_pick_input = st.text_area(
-                        "Draft Picks (comma-separated):",
-                        placeholder="Examples:\n2026 1.01, 2026 2.08\n2027 1st (late), 2027 2nd\n2028 1.05 (from Team X)",
-                        height=100,
-                        key="receive_picks",
-                        help="Enter picks separated by commas. Formats: '2026 1.01', '2027 1st (early)', '2026 2.05'"
+                    receive_pick_input = render_searchable_pick_input(
+                        "Draft Picks",
+                        pick_options,
+                        "receive_picks",
+                        help_text="Type to search picks. Click suggestions to add. Formats: '2026 1.01', '2027 Early 1st'"
                     )
 
                     # FAAB input for Side B
