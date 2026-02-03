@@ -411,62 +411,174 @@ def suggest_trades(your_roster: pd.DataFrame, all_rosters: Dict[str, pd.DataFram
     suggestions.sort(key=lambda x: x['your_gain'], reverse=True)
     return suggestions[:5]
 
-def get_pick_value(pick_description: str) -> float:
+def get_pick_value(pick_description: str, is_superflex: bool = False) -> tuple:
     """
-    Calculate dynasty draft pick value.
-    Values are approximate and can be customized based on your league.
-    You can also integrate KeepTradeCut (KTC) API for dynamic values if available.
+    Calculate dynasty draft pick value based on exact slot or general description.
+
+    Values based on FantasyPros consensus for 1QB leagues (add 8% for Superflex).
+    Future years are discounted (2027: 75% of 2026, 2028: 60% of 2026).
+
+    Returns: (value, parsed_description)
+
+    Supported formats:
+    - Exact slots: "2026 1.01", "2026 1.05", "2027 2.03"
+    - General: "2026 1st (Early)", "2026 2nd", "2027 3rd"
+    - With notes: "2026 1.01 (from Team X)", "2026 1st mid"
+
+    Can be customized or replaced with KeepTradeCut (KTC) API for real-time values.
     """
-    pick_values = {
-        # 2026 picks
-        '2026 1st (Early)': 3500,
-        '2026 1st (Mid)': 3000,
-        '2026 1st (Late)': 2500,
-        '2026 1st': 3000,  # Default mid-value
-        '2026 2nd (Early)': 1500,
-        '2026 2nd (Mid)': 1200,
-        '2026 2nd (Late)': 1000,
-        '2026 2nd': 1200,
-        '2026 3rd': 500,
-        '2026 4th': 200,
+    import re
 
-        # 2027 picks (slightly discounted)
-        '2027 1st (Early)': 3200,
-        '2027 1st (Mid)': 2700,
-        '2027 1st (Late)': 2200,
-        '2027 1st': 2700,
-        '2027 2nd (Early)': 1300,
-        '2027 2nd (Mid)': 1000,
-        '2027 2nd (Late)': 800,
-        '2027 2nd': 1000,
-        '2027 3rd': 400,
-        '2027 4th': 150,
+    pick_description = pick_description.strip()
 
-        # 2028 picks (more discounted)
-        '2028 1st (Early)': 2900,
-        '2028 1st (Mid)': 2400,
-        '2028 1st (Late)': 2000,
-        '2028 1st': 2400,
-        '2028 2nd (Early)': 1100,
-        '2028 2nd (Mid)': 900,
-        '2028 2nd (Late)': 700,
-        '2028 2nd': 900,
-        '2028 3rd': 350,
-        '2028 4th': 100,
+    # Base values for 2026 1QB (12-team league)
+    # 1st round picks (1.01 through 1.12)
+    first_round_2026_1qb = {
+        1: 6800,  2: 5800,  3: 5600,  4: 5400,
+        5: 5200,  6: 5000,  7: 4800,  8: 4600,
+        9: 4400, 10: 4200, 11: 4000, 12: 3800
     }
 
-    return pick_values.get(pick_description, 0)
+    # 2nd round picks (2.01 through 2.12)
+    second_round_2026_1qb = {
+        1: 3500,  2: 3300,  3: 3100,  4: 2900,
+        5: 2700,  6: 2500,  7: 2300,  8: 2100,
+        9: 1900, 10: 1700, 11: 1500, 12: 1300
+    }
+
+    # 3rd round picks (less granular)
+    third_round_2026_1qb = {
+        1: 1100,  2: 1000,  3: 900,   4: 800,
+        5: 700,   6: 600,   7: 500,   8: 450,
+        9: 400,  10: 350,  11: 300,  12: 250
+    }
+
+    # 4th+ rounds
+    fourth_round_2026_1qb = 150
+
+    # Superflex multiplier
+    sf_multiplier = 1.08 if is_superflex else 1.0
+
+    # Future year discounts
+    year_discounts = {
+        '2026': 1.0,
+        '2027': 0.75,  # 25% discount for next year
+        '2028': 0.60,  # 40% discount for 2 years out
+        '2029': 0.50,  # 50% discount for 3 years out
+    }
+
+    # Try to parse exact slot format (e.g., "2026 1.01", "2027 2.05")
+    slot_pattern = r'(\d{4})\s*(\d)\.(\d{1,2})'
+    slot_match = re.search(slot_pattern, pick_description)
+
+    if slot_match:
+        year = slot_match.group(1)
+        round_num = int(slot_match.group(2))
+        slot = int(slot_match.group(3))
+
+        discount = year_discounts.get(year, 0.50)
+
+        # Get base value from 2026 values
+        if round_num == 1 and 1 <= slot <= 12:
+            base_value = first_round_2026_1qb.get(slot, 4000)
+        elif round_num == 2 and 1 <= slot <= 12:
+            base_value = second_round_2026_1qb.get(slot, 2000)
+        elif round_num == 3 and 1 <= slot <= 12:
+            base_value = third_round_2026_1qb.get(slot, 500)
+        elif round_num == 4:
+            base_value = fourth_round_2026_1qb
+        else:
+            base_value = 100  # Very late picks
+
+        final_value = base_value * discount * sf_multiplier
+        parsed_desc = f"{year} {round_num}.{slot:02d}"
+        return (final_value, parsed_desc)
+
+    # Parse general format (e.g., "2026 1st", "2027 2nd (Early)")
+    general_pattern = r'(\d{4})\s*(\d)(?:st|nd|rd|th)?'
+    general_match = re.search(general_pattern, pick_description)
+
+    if general_match:
+        year = general_match.group(1)
+        round_num = int(general_match.group(2))
+
+        discount = year_discounts.get(year, 0.50)
+
+        # Check for Early/Mid/Late modifier
+        desc_lower = pick_description.lower()
+        if 'early' in desc_lower or 'top' in desc_lower:
+            slot_modifier = 'Early'
+            if round_num == 1:
+                base_value = first_round_2026_1qb[3]  # Pick 1.03
+            elif round_num == 2:
+                base_value = second_round_2026_1qb[3]
+            elif round_num == 3:
+                base_value = third_round_2026_1qb[3]
+            else:
+                base_value = fourth_round_2026_1qb
+        elif 'late' in desc_lower or 'bottom' in desc_lower:
+            slot_modifier = 'Late'
+            if round_num == 1:
+                base_value = first_round_2026_1qb[10]  # Pick 1.10
+            elif round_num == 2:
+                base_value = second_round_2026_1qb[10]
+            elif round_num == 3:
+                base_value = third_round_2026_1qb[10]
+            else:
+                base_value = fourth_round_2026_1qb
+        else:
+            slot_modifier = 'Mid'
+            if round_num == 1:
+                base_value = first_round_2026_1qb[6]  # Pick 1.06
+            elif round_num == 2:
+                base_value = second_round_2026_1qb[6]
+            elif round_num == 3:
+                base_value = third_round_2026_1qb[6]
+            else:
+                base_value = fourth_round_2026_1qb
+
+        final_value = base_value * discount * sf_multiplier
+        parsed_desc = f"{year} {round_num}{['st','nd','rd','th'][min(round_num-1,3)]} ({slot_modifier})"
+        return (final_value, parsed_desc)
+
+    # Fallback: return 0 for unparseable picks
+    return (0, pick_description)
+
+
+def parse_pick_input(pick_string: str, is_superflex: bool = False) -> List[Dict]:
+    """
+    Parse comma-separated pick descriptions into structured data.
+
+    Example input: "2026 1.01, 2026 2.08, 2027 1st (late)"
+    Returns: [{'description': '2026 1.01', 'value': 6800, 'parsed': '2026 1.01'}, ...]
+    """
+    if not pick_string or not pick_string.strip():
+        return []
+
+    picks = []
+    pick_list = [p.strip() for p in pick_string.split(',') if p.strip()]
+
+    for pick_desc in pick_list:
+        value, parsed = get_pick_value(pick_desc, is_superflex)
+        if value > 0:
+            picks.append({
+                'description': pick_desc,
+                'parsed': parsed,
+                'value': value
+            })
+
+    return picks
 
 def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
-                         give_picks: List[str], receive_picks: List[str]) -> Dict:
+                         give_picks: List[Dict], receive_picks: List[Dict]) -> Dict:
     """Evaluate a manually entered trade including players and draft picks."""
     # Calculate player values
     give_player_total = sum(p['value'] for p in give_players)
     receive_player_total = sum(p['value'] for p in receive_players)
 
-    # Calculate pick values
-    give_pick_total = sum(get_pick_value(pick) for pick in give_picks)
-    receive_pick_total = sum(get_pick_value(pick) for pick in receive_picks)
+    # Calculate pick values (picks are now parsed dicts with 'value' key)
+    give_pick_total = sum(p['value'] for p in give_picks)
+    receive_pick_total = sum(p['value'] for p in receive_picks)
 
     # Total values
     give_total = give_player_total + give_pick_total
@@ -498,7 +610,9 @@ def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
         'receive_pick_total': receive_pick_total,
         'receive_total': receive_total,
         'difference': difference,
-        'percentage_diff': percentage_diff
+        'percentage_diff': percentage_diff,
+        'give_picks': give_picks,
+        'receive_picks': receive_picks
     }
 
 def main():
@@ -736,26 +850,37 @@ def main():
 
         # Manual trade analyzer
         st.header("🔍 Dynasty Trade Analyzer")
-        st.markdown("Analyze multi-player trades with draft picks included")
+        st.markdown("Analyze multi-player trades with exact draft pick values")
+
+        # League format setting
+        is_superflex = st.checkbox("Superflex League", value=False, help="Check if your league is Superflex (adds 8% to pick values)")
+
+        # Pick format guide
+        with st.expander("📖 Draft Pick Format Guide", expanded=False):
+            st.markdown("""
+            **Supported Pick Formats:**
+            - **Exact Slots**: `2026 1.01`, `2026 1.05`, `2027 2.08`
+            - **General (Early/Mid/Late)**: `2026 1st (early)`, `2027 2nd (late)`, `2026 1st`
+            - **With Notes**: `2026 1.01 (from Team X)`, `2027 1st mid (acquired)`
+
+            **Examples:**
+            - `2026 1.01, 2026 2.08` - Two exact picks
+            - `2027 1st (early), 2027 3rd` - Mixed formats
+            - `2026 1.05, 2027 1st (late from Team X)` - With team notes
+
+            **Pick Values (2026 1QB):**
+            - 1.01: 6800 pts | 1.06: 5000 pts | 1.12: 3800 pts
+            - 2.01: 3500 pts | 2.06: 2500 pts | 2.12: 1300 pts
+            - 3.01: 1100 pts | 3.06: 600 pts | 3.12: 250 pts
+            - Future years discounted: 2027 (75%), 2028 (60%)
+            """)
+            st.caption("💡 Tip: Values based on 12-team dynasty consensus. Adjust estimates if your league differs.")
 
         # Prepare player options with detailed info
         your_player_options = []
         for _, player in your_roster_df.iterrows():
             option = f"{player['Name']} ({player['Position']}, {player['Team']}, Age {player['Age']}) - {player['AdjustedValue']:.0f} pts"
             your_player_options.append(option)
-
-        # Available draft picks
-        available_picks = [
-            '2026 1st (Early)', '2026 1st (Mid)', '2026 1st (Late)', '2026 1st',
-            '2026 2nd (Early)', '2026 2nd (Mid)', '2026 2nd (Late)', '2026 2nd',
-            '2026 3rd', '2026 4th',
-            '2027 1st (Early)', '2027 1st (Mid)', '2027 1st (Late)', '2027 1st',
-            '2027 2nd (Early)', '2027 2nd (Mid)', '2027 2nd (Late)', '2027 2nd',
-            '2027 3rd', '2027 4th',
-            '2028 1st (Early)', '2028 1st (Mid)', '2028 1st (Late)', '2028 1st',
-            '2028 2nd (Early)', '2028 2nd (Mid)', '2028 2nd (Late)', '2028 2nd',
-            '2028 3rd', '2028 4th',
-        ]
 
         # Select trading partner
         other_teams = [t for t in all_rosters_df.keys() if t != your_team]
@@ -782,23 +907,34 @@ def main():
                         help="Select multiple players to trade away"
                     )
 
-                    give_pick_selections = st.multiselect(
-                        "Draft Picks:",
-                        options=available_picks,
+                    give_pick_input = st.text_area(
+                        "Draft Picks (comma-separated):",
+                        placeholder="Examples:\n2026 1.01, 2026 2.08\n2027 1st (late), 2027 2nd\n2028 1.05 (from Team X)",
+                        height=100,
                         key="give_picks",
-                        help="Select draft picks to trade away"
+                        help="Enter picks separated by commas. Formats: '2026 1.01', '2027 1st (early)', '2026 2.05'"
                     )
 
                     # Show current side A value
-                    if give_player_selections or give_pick_selections:
+                    if give_player_selections or give_pick_input:
                         temp_give_value = 0
+                        temp_give_picks = []
+
                         for sel in give_player_selections:
                             player_name = sel.split(' (')[0]
                             player = your_roster_df[your_roster_df['Name'] == player_name].iloc[0]
                             temp_give_value += player['AdjustedValue']
-                        for pick in give_pick_selections:
-                            temp_give_value += get_pick_value(pick)
+
+                        if give_pick_input:
+                            temp_give_picks = parse_pick_input(give_pick_input, is_superflex)
+                            temp_give_value += sum(p['value'] for p in temp_give_picks)
+
                         st.info(f"Total Value: {temp_give_value:.0f} pts")
+
+                        if temp_give_picks:
+                            st.caption(f"Parsed {len(temp_give_picks)} pick(s):")
+                            for pick in temp_give_picks:
+                                st.caption(f"  • {pick['parsed']}: {pick['value']:.0f} pts")
 
                 with col2:
                     st.subheader(f"📥 {selected_team} Gives")
@@ -810,28 +946,39 @@ def main():
                         help="Select multiple players to receive"
                     )
 
-                    receive_pick_selections = st.multiselect(
-                        "Draft Picks:",
-                        options=available_picks,
+                    receive_pick_input = st.text_area(
+                        "Draft Picks (comma-separated):",
+                        placeholder="Examples:\n2026 1.01, 2026 2.08\n2027 1st (late), 2027 2nd\n2028 1.05 (from Team X)",
+                        height=100,
                         key="receive_picks",
-                        help="Select draft picks to receive"
+                        help="Enter picks separated by commas. Formats: '2026 1.01', '2027 1st (early)', '2026 2.05'"
                     )
 
                     # Show current side B value
-                    if receive_player_selections or receive_pick_selections:
+                    if receive_player_selections or receive_pick_input:
                         temp_receive_value = 0
+                        temp_receive_picks = []
+
                         for sel in receive_player_selections:
                             player_name = sel.split(' (')[0]
                             player = other_roster_df[other_roster_df['Name'] == player_name].iloc[0]
                             temp_receive_value += player['AdjustedValue']
-                        for pick in receive_pick_selections:
-                            temp_receive_value += get_pick_value(pick)
+
+                        if receive_pick_input:
+                            temp_receive_picks = parse_pick_input(receive_pick_input, is_superflex)
+                            temp_receive_value += sum(p['value'] for p in temp_receive_picks)
+
                         st.info(f"Total Value: {temp_receive_value:.0f} pts")
+
+                        if temp_receive_picks:
+                            st.caption(f"Parsed {len(temp_receive_picks)} pick(s):")
+                            for pick in temp_receive_picks:
+                                st.caption(f"  • {pick['parsed']}: {pick['value']:.0f} pts")
 
                 # Analyze button
                 st.markdown("---")
                 if st.button("🔍 Analyze Trade", type="primary", use_container_width=True):
-                    if (give_player_selections or give_pick_selections) and (receive_player_selections or receive_pick_selections):
+                    if (give_player_selections or give_pick_input) and (receive_player_selections or receive_pick_input):
                         # Parse player values from selections
                         give_data = []
                         for sel in give_player_selections:
@@ -857,12 +1004,16 @@ def main():
                                 'value': player['AdjustedValue']
                             })
 
+                        # Parse draft picks
+                        give_picks_parsed = parse_pick_input(give_pick_input, is_superflex)
+                        receive_picks_parsed = parse_pick_input(receive_pick_input, is_superflex)
+
                         # Evaluate trade
                         evaluation = evaluate_manual_trade(
                             give_data,
                             receive_data,
-                            give_pick_selections,
-                            receive_pick_selections
+                            give_picks_parsed,
+                            receive_picks_parsed
                         )
 
                         # Display results
@@ -896,10 +1047,10 @@ def main():
                                     st.write(f"• {player['name']} ({player['position']}, {player['team']}) - {player['value']:.0f} pts")
                                 st.write(f"**Players Total:** {evaluation['give_player_total']:.0f} pts")
 
-                            if give_pick_selections:
+                            if give_picks_parsed:
                                 st.markdown("*Draft Picks:*")
-                                for pick in give_pick_selections:
-                                    st.write(f"• {pick} - {get_pick_value(pick):.0f} pts")
+                                for pick in give_picks_parsed:
+                                    st.write(f"• {pick['parsed']} - {pick['value']:.0f} pts")
                                 st.write(f"**Picks Total:** {evaluation['give_pick_total']:.0f} pts")
 
                         with detail_col2:
@@ -911,24 +1062,40 @@ def main():
                                     st.write(f"• {player['name']} ({player['position']}, {player['team']}) - {player['value']:.0f} pts")
                                 st.write(f"**Players Total:** {evaluation['receive_player_total']:.0f} pts")
 
-                            if receive_pick_selections:
+                            if receive_picks_parsed:
                                 st.markdown("*Draft Picks:*")
-                                for pick in receive_pick_selections:
-                                    st.write(f"• {pick} - {get_pick_value(pick):.0f} pts")
+                                for pick in receive_picks_parsed:
+                                    st.write(f"• {pick['parsed']} - {pick['value']:.0f} pts")
                                 st.write(f"**Picks Total:** {evaluation['receive_pick_total']:.0f} pts")
 
                         # Recommendation
                         st.markdown("---")
+
+                        # Build trade summary with key assets
+                        trade_summary_parts = []
+                        if give_picks_parsed:
+                            key_give_picks = [p['parsed'] for p in sorted(give_picks_parsed, key=lambda x: x['value'], reverse=True)[:2]]
+                            if key_give_picks:
+                                trade_summary_parts.append(f"giving up {', '.join(key_give_picks)}")
+                        if receive_picks_parsed:
+                            key_receive_picks = [p['parsed'] for p in sorted(receive_picks_parsed, key=lambda x: x['value'], reverse=True)[:2]]
+                            if key_receive_picks:
+                                trade_summary_parts.append(f"receiving {', '.join(key_receive_picks)}")
+
+                        trade_summary = ""
+                        if trade_summary_parts:
+                            trade_summary = f" (including {' and '.join(trade_summary_parts)})"
+
                         if evaluation['percentage_diff'] > 10:
-                            st.success("💰 This trade significantly favors you! Strong opportunity to upgrade your roster.")
+                            st.success(f"💰 This trade significantly favors you{trade_summary}! Strong opportunity to upgrade your roster with a net gain of {evaluation['difference']:.0f} points.")
                         elif evaluation['percentage_diff'] > 5:
-                            st.success("👍 This trade favors you slightly. Good deal if it fills a positional need.")
+                            st.success(f"👍 This trade favors you slightly{trade_summary}. Good deal if it fills a positional need. Net gain: {evaluation['difference']:.0f} points.")
                         elif abs(evaluation['percentage_diff']) <= 5:
-                            st.info("⚖️ This is a balanced trade. Consider your positional needs and roster construction.")
+                            st.info(f"⚖️ This is a balanced trade{trade_summary}. Consider your positional needs and roster construction. Value difference: {abs(evaluation['difference']):.0f} points.")
                         elif evaluation['percentage_diff'] < -10:
-                            st.error("⚠️ This trade is unfavorable for you. Consider negotiating or adding assets to your side.")
+                            st.error(f"⚠️ This trade is unfavorable for you{trade_summary}. Consider negotiating or adding assets to your side. Net loss: {abs(evaluation['difference']):.0f} points.")
                         else:
-                            st.warning("📊 This trade slightly favors the other team. Negotiate if possible.")
+                            st.warning(f"📊 This trade slightly favors the other team{trade_summary}. Negotiate if possible. Net loss: {abs(evaluation['difference']):.0f} points.")
 
                     else:
                         st.warning("⚠️ Please select at least one player or pick for each side of the trade.")
