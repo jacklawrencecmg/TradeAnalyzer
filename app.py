@@ -201,6 +201,117 @@ def render_searchable_player_multiselect(
 
     return selections
 
+@st.cache_data(ttl=1800)
+def calculate_league_rankings(
+    all_rosters_df: Dict,
+    traded_picks: List[Dict],
+    league_rosters: List[Dict],
+    league_users: List[Dict],
+    league_details: Dict,
+    is_superflex: bool = False
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """
+    Calculate league-wide team rankings based on player values and picks.
+    Returns: (players_only_df, players_plus_picks_df)
+    """
+    if not all_rosters_df:
+        return pd.DataFrame(), pd.DataFrame()
+
+    current_season = int(league_details.get('season', datetime.now().year)) if league_details else datetime.now().year
+    num_rounds = league_details.get('settings', {}).get('draft_rounds', 5) if league_details else 5
+
+    user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
+                for user in league_users} if league_users else {}
+    roster_to_user = {roster['roster_id']: roster['owner_id'] for roster in league_rosters} if league_rosters else {}
+
+    roster_id_to_team = {}
+    for roster in league_rosters:
+        owner_id = roster.get('owner_id')
+        team_name = user_map.get(owner_id, f"Team {roster.get('roster_id', '?')}")
+        roster_id_to_team[roster['roster_id']] = team_name
+
+    rankings_data = []
+
+    for team_name, roster_df in all_rosters_df.items():
+        total_player_value = roster_df['AdjustedValue'].sum()
+
+        top_players = roster_df.nlargest(5, 'AdjustedValue')[['Name', 'Position', 'AdjustedValue']].to_dict('records')
+        top_players_str = ", ".join([f"{p['Name']} ({p['Position']}) {p['AdjustedValue']:.0f}"
+                                     for p in top_players[:3]])
+
+        team_roster_id = None
+        for roster_id, name in roster_id_to_team.items():
+            if name == team_name:
+                team_roster_id = roster_id
+                break
+
+        total_pick_value = 0
+        future_picks = []
+
+        if team_roster_id and traded_picks:
+            for future_year in range(current_season + 1, current_season + 4):
+                for round_num in range(1, num_rounds + 1):
+                    owned_by_team = False
+                    original_owner_name = None
+
+                    pick_traded_away = False
+                    for traded_pick in traded_picks:
+                        if (str(traded_pick.get('season')) == str(future_year) and
+                            traded_pick.get('round') == round_num and
+                            traded_pick.get('roster_id') == team_roster_id):
+                            pick_traded_away = True
+                            break
+
+                    if not pick_traded_away:
+                        owned_by_team = True
+                        original_owner_name = "Own"
+
+                    for traded_pick in traded_picks:
+                        if (str(traded_pick.get('season')) == str(future_year) and
+                            traded_pick.get('round') == round_num and
+                            traded_pick.get('owner_id') == team_roster_id):
+                            owned_by_team = True
+                            original_roster_id = traded_pick.get('roster_id')
+                            original_owner_name = roster_id_to_team.get(original_roster_id, f"Team {original_roster_id}")
+                            break
+
+                    if owned_by_team:
+                        pick_str = f"{future_year} {round_num}.06"
+                        pick_value, _ = get_pick_value(pick_str, is_superflex)
+                        total_pick_value += pick_value
+
+                        round_suffix = {1: '1st', 2: '2nd', 3: '3rd'}.get(round_num, f'{round_num}th')
+                        pick_desc = f"{future_year} {round_suffix}"
+                        if original_owner_name and original_owner_name != "Own":
+                            pick_desc += f" (from {original_owner_name})"
+                        future_picks.append(pick_desc)
+
+        future_picks_str = ", ".join(future_picks) if future_picks else "None"
+
+        rankings_data.append({
+            'Team': team_name,
+            'Player Value': total_player_value,
+            'Pick Value': total_pick_value,
+            'Total Value': total_player_value + total_pick_value,
+            'Top Players': top_players_str,
+            'Future Picks': future_picks_str,
+            'Pick Count': len(future_picks)
+        })
+
+    rankings_df = pd.DataFrame(rankings_data)
+
+    players_only_df = rankings_df[['Team', 'Player Value', 'Top Players']].copy()
+    players_only_df['Rank'] = players_only_df['Player Value'].rank(ascending=False, method='min').astype(int)
+    players_only_df = players_only_df.sort_values('Player Value', ascending=False).reset_index(drop=True)
+    players_only_df = players_only_df[['Rank', 'Team', 'Player Value', 'Top Players']]
+
+    players_plus_picks_df = rankings_df[['Team', 'Total Value', 'Player Value', 'Pick Value', 'Future Picks', 'Pick Count']].copy()
+    players_plus_picks_df['Rank'] = players_plus_picks_df['Total Value'].rank(ascending=False, method='min').astype(int)
+    players_plus_picks_df = players_plus_picks_df.sort_values('Total Value', ascending=False).reset_index(drop=True)
+    players_plus_picks_df = players_plus_picks_df[['Rank', 'Team', 'Total Value', 'Player Value', 'Pick Value', 'Future Picks', 'Pick Count']]
+
+    return players_only_df, players_plus_picks_df
+
 def render_searchable_pick_input(
     label: str,
     pick_options: List[str],
@@ -2372,7 +2483,149 @@ def main():
         ).properties(height=300)
         st.altair_chart(chart, use_container_width=True)
 
+        # League Rankings Section
+        st.markdown("---")
+        st.header("🏆 League-Wide Team Rankings")
+        st.caption("Rankings based on SportsDataIO projections with custom adjustments for age, scoring, and league format")
+
+        with st.spinner("Calculating league rankings..."):
+            players_only_df, players_plus_picks_df = calculate_league_rankings(
+                all_rosters_df,
+                traded_picks,
+                league_rosters,
+                league_users,
+                league_details,
+                is_superflex
+            )
+
+        if not players_only_df.empty and not players_plus_picks_df.empty:
+            ranking_subtab1, ranking_subtab2 = st.tabs([
+                "👥 Players Only",
+                "👥+🎯 Players + Picks"
+            ])
+
+            with ranking_subtab1:
+                st.markdown("##### Team Rankings by Player Value")
+                st.caption("Total roster value based on adjusted projections, VORP, age, and scoring format")
+
+                for idx, row in players_only_df.iterrows():
+                    is_your_team = row['Team'] == your_team
+                    team_display = f"**{row['Team']}**" if is_your_team else row['Team']
+                    emoji = "🏆" if row['Rank'] == 1 else "🥈" if row['Rank'] == 2 else "🥉" if row['Rank'] == 3 else "📊"
+
+                    with st.expander(f"{emoji} #{row['Rank']} - {team_display} - {row['Player Value']:.0f} pts", expanded=is_your_team):
+                        st.write(f"**Total Player Value:** {row['Player Value']:,.0f} points")
+                        st.write(f"**Top Players:** {row['Top Players']}")
+
+                st.markdown("---")
+                st.markdown("##### Visual Comparison")
+
+                chart_data = players_only_df.copy()
+                chart_data['Color'] = chart_data['Team'].apply(lambda x: '#1f77b4' if x == your_team else '#aec7e8')
+
+                chart = alt.Chart(chart_data).mark_bar().encode(
+                    x=alt.X('Player Value:Q', title='Total Player Value (pts)'),
+                    y=alt.Y('Team:N', sort='-x', title='Team'),
+                    color=alt.Color('Color:N', scale=None, legend=None),
+                    tooltip=['Team', alt.Tooltip('Player Value:Q', format=',.0f')]
+                ).properties(height=400)
+
+                st.altair_chart(chart, use_container_width=True)
+
+                st.dataframe(
+                    players_only_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        'Rank': st.column_config.NumberColumn('Rank', format='#%d'),
+                        'Player Value': st.column_config.NumberColumn('Player Value', format='%,.0f pts')
+                    }
+                )
+
+            with ranking_subtab2:
+                st.markdown("##### Team Rankings by Total Value (Players + Future Picks)")
+                st.caption("Complete roster value including future draft picks. Pick values estimated from slot position.")
+
+                for idx, row in players_plus_picks_df.iterrows():
+                    is_your_team = row['Team'] == your_team
+                    team_display = f"**{row['Team']}**" if is_your_team else row['Team']
+                    emoji = "🏆" if row['Rank'] == 1 else "🥈" if row['Rank'] == 2 else "🥉" if row['Rank'] == 3 else "📊"
+
+                    with st.expander(f"{emoji} #{row['Rank']} - {team_display} - {row['Total Value']:.0f} pts", expanded=is_your_team):
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+                            st.metric("Total Value", f"{row['Total Value']:,.0f} pts")
+                            st.metric("Player Value", f"{row['Player Value']:,.0f} pts")
+
+                        with col2:
+                            st.metric("Pick Value", f"{row['Pick Value']:,.0f} pts")
+                            st.metric("Future Picks", f"{row['Pick Count']} picks")
+
+                        st.write(f"**Future Picks:** {row['Future Picks']}")
+
+                st.markdown("---")
+                st.markdown("##### Visual Comparison")
+
+                chart_data = players_plus_picks_df.copy()
+                chart_data['Your Team'] = chart_data['Team'].apply(lambda x: 'Your Team' if x == your_team else 'Other Teams')
+
+                chart = alt.Chart(chart_data).mark_bar().encode(
+                    x=alt.X('Total Value:Q', title='Total Value (pts)'),
+                    y=alt.Y('Team:N', sort='-x', title='Team'),
+                    color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#1f77b4', '#aec7e8'])),
+                    tooltip=[
+                        'Team',
+                        alt.Tooltip('Total Value:Q', format=',.0f'),
+                        alt.Tooltip('Player Value:Q', format=',.0f'),
+                        alt.Tooltip('Pick Value:Q', format=',.0f'),
+                        alt.Tooltip('Pick Count:Q', format='d')
+                    ]
+                ).properties(height=400)
+
+                st.altair_chart(chart, use_container_width=True)
+
+                chart_data_stacked = pd.DataFrame()
+                for _, row in players_plus_picks_df.iterrows():
+                    chart_data_stacked = pd.concat([
+                        chart_data_stacked,
+                        pd.DataFrame({
+                            'Team': [row['Team'], row['Team']],
+                            'Value Type': ['Players', 'Picks'],
+                            'Value': [row['Player Value'], row['Pick Value']],
+                            'Your Team': ['Your Team' if row['Team'] == your_team else 'Other Teams'] * 2
+                        })
+                    ])
+
+                stacked_chart = alt.Chart(chart_data_stacked).mark_bar().encode(
+                    x=alt.X('sum(Value):Q', title='Value (pts)', stack='zero'),
+                    y=alt.Y('Team:N', sort=alt.EncodingSortField(field='Value', op='sum', order='descending'), title='Team'),
+                    color=alt.Color('Value Type:N', scale=alt.Scale(domain=['Players', 'Picks'], range=['#2ca02c', '#ff7f0e'])),
+                    tooltip=['Team', 'Value Type', alt.Tooltip('Value:Q', format=',.0f')]
+                ).properties(height=400, title='Team Value Breakdown: Players vs Picks')
+
+                st.altair_chart(stacked_chart, use_container_width=True)
+
+                st.dataframe(
+                    players_plus_picks_df,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        'Rank': st.column_config.NumberColumn('Rank', format='#%d'),
+                        'Total Value': st.column_config.NumberColumn('Total Value', format='%,.0f pts'),
+                        'Player Value': st.column_config.NumberColumn('Player Value', format='%,.0f pts'),
+                        'Pick Value': st.column_config.NumberColumn('Pick Value', format='%,.0f pts'),
+                        'Pick Count': st.column_config.NumberColumn('Pick Count', format='%d picks')
+                    }
+                )
+
+                st.info("💡 **Note:** Pick values are estimated at mid-round (slot .06) for each owned pick. Actual value may vary based on final draft position.")
+
+        else:
+            st.warning("Unable to calculate rankings. Please ensure roster data is loaded.")
+
         # Trade suggestions
+        st.markdown("---")
         st.header("💡 AI Trade Suggestions")
 
         with st.spinner("Analyzing trade opportunities..."):
