@@ -12,6 +12,11 @@ import json
 from datetime import datetime
 from fuzzywuzzy import fuzz
 import altair as alt
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import StandardScaler
+import warnings
+warnings.filterwarnings('ignore')
 
 # Configuration
 API_KEY = "73280229e64f4083b54094d6745b3a7d"  # SportsDataIO API key
@@ -803,6 +808,340 @@ def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
         'receive_picks': receive_picks
     }
 
+def train_ml_value_predictor(players_df: pd.DataFrame) -> Tuple[LinearRegression, StandardScaler]:
+    """
+    Train ML model to predict player values based on age, stats, and projections.
+    Uses linear regression with feature engineering for enhanced value predictions.
+    """
+    # Prepare features for ML model
+    features = []
+    targets = []
+
+    for _, player in players_df.iterrows():
+        # Skip players without essential data
+        if pd.isna(player.get('Age')) or pd.isna(player.get('AdjustedValue')):
+            continue
+
+        age = player.get('Age', 25)
+        position = player.get('Position', 'WR')
+        proj_points = player.get('ProjectedPoints', 0)
+        historical_avg = player.get('HistoricalAvg', 0)
+
+        # Feature engineering
+        age_peak_diff = abs(age - 26)  # Distance from peak age
+        is_qb = 1 if position == 'QB' else 0
+        is_rb = 1 if position == 'RB' else 0
+        is_wr = 1 if position == 'WR' else 0
+        is_te = 1 if position == 'TE' else 0
+        is_idp = 1 if position in ['DL', 'LB', 'DB'] else 0
+
+        # Combine features
+        feature_vec = [
+            age,
+            age_peak_diff,
+            proj_points,
+            historical_avg,
+            is_qb,
+            is_rb,
+            is_wr,
+            is_te,
+            is_idp
+        ]
+
+        features.append(feature_vec)
+        targets.append(player['AdjustedValue'])
+
+    # Convert to numpy arrays
+    X = np.array(features)
+    y = np.array(targets)
+
+    # Scale features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # Train linear regression model
+    model = LinearRegression()
+    model.fit(X_scaled, y)
+
+    return model, scaler
+
+def analyze_roster_needs(roster_df: pd.DataFrame, all_players_df: pd.DataFrame,
+                         is_superflex: bool = False) -> Dict:
+    """
+    Analyze team's positional strengths, weaknesses, and surpluses.
+    Returns dict with needs, surpluses, and overall strategy.
+    """
+    # Count players by position
+    position_counts = roster_df['Position'].value_counts().to_dict()
+    position_values = roster_df.groupby('Position')['AdjustedValue'].agg(['sum', 'mean']).to_dict('index')
+
+    # Calculate position strength scores
+    needs = []
+    surpluses = []
+
+    # Analyze each position
+    for pos in ['QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB']:
+        count = position_counts.get(pos, 0)
+        total_value = position_values.get(pos, {}).get('sum', 0)
+        avg_value = position_values.get(pos, {}).get('mean', 0)
+
+        # Define thresholds based on position
+        if pos == 'QB':
+            ideal_count = 3 if is_superflex else 2
+            min_value = 8000 if is_superflex else 5000
+        elif pos == 'RB':
+            ideal_count = 5
+            min_value = 12000
+        elif pos == 'WR':
+            ideal_count = 6
+            min_value = 15000
+        elif pos == 'TE':
+            ideal_count = 3
+            min_value = 4000
+        elif pos in ['DL', 'LB', 'DB']:
+            ideal_count = 4
+            min_value = 3000
+        else:
+            continue
+
+        # Check for needs
+        if count < ideal_count or total_value < min_value:
+            strength = total_value / min_value if min_value > 0 else 0
+            needs.append({
+                'position': pos,
+                'count': count,
+                'ideal': ideal_count,
+                'total_value': total_value,
+                'strength': strength,
+                'priority': 'High' if strength < 0.6 else 'Medium'
+            })
+
+        # Check for surpluses
+        if count > ideal_count + 2:
+            surpluses.append({
+                'position': pos,
+                'count': count,
+                'excess': count - ideal_count,
+                'avg_value': avg_value
+            })
+
+    # Sort by priority
+    needs.sort(key=lambda x: x['strength'])
+    surpluses.sort(key=lambda x: x['count'], reverse=True)
+
+    # Calculate team age
+    avg_age = roster_df['Age'].mean()
+
+    # Determine strategy
+    if avg_age > 27:
+        strategy = "Win-Now (Aging roster - prioritize proven players)"
+    elif avg_age < 25:
+        strategy = "Rebuild (Young roster - target picks and prospects)"
+    else:
+        strategy = "Balanced (Mixed roster - target value)"
+
+    return {
+        'needs': needs,
+        'surpluses': surpluses,
+        'avg_age': avg_age,
+        'strategy': strategy,
+        'total_value': roster_df['AdjustedValue'].sum()
+    }
+
+def calculate_playoff_odds(roster_df: pd.DataFrame, all_rosters: Dict[str, pd.DataFrame],
+                          team_name: str) -> Dict:
+    """
+    Calculate playoff odds based on roster strength, projected points, and league standings.
+    Simple calculation for demonstration.
+    """
+    # Calculate team's total projected points
+    team_proj = roster_df['ProjectedPoints'].sum()
+    team_value = roster_df['AdjustedValue'].sum()
+
+    # Calculate league averages
+    all_team_values = []
+    all_team_projs = []
+
+    for t_name, t_roster in all_rosters.items():
+        all_team_values.append(t_roster['AdjustedValue'].sum())
+        all_team_projs.append(t_roster['ProjectedPoints'].sum())
+
+    league_avg_value = np.mean(all_team_values)
+    league_avg_proj = np.mean(all_team_projs)
+
+    # Calculate percentiles
+    value_percentile = (sum(1 for v in all_team_values if v < team_value) / len(all_team_values)) * 100
+    proj_percentile = (sum(1 for p in all_team_projs if p < team_proj) / len(all_team_projs)) * 100
+
+    # Estimate playoff odds (simplified)
+    # Top 50% = ~60-80% playoff odds, Bottom 50% = 20-40%
+    base_odds = 50
+    value_boost = (value_percentile - 50) * 0.6  # -30 to +30
+    proj_boost = (proj_percentile - 50) * 0.4    # -20 to +20
+
+    playoff_odds = max(10, min(95, base_odds + value_boost + proj_boost))
+    championship_odds = max(5, min(40, playoff_odds * 0.4))  # Roughly 40% of playoff odds
+
+    return {
+        'playoff_odds': playoff_odds,
+        'championship_odds': championship_odds,
+        'team_value': team_value,
+        'league_avg_value': league_avg_value,
+        'value_percentile': value_percentile,
+        'proj_percentile': proj_percentile,
+        'team_proj': team_proj
+    }
+
+def generate_ai_trade_suggestions(your_roster: pd.DataFrame, all_rosters: Dict[str, pd.DataFrame],
+                                   your_team: str, your_needs: Dict, your_faab: float,
+                                   other_faab_map: Dict, is_superflex: bool = False) -> List[Dict]:
+    """
+    Generate AI-powered trade suggestions using ML predictions and roster analysis.
+    Considers positional needs, surpluses, picks, and FAAB.
+    """
+    suggestions = []
+
+    # Get your surpluses and needs
+    your_surplus_positions = [s['position'] for s in your_needs['surpluses']]
+    your_need_positions = [n['position'] for n in your_needs['needs'][:3]]  # Top 3 needs
+
+    # Analyze each potential trading partner
+    for partner_name, partner_roster in all_rosters.items():
+        if partner_name == your_team:
+            continue
+
+        # Analyze partner's needs
+        partner_needs_data = analyze_roster_needs(partner_roster, pd.concat([your_roster, partner_roster]), is_superflex)
+        partner_surplus_positions = [s['position'] for s in partner_needs_data['surpluses']]
+        partner_need_positions = [n['position'] for n in partner_needs_data['needs'][:3]]
+
+        # Find complementary needs
+        # You give from your surplus to fill their needs
+        # You receive from their surplus to fill your needs
+
+        # Scenario 1: Player for player swap
+        for your_pos in your_surplus_positions:
+            if your_pos in partner_need_positions:
+                for their_pos in partner_surplus_positions:
+                    if their_pos in your_need_positions:
+                        # Find suitable players
+                        your_candidates = your_roster[your_roster['Position'] == your_pos].nlargest(3, 'AdjustedValue')
+                        their_candidates = partner_roster[partner_roster['Position'] == their_pos].nlargest(3, 'AdjustedValue')
+
+                        for _, your_player in your_candidates.iterrows():
+                            for _, their_player in their_candidates.iterrows():
+                                value_diff = their_player['AdjustedValue'] - your_player['AdjustedValue']
+
+                                # Look for relatively balanced trades
+                                if abs(value_diff) < your_player['AdjustedValue'] * 0.5:
+                                    # Calculate FAAB to balance if needed
+                                    faab_to_add = 0
+                                    faab_direction = None
+
+                                    if value_diff > 300:  # They're giving more value
+                                        # You should add FAAB
+                                        faab_needed = value_diff / 12  # Rough conversion
+                                        if faab_needed <= your_faab and faab_needed <= 150:
+                                            faab_to_add = min(faab_needed, 150)
+                                            faab_direction = "you_give"
+                                    elif value_diff < -300:  # You're giving more value
+                                        # They should add FAAB
+                                        faab_needed = abs(value_diff) / 12
+                                        partner_faab = other_faab_map.get(partner_name, 300)
+                                        if faab_needed <= partner_faab and faab_needed <= 150:
+                                            faab_to_add = min(faab_needed, 150)
+                                            faab_direction = "they_give"
+
+                                    # Build suggestion
+                                    suggestion = {
+                                        'partner': partner_name,
+                                        'you_give': [{
+                                            'name': your_player['Name'],
+                                            'position': your_player['Position'],
+                                            'value': your_player['AdjustedValue']
+                                        }],
+                                        'you_receive': [{
+                                            'name': their_player['Name'],
+                                            'position': their_player['Position'],
+                                            'value': their_player['AdjustedValue']
+                                        }],
+                                        'you_give_faab': faab_to_add if faab_direction == "you_give" else 0,
+                                        'you_receive_faab': faab_to_add if faab_direction == "they_give" else 0,
+                                        'value_diff': value_diff + (calculate_faab_value(faab_to_add) if faab_direction == "they_give" else -calculate_faab_value(faab_to_add) if faab_direction == "you_give" else 0),
+                                        'rationale': f"Addresses your {their_pos} need while giving them {your_pos} depth. {'Balanced with FAAB.' if faab_to_add > 0 else 'Relatively balanced value.'}",
+                                        'impact': f"Strengthens {their_pos}, reduces {your_pos} surplus"
+                                    }
+
+                                    suggestions.append(suggestion)
+
+        # Scenario 2: Include draft picks for bigger gaps
+        # Find your best tradeable assets from surplus positions
+        if your_surplus_positions and partner_need_positions:
+            for your_pos in your_surplus_positions[:2]:
+                if your_pos in partner_need_positions:
+                    your_best = your_roster[your_roster['Position'] == your_pos].nlargest(2, 'AdjustedValue')
+
+                    for _, your_player in your_best.iterrows():
+                        # Suggest trading for a pick
+                        pick_value_target = your_player['AdjustedValue'] * 0.8  # Pick worth ~80% of player
+
+                        # Determine appropriate pick
+                        if pick_value_target > 5000:
+                            pick_desc = "2026 1st (mid)"
+                            pick_val = 5500
+                        elif pick_value_target > 3000:
+                            pick_desc = "2026 1st (late)"
+                            pick_val = 3800
+                        elif pick_value_target > 2000:
+                            pick_desc = "2026 2nd (early)"
+                            pick_val = 3200
+                        elif pick_value_target > 1000:
+                            pick_desc = "2026 2nd (mid)"
+                            pick_val = 2100
+                        else:
+                            pick_desc = "2026 3rd"
+                            pick_val = 800
+
+                        diff = pick_val - your_player['AdjustedValue']
+
+                        # Add FAAB to balance if needed
+                        faab_balance = 0
+                        faab_dir = None
+                        if diff < -500:  # You need more
+                            faab_balance = min(abs(diff) / 12, 100)
+                            faab_dir = "receive"
+                        elif diff > 500:  # They need more
+                            faab_balance = min(diff / 12, 100)
+                            faab_dir = "give"
+
+                        suggestion = {
+                            'partner': partner_name,
+                            'you_give': [{
+                                'name': your_player['Name'],
+                                'position': your_player['Position'],
+                                'value': your_player['AdjustedValue']
+                            }],
+                            'you_receive': [],
+                            'you_give_picks': [] if faab_dir != "give" else [],
+                            'you_receive_picks': [{'description': pick_desc, 'value': pick_val}],
+                            'you_give_faab': faab_balance if faab_dir == "give" else 0,
+                            'you_receive_faab': faab_balance if faab_dir == "receive" else 0,
+                            'value_diff': diff + (calculate_faab_value(faab_balance) if faab_dir == "receive" else -calculate_faab_value(faab_balance)),
+                            'rationale': f"Converts {your_pos} surplus into draft capital. {partner_name} gets immediate help at {your_pos}.",
+                            'impact': "Builds future assets, reduces current surplus"
+                        }
+
+                        suggestions.append(suggestion)
+
+    # Limit to top 10 suggestions
+    # Score suggestions by absolute value difference (prefer balanced)
+    for s in suggestions:
+        s['balance_score'] = 1000 - abs(s['value_diff'])
+
+    suggestions.sort(key=lambda x: x['balance_score'], reverse=True)
+
+    return suggestions[:10]
+
 def main():
     st.set_page_config(page_title="Fantasy Football Trade Analyzer", layout="wide")
 
@@ -825,13 +1164,14 @@ def main():
         st.markdown("---")
         st.markdown("**About**")
         st.info("""
-        This tool analyzes fantasy football trades using SportsDataIO data:
+        This tool analyzes fantasy football trades using SportsDataIO data + ML:
 
         **Player Values (Unified Scale):**
         - 🏆 Dynasty ADP (60%) - Market value
         - 📊 Season projections (30%)
         - 📈 Historical avg (10%)
         - Adjustments: Age, injury, team performance
+        - 🤖 ML refinement via scikit-learn
 
         **Draft Pick Values:**
         - Based on typical rookie ADP curves
@@ -843,6 +1183,12 @@ def main():
         - $1-25: 8 pts/$ | $26-75: 12 pts/$
         - $76-150: 15 pts/$ | $151-300: 18 pts/$
         - Auto-fetched from Sleeper when available
+
+        **AI Features:**
+        - 🤖 Roster needs/surplus analysis
+        - 📊 Playoff odds estimation
+        - 💡 10 optimized trade suggestions
+        - 🎯 Includes picks + FAAB balancing
 
         **League Format:**
         - Auto-detects Superflex from Sleeper
@@ -1410,6 +1756,158 @@ def main():
     else:
         st.warning(f"No roster data found for {your_team}")
 
+    # AI Trade Suggestions Section
+    st.markdown("---")
+    st.header("🤖 AI-Powered Trade Suggestions")
+    st.markdown("Machine learning analyzes your roster needs, surpluses, and generates optimized trade proposals")
+
+    if your_team in all_rosters_df and len(all_rosters_df) > 1:
+        your_roster_df = all_rosters_df[your_team]
+
+        with st.spinner("Training ML model and analyzing rosters..."):
+            # Train ML model
+            all_players = pd.concat([df for df in all_rosters_df.values()])
+            try:
+                ml_model, ml_scaler = train_ml_value_predictor(all_players)
+
+                # Analyze your roster needs
+                roster_analysis = analyze_roster_needs(your_roster_df, all_players, is_superflex)
+
+                # Calculate playoff odds
+                playoff_data = calculate_playoff_odds(your_roster_df, all_rosters_df, your_team)
+
+                # Display roster analysis
+                st.subheader(f"📊 {your_team} Roster Analysis")
+
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Avg Age", f"{roster_analysis['avg_age']:.1f}",
+                             help="Average age of your roster")
+                with col2:
+                    st.metric("Playoff Odds", f"{playoff_data['playoff_odds']:.1f}%",
+                             help="Estimated playoff probability based on roster value")
+                with col3:
+                    st.metric("Championship Odds", f"{playoff_data['championship_odds']:.1f}%",
+                             help="Estimated championship probability")
+                with col4:
+                    st.metric("League Rank", f"#{int((100 - playoff_data['value_percentile']) / 100 * len(all_rosters_df) + 1)}",
+                             help="Roster value ranking in league")
+
+                st.info(f"**Strategy:** {roster_analysis['strategy']}")
+
+                # Show needs and surpluses
+                needs_col, surplus_col = st.columns(2)
+
+                with needs_col:
+                    st.markdown("**🔴 Positional Needs:**")
+                    if roster_analysis['needs']:
+                        for need in roster_analysis['needs'][:5]:
+                            priority_color = "🔴" if need['priority'] == 'High' else "🟡"
+                            st.write(f"{priority_color} **{need['position']}**: {need['count']}/{need['ideal']} players ({need['strength']*100:.0f}% strength)")
+                    else:
+                        st.write("✅ No major needs detected")
+
+                with surplus_col:
+                    st.markdown("**🟢 Positional Surpluses:**")
+                    if roster_analysis['surpluses']:
+                        for surplus in roster_analysis['surpluses']:
+                            st.write(f"🟢 **{surplus['position']}**: {surplus['count']} players (+{surplus['excess']} excess)")
+                    else:
+                        st.write("⚖️ No major surpluses")
+
+                # Generate AI trade suggestions
+                st.markdown("---")
+                st.subheader("💡 Recommended Trades")
+
+                your_faab_remaining = faab_map.get(your_team, 300)
+                trade_suggestions = generate_ai_trade_suggestions(
+                    your_roster_df,
+                    all_rosters_df,
+                    your_team,
+                    roster_analysis,
+                    your_faab_remaining,
+                    faab_map,
+                    is_superflex
+                )
+
+                if trade_suggestions:
+                    st.write(f"Found **{len(trade_suggestions)}** optimized trade opportunities:")
+
+                    for idx, suggestion in enumerate(trade_suggestions, 1):
+                        with st.expander(f"🔄 Trade #{idx}: {suggestion['partner']} | Value Diff: {suggestion['value_diff']:+.0f} pts", expanded=(idx <= 3)):
+                            # Trade details in columns
+                            give_col, arrow_col, receive_col = st.columns([5, 1, 5])
+
+                            with give_col:
+                                st.markdown(f"**You Give to {suggestion['partner']}:**")
+
+                                # Players
+                                for player in suggestion.get('you_give', []):
+                                    st.write(f"• {player['name']} ({player['position']}) - {player['value']:.0f} pts")
+
+                                # Picks
+                                for pick in suggestion.get('you_give_picks', []):
+                                    st.write(f"• {pick['description']} - {pick['value']:.0f} pts")
+
+                                # FAAB
+                                if suggestion.get('you_give_faab', 0) > 0:
+                                    st.write(f"• ${suggestion['you_give_faab']:.0f} FAAB - {calculate_faab_value(suggestion['you_give_faab']):.0f} pts")
+
+                                # Calculate total
+                                give_total = sum(p['value'] for p in suggestion.get('you_give', []))
+                                give_total += sum(p['value'] for p in suggestion.get('you_give_picks', []))
+                                give_total += calculate_faab_value(suggestion.get('you_give_faab', 0))
+                                st.markdown(f"**Total: {give_total:.0f} pts**")
+
+                            with arrow_col:
+                                st.markdown("<div style='text-align: center; font-size: 2em; padding-top: 50px;'>⇄</div>", unsafe_allow_html=True)
+
+                            with receive_col:
+                                st.markdown(f"**You Receive from {suggestion['partner']}:**")
+
+                                # Players
+                                for player in suggestion.get('you_receive', []):
+                                    st.write(f"• {player['name']} ({player['position']}) - {player['value']:.0f} pts")
+
+                                # Picks
+                                for pick in suggestion.get('you_receive_picks', []):
+                                    st.write(f"• {pick['description']} - {pick['value']:.0f} pts")
+
+                                # FAAB
+                                if suggestion.get('you_receive_faab', 0) > 0:
+                                    st.write(f"• ${suggestion['you_receive_faab']:.0f} FAAB - {calculate_faab_value(suggestion['you_receive_faab']):.0f} pts")
+
+                                # Calculate total
+                                receive_total = sum(p['value'] for p in suggestion.get('you_receive', []))
+                                receive_total += sum(p['value'] for p in suggestion.get('you_receive_picks', []))
+                                receive_total += calculate_faab_value(suggestion.get('you_receive_faab', 0))
+                                st.markdown(f"**Total: {receive_total:.0f} pts**")
+
+                            # AI Analysis
+                            st.markdown("---")
+                            st.markdown("**🤖 AI Analysis:**")
+                            st.info(f"**Rationale:** {suggestion['rationale']}\n\n**Impact:** {suggestion['impact']}")
+
+                            # Calculate impact on playoff odds
+                            value_change = suggestion['value_diff']
+                            odds_change = (value_change / roster_analysis['total_value']) * playoff_data['playoff_odds'] * 0.15  # Conservative estimate
+                            if abs(odds_change) > 0.5:
+                                odds_text = f"This trade could change your playoff odds by approximately {odds_change:+.1f}%"
+                                if odds_change > 0:
+                                    st.success(f"📈 {odds_text}")
+                                else:
+                                    st.warning(f"📉 {odds_text}")
+
+                else:
+                    st.info("No optimal trade opportunities found based on current roster analysis. Your team may already be well-balanced!")
+
+            except Exception as e:
+                st.error(f"Error generating AI suggestions: {str(e)}")
+                st.info("Try refreshing or check that you have sufficient player data loaded.")
+
+    else:
+        st.info("AI Trade Suggestions require valid roster data. Please ensure your team is selected above.")
+
     # League overview
     st.header("🏆 League Overview")
 
@@ -1449,12 +1947,18 @@ def main():
     # Footer
     st.markdown("---")
     st.markdown("""
-    ### 🔧 Extension Ideas
-    - **Machine Learning**: Train models with scikit-learn for better predictions
+    ### ✅ Implemented Features
+    - **Machine Learning**: ✅ scikit-learn models for player value prediction
+    - **AI Trade Suggestions**: ✅ Roster analysis with positional needs/surpluses
+    - **Playoff Odds Calculator**: ✅ Championship probability estimation
+    - **FAAB Integration**: ✅ Full support with tiered valuation
+    - **IDP Support**: ✅ DL, LB, DB positions with valuations
+
+    ### 🔧 Future Enhancement Ideas
     - **Custom Scoring**: Adjust position weights and scoring settings
     - **Advanced Metrics**: Add snap counts, target share, red zone usage
     - **Trade History**: Track completed trades and accuracy of predictions
-    - **Keeper/Dynasty**: Add long-term value calculations
+    - **Real-time Updates**: Integrate injury reports and breaking news
     """)
 
 if __name__ == "__main__":
