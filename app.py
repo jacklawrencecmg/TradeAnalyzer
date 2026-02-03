@@ -3054,9 +3054,28 @@ def main():
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         }
 
+        /* Ensure all interactive elements are clickable */
+        button, a, input, select, textarea, label, [role="button"], [role="link"] {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+        }
+
+        input[type="text"], input[type="number"], textarea {
+            cursor: text !important;
+        }
+
         /* Main Background */
         .stApp {
             background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-0) 100%);
+        }
+
+        /* Ensure forms are not blocking interactions */
+        form {
+            pointer-events: auto !important;
+        }
+
+        form button, form input, form select, form textarea {
+            pointer-events: auto !important;
         }
 
         /* Main Content Area */
@@ -3118,6 +3137,8 @@ def main():
             border-radius: 12px !important;
             margin: 0.75rem 0 !important;
             transition: all 0.3s ease;
+            cursor: pointer !important;
+            pointer-events: auto !important;
         }
 
         .stExpander:hover {
@@ -3129,10 +3150,12 @@ def main():
         .stExpander summary {
             color: var(--text-1) !important;
             font-weight: 600 !important;
+            cursor: pointer !important;
         }
 
         /* Buttons - Glowing Effect */
-        .stButton > button {
+        .stButton > button,
+        .stFormSubmitButton > button {
             background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%) !important;
             color: white !important;
             font-weight: 600 !important;
@@ -3141,15 +3164,28 @@ def main():
             padding: 0.75rem 2rem !important;
             transition: all 0.3s ease !important;
             box-shadow: 0 4px 15px rgba(60, 190, 220, 0.4);
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            user-select: none !important;
         }
 
-        .stButton > button:hover {
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(60, 190, 220, 0.6);
+            cursor: pointer !important;
         }
 
-        .stButton > button:active {
+        .stButton > button:active,
+        .stFormSubmitButton > button:active {
             transform: translateY(-1px);
+        }
+
+        .stButton > button:disabled,
+        .stFormSubmitButton > button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            transform: none !important;
         }
 
         /* Download Buttons */
@@ -3160,11 +3196,14 @@ def main():
             border: none !important;
             border-radius: 8px !important;
             box-shadow: 0 4px 15px rgba(46, 229, 157, 0.4);
+            cursor: pointer !important;
+            pointer-events: auto !important;
         }
 
         .stDownloadButton > button:hover {
             transform: translateY(-3px);
             box-shadow: 0 8px 25px rgba(46, 229, 157, 0.6);
+            cursor: pointer !important;
         }
 
         /* Input Fields */
@@ -3177,6 +3216,7 @@ def main():
             color: var(--text-1) !important;
             padding: 0.75rem !important;
             transition: all 0.3s ease;
+            cursor: text !important;
         }
 
         .stTextInput > div > div > input:focus,
@@ -3184,6 +3224,7 @@ def main():
         .stTextArea > div > div > textarea:focus {
             border-color: var(--accent-1) !important;
             box-shadow: 0 0 0 1px var(--accent-1), 0 0 20px rgba(60, 190, 220, 0.3) !important;
+            outline: none !important;
         }
 
         /* Select Boxes */
@@ -3191,6 +3232,7 @@ def main():
             background: var(--surface-2) !important;
             border: 1px solid var(--border-1) !important;
             border-radius: 8px !important;
+            cursor: pointer !important;
         }
 
         .stSelectbox > div > div:hover {
@@ -3202,6 +3244,7 @@ def main():
             background: var(--surface-2) !important;
             border: 1px solid var(--border-1) !important;
             border-radius: 8px !important;
+            cursor: pointer !important;
         }
 
         /* DataFrames / Tables */
@@ -3308,11 +3351,14 @@ def main():
             color: var(--text-3) !important;
             font-weight: 600;
             padding: 0.75rem 1.5rem;
+            cursor: pointer !important;
+            pointer-events: auto !important;
         }
 
         .stTabs [data-baseweb="tab"]:hover {
             background: var(--surface-2);
             color: var(--text-2) !important;
+            cursor: pointer !important;
         }
 
         .stTabs [aria-selected="true"] {
@@ -3337,11 +3383,39 @@ def main():
         /* Checkbox & Radio */
         .stCheckbox, .stRadio {
             color: var(--text-2) !important;
+            cursor: pointer !important;
+        }
+
+        .stCheckbox label, .stRadio label {
+            cursor: pointer !important;
+        }
+
+        .stCheckbox input[type="checkbox"],
+        .stRadio input[type="radio"] {
+            cursor: pointer !important;
+        }
+
+        .stRadio > div {
+            cursor: pointer !important;
+        }
+
+        .stRadio [role="radiogroup"] {
+            cursor: pointer !important;
+        }
+
+        .stRadio [role="radio"] {
+            cursor: pointer !important;
+            pointer-events: auto !important;
         }
 
         /* Slider */
         .stSlider > div > div > div > div {
             background: var(--accent-1) !important;
+            cursor: pointer !important;
+        }
+
+        .stSlider {
+            cursor: pointer !important;
         }
 
         /* Caption Text */
@@ -3361,12 +3435,23 @@ def main():
             text-decoration: none !important;
             transition: all 0.3s ease;
             display: inline-block;
+            cursor: pointer !important;
+            pointer-events: auto !important;
         }
 
         .stLinkButton > a:hover {
             border-color: var(--accent-1) !important;
             box-shadow: 0 0 20px rgba(60, 190, 220, 0.4);
             transform: translateY(-2px);
+            cursor: pointer !important;
+        }
+
+        .stLinkButton > a:visited {
+            color: var(--accent-2) !important;
+        }
+
+        .stLinkButton > a:active {
+            transform: translateY(0px);
         }
 
         /* Responsive Design */
