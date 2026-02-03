@@ -27,6 +27,16 @@ from auth_utils import (
     get_current_user, save_trade, get_saved_trades
 )
 
+from sleeper_api import (
+    fetch_league_details, fetch_league_rosters, fetch_league_users,
+    fetch_traded_picks, fetch_league_drafts, fetch_draft_picks,
+    fetch_league_transactions, fetch_league_matchups,
+    get_roster_positions_summary, get_scoring_summary,
+    get_future_picks_inventory, adjust_value_for_league_scoring,
+    get_team_roster_composition, calculate_optimal_starter_count,
+    get_recent_transactions_summary, format_roster_positions, is_superflex_league
+)
+
 # Configuration
 API_KEY = "73280229e64f4083b54094d6745b3a7d"  # SportsDataIO API key
 BASE_URL = "https://api.sportsdata.io/v3/nfl"
@@ -1731,11 +1741,19 @@ def main():
 
         return
 
-    # Fetch league data
-    with st.spinner("Loading league data..."):
+    # Fetch comprehensive league data
+    with st.spinner("Loading comprehensive league data..."):
+        # Core league data
         users = fetch_sleeper_users(league_id)
         rosters = fetch_sleeper_rosters(league_id)
         sleeper_players = fetch_sleeper_players()
+
+        # Comprehensive Sleeper data
+        league_details = fetch_league_details(league_id)
+        league_rosters = fetch_league_rosters(league_id)
+        league_users = fetch_league_users(league_id)
+        traded_picks = fetch_traded_picks(league_id)
+        league_drafts = fetch_league_drafts(league_id)
 
         if not all([users, rosters, sleeper_players]):
             st.error("Failed to load league data. Please check your League ID.")
@@ -1797,18 +1815,8 @@ def main():
                 if player_id and adp_value:
                     dynasty_adp_map[player_id] = adp_value
 
-        # Detect league format (superflex check)
-        # Sleeper league settings include roster_positions which shows QB slots
-        is_superflex = False
-        if rosters:
-            # Check if any roster has superflex settings
-            first_roster = rosters[0]
-            league_info_response = requests.get(f"https://api.sleeper.app/v1/league/{league_id}")
-            if league_info_response.status_code == 200:
-                league_settings = league_info_response.json()
-                roster_positions = league_settings.get('roster_positions', [])
-                # Superflex leagues have "SUPER_FLEX" position
-                is_superflex = 'SUPER_FLEX' in roster_positions or roster_positions.count('QB') > 1
+        # Detect league format (superflex check) using comprehensive league data
+        is_superflex = is_superflex_league(league_details) if league_details else False
 
     # Map rosters to owners (including FAAB)
     user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
@@ -1830,6 +1838,156 @@ def main():
     # Team selection
     st.header("👥 Select Your Team")
     your_team = st.selectbox("Choose your team:", list(roster_map.keys()))
+
+    # League Overview Section
+    st.markdown("---")
+    st.header("📋 League Overview")
+
+    if league_details:
+        overview_tab1, overview_tab2, overview_tab3, overview_tab4 = st.tabs([
+            "⚙️ League Settings",
+            "📊 Scoring",
+            "🎯 Future Picks",
+            "📈 Recent Activity"
+        ])
+
+        with overview_tab1:
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                league_name = league_details.get('name', 'Unknown League')
+                st.metric("League Name", league_name)
+
+            with col2:
+                season = league_details.get('season', 'N/A')
+                st.metric("Season", season)
+
+            with col3:
+                num_teams = len(league_rosters) if league_rosters else len(rosters)
+                st.metric("Teams", num_teams)
+
+            with col4:
+                league_status = league_details.get('status', 'unknown')
+                st.metric("Status", league_status.title())
+
+            st.markdown("#### Roster Configuration")
+            roster_format = format_roster_positions(league_details)
+            st.info(f"**Starters & Bench:** {roster_format}")
+
+            st.markdown("#### League Settings")
+            settings = league_details.get('settings', {})
+            settings_col1, settings_col2, settings_col3 = st.columns(3)
+
+            with settings_col1:
+                waiver_type = settings.get('waiver_type', 'N/A')
+                st.write(f"**Waiver Type:** {waiver_type}")
+                waiver_budget = settings.get('waiver_budget', 0)
+                if waiver_budget > 0:
+                    st.write(f"**FAAB Budget:** ${waiver_budget}")
+
+            with settings_col2:
+                playoff_teams = settings.get('playoff_teams', 'N/A')
+                st.write(f"**Playoff Teams:** {playoff_teams}")
+                playoff_weeks = settings.get('playoff_week_start', 'N/A')
+                st.write(f"**Playoff Start:** Week {playoff_weeks}")
+
+            with settings_col3:
+                trade_deadline = settings.get('trade_deadline', 'N/A')
+                st.write(f"**Trade Deadline:** Week {trade_deadline}")
+                taxi_slots = settings.get('taxi_slots', 0)
+                if taxi_slots > 0:
+                    st.write(f"**Taxi Slots:** {taxi_slots}")
+
+            if is_superflex:
+                st.success("⚡ **Superflex League** - QB values are boosted 50%")
+            else:
+                st.info("🏈 **1QB League** - Standard QB valuations")
+
+        with overview_tab2:
+            st.markdown("#### Scoring Settings")
+
+            scoring_df = get_scoring_summary(league_details)
+
+            if not scoring_df.empty:
+                for category in scoring_df['Category'].unique():
+                    with st.expander(f"{category} Scoring", expanded=(category in ['Passing', 'Rushing', 'Receiving'])):
+                        category_df = scoring_df[scoring_df['Category'] == category]
+                        st.dataframe(
+                            category_df[['Stat', 'Points']].reset_index(drop=True),
+                            use_container_width=True,
+                            hide_index=True
+                        )
+            else:
+                st.info("Scoring settings not available")
+
+            st.markdown("#### PPR Status")
+            scoring_settings = league_details.get('scoring_settings', {})
+            rec_pts = scoring_settings.get('rec', 0)
+            if rec_pts == 1:
+                st.success("✅ **Full PPR** (1 point per reception)")
+            elif rec_pts == 0.5:
+                st.info("📊 **Half PPR** (0.5 points per reception)")
+            else:
+                st.info("📈 **Standard** (No PPR)")
+
+        with overview_tab3:
+            st.markdown("#### Future Draft Picks Inventory")
+
+            if traded_picks or league_rosters:
+                future_picks_df = get_future_picks_inventory(
+                    league_id, league_details, league_rosters, league_users, traded_picks
+                )
+
+                if not future_picks_df.empty:
+                    st.write(f"Total future picks tracked: **{len(future_picks_df)}**")
+
+                    for team in sorted(future_picks_df['Current Owner'].unique()):
+                        team_picks = future_picks_df[future_picks_df['Current Owner'] == team]
+                        with st.expander(f"{team} ({len(team_picks)} picks)", expanded=False):
+                            for _, pick_row in team_picks.iterrows():
+                                if pick_row['Status'] == 'Traded':
+                                    st.write(f"✅ {pick_row['Pick']} (from {pick_row['Original Team']})")
+                                else:
+                                    st.write(f"• {pick_row['Pick']}")
+
+                    st.markdown("---")
+                    st.markdown("**Pick Summary by Year:**")
+                    picks_by_year = future_picks_df.groupby('Season').size().reset_index(name='Count')
+                    st.dataframe(picks_by_year, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No future picks data available")
+            else:
+                st.info("No traded picks found. All teams have their original picks.")
+
+        with overview_tab4:
+            st.markdown("#### Recent League Activity")
+
+            recent_activity = get_recent_transactions_summary(league_id, weeks=4)
+
+            activity_col1, activity_col2, activity_col3 = st.columns(3)
+
+            with activity_col1:
+                st.metric("Trades (Last 4 Weeks)", recent_activity['total_trades'])
+
+            with activity_col2:
+                st.metric("Waiver Claims", recent_activity['total_waivers'])
+
+            with activity_col3:
+                st.metric("FAAB Spent", f"${recent_activity['total_faab_spent']}")
+
+            st.write(f"**Active Teams:** {recent_activity['active_teams']} teams have made moves")
+
+            if league_drafts:
+                st.markdown("#### Draft History")
+                st.write(f"**Total Drafts:** {len(league_drafts)}")
+
+                for draft in league_drafts[:3]:
+                    draft_type = draft.get('type', 'unknown')
+                    draft_status = draft.get('status', 'unknown')
+                    st.write(f"• {draft_type.title()} Draft - Status: {draft_status.title()}")
+
+    else:
+        st.warning("League details not available. Some features may be limited.")
 
     # Process player data with enhanced valuations
     st.header("📊 Enhanced Player Valuations")
@@ -1865,6 +2023,10 @@ def main():
                 proj, details, team_stats, historical_avg, matchup_factor,
                 dynasty_adp=player_adp, is_superflex=is_superflex
             )
+
+            # Apply league-specific scoring adjustments
+            if league_details:
+                adjusted_value = adjust_value_for_league_scoring(adjusted_value, position, league_details)
 
             all_players_data.append({
                 'PlayerID': player_id,
@@ -2437,7 +2599,11 @@ def main():
     # AI Trade Suggestions Section
     st.markdown("---")
     st.header("🤖 AI-Powered Trade Suggestions")
-    st.markdown("Machine learning analyzes your roster needs, surpluses, and generates optimized trade proposals")
+    league_context_str = ""
+    if league_details:
+        roster_format = format_roster_positions(league_details)
+        league_context_str = f" for your {roster_format} roster"
+    st.markdown(f"Machine learning analyzes your roster needs, surpluses{league_context_str}, and generates optimized trade proposals")
 
     if your_team in all_rosters_df and len(all_rosters_df) > 1:
         your_roster_df = all_rosters_df[your_team]
@@ -2571,7 +2737,25 @@ def main():
                             # AI Analysis
                             st.markdown("---")
                             st.markdown("**🤖 AI Analysis:**")
-                            st.info(f"**Rationale:** {suggestion['rationale']}\n\n**Impact:** {suggestion['impact']}")
+
+                            league_fit_context = ""
+                            if league_details:
+                                optimal_starters = calculate_optimal_starter_count(league_details)
+                                scoring_settings = league_details.get('scoring_settings', {})
+                                rec_pts = scoring_settings.get('rec', 0)
+
+                                context_parts = []
+                                if is_superflex:
+                                    context_parts.append("This trade fits your **Superflex** league format")
+                                if rec_pts == 1:
+                                    context_parts.append("Values adjusted for **Full PPR** scoring")
+                                elif rec_pts == 0.5:
+                                    context_parts.append("Values adjusted for **Half PPR** scoring")
+
+                                if context_parts:
+                                    league_fit_context = f"\n\n**League Context:** {' | '.join(context_parts)}"
+
+                            st.info(f"**Rationale:** {suggestion['rationale']}\n\n**Impact:** {suggestion['impact']}{league_fit_context}")
 
                             # Check for news alerts on involved players
                             news_alerts = []
