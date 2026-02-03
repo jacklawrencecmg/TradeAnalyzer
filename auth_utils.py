@@ -11,11 +11,28 @@ from datetime import datetime
 
 def get_supabase_client() -> Client:
     """Get or create Supabase client"""
-    url = os.getenv("VITE_SUPABASE_URL")
-    key = os.getenv("VITE_SUPABASE_ANON_KEY")
+    try:
+        url = st.secrets["supabase"]["url"]
+        key = st.secrets["supabase"]["anon_key"]
+    except (KeyError, FileNotFoundError):
+        url = os.getenv("VITE_SUPABASE_URL")
+        key = os.getenv("VITE_SUPABASE_ANON_KEY")
 
     if not url or not key:
-        st.error("Supabase credentials not configured. Check .env file.")
+        st.error("""
+        **Supabase credentials not configured.**
+
+        For local development:
+        1. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`
+        2. Fill in your Supabase URL and anon key
+
+        For Streamlit Cloud:
+        1. Go to your app settings
+        2. Click "Secrets" in the left sidebar
+        3. Add your secrets in TOML format
+
+        See STREAMLIT_DEPLOYMENT_GUIDE.md for details.
+        """)
         st.stop()
 
     return create_client(url, key)
