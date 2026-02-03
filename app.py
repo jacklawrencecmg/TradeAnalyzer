@@ -89,6 +89,36 @@ def fetch_projections(year: int = CURRENT_YEAR) -> Optional[List[Dict]]:
         st.error(f"Error fetching projections: {e}")
         return generate_mock_projections()
 
+@st.cache_data(ttl=1800)
+def fetch_injuries(year: int = CURRENT_YEAR) -> Optional[List[Dict]]:
+    """Fetch current injury reports from SportsDataIO."""
+    if API_KEY == "YOUR_SPORTSDATAIO_KEY_HERE":
+        return []
+
+    try:
+        url = f"{BASE_URL}/scores/json/Injuries/{year}?key={API_KEY}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.warning(f"Error fetching injuries: {e}")
+        return []
+
+@st.cache_data(ttl=1800)
+def fetch_news(year: int = CURRENT_YEAR) -> Optional[List[Dict]]:
+    """Fetch latest news from SportsDataIO."""
+    if API_KEY == "YOUR_SPORTSDATAIO_KEY_HERE":
+        return []
+
+    try:
+        url = f"{BASE_URL}/scores/json/News?key={API_KEY}"
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.warning(f"Error fetching news: {e}")
+        return []
+
 @st.cache_data(ttl=3600)
 def fetch_historical_stats(player_id: str, years: int = 3) -> List[Dict]:
     """Fetch historical player stats."""
@@ -1142,6 +1172,127 @@ def generate_ai_trade_suggestions(your_roster: pd.DataFrame, all_rosters: Dict[s
 
     return suggestions[:10]
 
+def aggregate_player_news(roster_df: pd.DataFrame, injuries_data: List[Dict],
+                         news_data: List[Dict]) -> List[Dict]:
+    """
+    Aggregate injury and news data for roster players.
+    Returns list of news items with impact analysis.
+    """
+    player_news = []
+
+    # Create lookup dict for roster players
+    roster_players = {row['Name'].lower(): row for _, row in roster_df.iterrows()}
+
+    # Process injury data
+    if injuries_data:
+        for injury in injuries_data:
+            player_name = injury.get('Name', '').lower()
+            if player_name in roster_players:
+                player_data = roster_players[player_name]
+                status = injury.get('Status', 'Unknown')
+                body_part = injury.get('BodyPart', 'N/A')
+
+                # Determine impact on value
+                impact = "Neutral"
+                impact_pct = 0
+
+                if status in ['Out', 'IR', 'PUP']:
+                    impact = "High Negative"
+                    impact_pct = -15
+                elif status in ['Doubtful']:
+                    impact = "Moderate Negative"
+                    impact_pct = -8
+                elif status in ['Questionable', 'Day-To-Day']:
+                    impact = "Low Negative"
+                    impact_pct = -3
+
+                player_news.append({
+                    'player': injury.get('Name', 'Unknown'),
+                    'position': player_data['Position'],
+                    'team': injury.get('Team', 'N/A'),
+                    'type': 'Injury',
+                    'headline': f"{status} - {body_part}",
+                    'details': f"Status: {status}, Body Part: {body_part}",
+                    'impact': impact,
+                    'impact_pct': impact_pct,
+                    'current_value': player_data['AdjustedValue'],
+                    'updated': injury.get('Updated', 'N/A')
+                })
+
+    # Process news data (limit to recent news)
+    if news_data:
+        for news_item in news_data[:100]:  # Limit to most recent
+            player_name = news_item.get('PlayerName', '').lower()
+            if player_name in roster_players:
+                player_data = roster_players[player_name]
+                title = news_item.get('Title', '')
+                content = news_item.get('Content', '')
+
+                # Analyze sentiment for impact
+                impact = "Neutral"
+                impact_pct = 0
+
+                title_lower = title.lower()
+                content_lower = content.lower()
+
+                # Negative keywords
+                if any(word in title_lower or word in content_lower for word in
+                       ['injury', 'injured', 'hurt', 'suspend', 'arrest', 'trade rumors', 'decline', 'benched']):
+                    impact = "Negative"
+                    impact_pct = -5
+
+                # Positive keywords
+                elif any(word in title_lower or word in content_lower for word in
+                         ['breakout', 'promoted', 'starter', 'extension', 'career high', 'dominant']):
+                    impact = "Positive"
+                    impact_pct = 5
+
+                # Only add if there's meaningful impact
+                if impact != "Neutral" or 'trade' in title_lower:
+                    player_news.append({
+                        'player': news_item.get('PlayerName', 'Unknown'),
+                        'position': player_data['Position'],
+                        'team': news_item.get('Team', 'N/A'),
+                        'type': 'News',
+                        'headline': title[:100],
+                        'details': content[:200] + '...' if len(content) > 200 else content,
+                        'impact': impact,
+                        'impact_pct': impact_pct,
+                        'current_value': player_data['AdjustedValue'],
+                        'updated': news_item.get('Updated', 'N/A')
+                    })
+
+    # Sort by impact (most negative first, then most positive)
+    player_news.sort(key=lambda x: (abs(x['impact_pct']), x['impact_pct']), reverse=True)
+
+    return player_news
+
+def search_trade_rumors_web(query: str = "NFL trade rumors 2026") -> List[Dict]:
+    """
+    Search web for trade rumors using available search tools.
+    Returns structured rumor data.
+    """
+    rumors = []
+
+    try:
+        # Note: This would use X/Twitter semantic search in production
+        # For now, returns placeholder for web search integration
+        rumors.append({
+            'headline': 'Trade Rumor Search Available',
+            'source': 'Web Search',
+            'details': f'Search query: "{query}" - Enable web search integration for live rumors',
+            'relevance': 'Medium',
+            'updated': datetime.now().strftime('%Y-%m-%d')
+        })
+    except Exception as e:
+        st.warning(f"Could not fetch trade rumors: {e}")
+
+    return rumors
+
+def calculate_news_adjusted_value(base_value: float, impact_pct: float) -> float:
+    """Calculate value adjusted for news impact."""
+    return base_value * (1 + impact_pct / 100)
+
 def main():
     st.set_page_config(page_title="Fantasy Football Trade Analyzer", layout="wide")
 
@@ -1189,6 +1340,12 @@ def main():
         - 📊 Playoff odds estimation
         - 💡 10 optimized trade suggestions
         - 🎯 Includes picks + FAAB balancing
+
+        **News & Alerts:**
+        - 📰 Real-time injury reports (SportsDataIO)
+        - 🚨 Automatic news alerts on trades
+        - 📈 Value impact analysis (-15% to +5%)
+        - 🔄 30-minute cache with refresh button
 
         **League Format:**
         - Auto-detects Superflex from Sleeper
@@ -1722,6 +1879,20 @@ def main():
                         # Recommendation
                         st.markdown("---")
 
+                        # Check for news alerts on traded players
+                        injuries_data_manual = fetch_injuries(CURRENT_YEAR)
+                        news_data_manual = fetch_news(CURRENT_YEAR)
+                        all_trade_players = pd.DataFrame(give_data + receive_data)
+                        if len(all_trade_players) > 0:
+                            trade_news = aggregate_player_news(all_trade_players, injuries_data_manual, news_data_manual)
+                            if trade_news:
+                                st.markdown("### 📰 News Alerts")
+                                for news_item in trade_news:
+                                    if news_item['impact_pct'] < 0:
+                                        st.warning(f"⚠️ **{news_item['player']}**: {news_item['headline']} ({news_item['impact_pct']:+.0f}% value impact)")
+                                    elif news_item['impact_pct'] > 0:
+                                        st.info(f"✅ **{news_item['player']}**: {news_item['headline']} ({news_item['impact_pct']:+.0f}% value impact)")
+
                         # Build trade summary with key assets
                         trade_summary_parts = []
                         if give_picks_parsed:
@@ -1819,6 +1990,13 @@ def main():
                 st.markdown("---")
                 st.subheader("💡 Recommended Trades")
 
+                # Fetch news for alerts in trade suggestions
+                injuries_data = fetch_injuries(CURRENT_YEAR)
+                news_data = fetch_news(CURRENT_YEAR)
+                all_players_df = pd.concat([df for df in all_rosters_df.values()])
+                all_player_news = aggregate_player_news(all_players_df, injuries_data, news_data)
+                news_lookup = {n['player'].lower(): n for n in all_player_news}
+
                 your_faab_remaining = faab_map.get(your_team, 300)
                 trade_suggestions = generate_ai_trade_suggestions(
                     your_roster_df,
@@ -1888,6 +2066,18 @@ def main():
                             st.markdown("**🤖 AI Analysis:**")
                             st.info(f"**Rationale:** {suggestion['rationale']}\n\n**Impact:** {suggestion['impact']}")
 
+                            # Check for news alerts on involved players
+                            news_alerts = []
+                            for player in suggestion.get('you_give', []) + suggestion.get('you_receive', []):
+                                player_name_lower = player['name'].lower()
+                                if player_name_lower in news_lookup:
+                                    news = news_lookup[player_name_lower]
+                                    if news['impact_pct'] < 0:
+                                        news_alerts.append(f"⚠️ **{player['name']}**: {news['headline']} ({news['impact_pct']:+.0f}% value impact)")
+
+                            if news_alerts:
+                                st.warning("**📰 News Alerts:**\n\n" + "\n\n".join(news_alerts))
+
                             # Calculate impact on playoff odds
                             value_change = suggestion['value_diff']
                             odds_change = (value_change / roster_analysis['total_value']) * playoff_data['playoff_odds'] * 0.15  # Conservative estimate
@@ -1907,6 +2097,151 @@ def main():
 
     else:
         st.info("AI Trade Suggestions require valid roster data. Please ensure your team is selected above.")
+
+    # News & Alerts Dashboard
+    st.markdown("---")
+    st.header("📰 Real-Time News & Alerts Dashboard")
+    st.markdown("Live injury reports and news updates for your roster with value impact analysis")
+
+    if your_team in all_rosters_df:
+        your_roster_df = all_rosters_df[your_team]
+
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown("### Your Roster Updates")
+        with col2:
+            if st.button("🔄 Refresh News", use_container_width=True):
+                st.cache_data.clear()
+                st.rerun()
+
+        with st.spinner("Fetching latest injuries and news..."):
+            # Fetch injury and news data
+            injuries_data = fetch_injuries(CURRENT_YEAR)
+            news_data = fetch_news(CURRENT_YEAR)
+
+            # Aggregate news for roster
+            player_news = aggregate_player_news(your_roster_df, injuries_data, news_data)
+
+            if player_news:
+                # Summary metrics
+                total_alerts = len(player_news)
+                high_impact = sum(1 for n in player_news if 'High' in n['impact'])
+                negative_impact = sum(1 for n in player_news if n['impact_pct'] < 0)
+
+                metric_col1, metric_col2, metric_col3 = st.columns(3)
+                with metric_col1:
+                    st.metric("Total Alerts", total_alerts, help="News items affecting your roster")
+                with metric_col2:
+                    st.metric("High Impact", high_impact, help="Critical injury or news alerts")
+                with metric_col3:
+                    st.metric("Negative Alerts", negative_impact, help="News with negative value impact")
+
+                # Show alerts with impact
+                st.markdown("---")
+                st.subheader("🚨 Active Alerts")
+
+                for news_item in player_news[:20]:  # Show top 20
+                    # Color code by impact
+                    if news_item['impact_pct'] <= -10:
+                        border_color = "#dc2626"  # Red
+                        emoji = "🔴"
+                    elif news_item['impact_pct'] < 0:
+                        border_color = "#f59e0b"  # Orange
+                        emoji = "🟡"
+                    elif news_item['impact_pct'] > 0:
+                        border_color = "#10b981"  # Green
+                        emoji = "🟢"
+                    else:
+                        border_color = "#6b7280"  # Gray
+                        emoji = "⚪"
+
+                    with st.container():
+                        col_a, col_b, col_c = st.columns([3, 4, 2])
+
+                        with col_a:
+                            st.markdown(f"**{emoji} {news_item['player']}**")
+                            st.caption(f"{news_item['position']} - {news_item['team']}")
+                            st.caption(f"Type: {news_item['type']}")
+
+                        with col_b:
+                            st.markdown(f"**{news_item['headline']}**")
+                            st.caption(news_item['details'])
+
+                        with col_c:
+                            current_val = news_item['current_value']
+                            adjusted_val = calculate_news_adjusted_value(current_val, news_item['impact_pct'])
+
+                            st.metric(
+                                "Value Impact",
+                                f"{news_item['impact_pct']:+.0f}%",
+                                delta=f"{adjusted_val - current_val:+.0f} pts",
+                                help=f"Base: {current_val:.0f} → Adjusted: {adjusted_val:.0f}"
+                            )
+
+                        st.markdown(f"<div style='border-left: 4px solid {border_color}; padding-left: 10px; margin: 5px 0;'></div>",
+                                  unsafe_allow_html=True)
+
+                # Value impact summary
+                st.markdown("---")
+                st.subheader("💰 Total Value Impact")
+
+                total_impact = sum(calculate_news_adjusted_value(n['current_value'], n['impact_pct']) - n['current_value']
+                                 for n in player_news)
+                original_value = sum(n['current_value'] for n in player_news)
+                impact_pct = (total_impact / your_roster_df['AdjustedValue'].sum() * 100) if len(your_roster_df) > 0 else 0
+
+                impact_col1, impact_col2, impact_col3 = st.columns(3)
+                with impact_col1:
+                    st.metric("Affected Players", len(player_news))
+                with impact_col2:
+                    st.metric("Total Value Change", f"{total_impact:+.0f} pts",
+                             delta=f"{impact_pct:+.1f}% of roster")
+                with impact_col3:
+                    roster_total = your_roster_df['AdjustedValue'].sum()
+                    adjusted_roster = roster_total + total_impact
+                    st.metric("Adjusted Roster Value", f"{adjusted_roster:.0f} pts",
+                             delta=f"{total_impact:+.0f} pts")
+
+                if abs(total_impact) > 500:
+                    if total_impact < 0:
+                        st.warning(f"⚠️ Your roster has been negatively impacted by recent news. Consider adjusting your trade strategy or targeting replacements.")
+                    else:
+                        st.success(f"✅ Your roster has benefited from recent news. This may increase your trade leverage.")
+
+            else:
+                st.info("✅ No recent injury or news alerts for your roster players. All clear!")
+
+        # Trade Rumors Section
+        st.markdown("---")
+        st.subheader("📢 League Trade Rumors")
+
+        with st.expander("🔍 Search Trade Rumors (Web Integration)"):
+            st.info("""
+            **Trade Rumor Search**
+
+            This feature uses web search to find NFL trade rumors and speculation.
+            In production, this would integrate with:
+            - X (Twitter) semantic search for real-time rumors
+            - SportsDataIO news API for official reports
+            - Fantasy analyst feeds for dynasty insights
+
+            Enable API integrations in configuration to activate live rumor tracking.
+            """)
+
+            search_query = st.text_input("Search query", "NFL trade rumors 2026")
+            if st.button("Search Rumors"):
+                with st.spinner("Searching..."):
+                    rumors = search_trade_rumors_web(search_query)
+                    if rumors:
+                        for rumor in rumors:
+                            st.markdown(f"**{rumor['headline']}**")
+                            st.caption(f"Source: {rumor['source']} | Updated: {rumor['updated']}")
+                            st.write(rumor['details'])
+                    else:
+                        st.info("No rumors found. Try a different search query.")
+
+    else:
+        st.info("News Dashboard requires valid roster data. Please ensure your team is selected above.")
 
     # League overview
     st.header("🏆 League Overview")
@@ -1951,14 +2286,16 @@ def main():
     - **Machine Learning**: ✅ scikit-learn models for player value prediction
     - **AI Trade Suggestions**: ✅ Roster analysis with positional needs/surpluses
     - **Playoff Odds Calculator**: ✅ Championship probability estimation
+    - **Real-Time News Dashboard**: ✅ Injury reports, news alerts, value impact analysis
+    - **News Integration**: ✅ Alerts on trade suggestions and manual analyzer
     - **FAAB Integration**: ✅ Full support with tiered valuation
     - **IDP Support**: ✅ DL, LB, DB positions with valuations
 
     ### 🔧 Future Enhancement Ideas
+    - **X/Twitter Integration**: Add semantic search for real-time trade rumors
     - **Custom Scoring**: Adjust position weights and scoring settings
     - **Advanced Metrics**: Add snap counts, target share, red zone usage
     - **Trade History**: Track completed trades and accuracy of predictions
-    - **Real-time Updates**: Integrate injury reports and breaking news
     """)
 
 if __name__ == "__main__":
