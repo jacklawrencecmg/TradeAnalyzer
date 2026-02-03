@@ -312,6 +312,329 @@ def calculate_league_rankings(
 
     return players_only_df, players_plus_picks_df
 
+@st.cache_data(ttl=1800)
+def fetch_all_matchups(league_id: str, current_week: int, total_weeks: int) -> Dict[int, List[Dict]]:
+    """
+    Fetch matchups for all weeks in the season.
+    Returns: dict mapping week number to list of matchup dicts
+    """
+    all_matchups = {}
+    for week in range(1, total_weeks + 1):
+        matchups = fetch_league_matchups(league_id, week)
+        if matchups:
+            all_matchups[week] = matchups
+    return all_matchups
+
+def calculate_team_projected_points(
+    roster_df: pd.DataFrame,
+    league_details: Dict,
+    starters_only: bool = True
+) -> float:
+    """
+    Calculate projected points for a team based on their roster.
+    Uses AdjustedValue as weekly projection proxy.
+    """
+    if roster_df.empty:
+        return 0.0
+
+    # Use AdjustedValue as season-long value, divide by ~17 weeks for weekly projection
+    # For starters, use top players at each position based on league settings
+    if starters_only and league_details:
+        roster_positions = league_details.get('roster_positions', [])
+        position_counts = {}
+        for pos in roster_positions:
+            if pos != 'BN':  # Exclude bench
+                position_counts[pos] = position_counts.get(pos, 0) + 1
+
+        weekly_value = 0
+        for position, count in position_counts.items():
+            if position == 'FLEX':
+                # FLEX can be RB/WR/TE
+                flex_players = roster_df[roster_df['Position'].isin(['RB', 'WR', 'TE'])].nlargest(count, 'AdjustedValue')
+                weekly_value += flex_players['AdjustedValue'].sum() / 17
+            elif position == 'SUPER_FLEX':
+                # SUPER_FLEX can be any offensive position
+                sf_players = roster_df[roster_df['Position'].isin(['QB', 'RB', 'WR', 'TE'])].nlargest(count, 'AdjustedValue')
+                weekly_value += sf_players['AdjustedValue'].sum() / 17
+            else:
+                pos_players = roster_df[roster_df['Position'] == position].nlargest(count, 'AdjustedValue')
+                weekly_value += pos_players['AdjustedValue'].sum() / 17
+
+        return max(weekly_value, 0.0)
+    else:
+        # Simple average of top players
+        return roster_df['AdjustedValue'].sum() / 17
+
+def simulate_matchup(
+    team1_projection: float,
+    team2_projection: float,
+    variance_pct: float = 0.25,
+    n_simulations: int = 1
+) -> Tuple[float, float]:
+    """
+    Simulate a single matchup between two teams.
+    Returns: (team1_win_pct, team2_win_pct)
+    """
+    team1_wins = 0
+    team2_wins = 0
+
+    for _ in range(n_simulations):
+        # Generate scores with normal distribution
+        team1_score = np.random.normal(team1_projection, team1_projection * variance_pct)
+        team2_score = np.random.normal(team2_projection, team2_projection * variance_pct)
+
+        # Ensure non-negative scores
+        team1_score = max(team1_score, 0)
+        team2_score = max(team2_score, 0)
+
+        if team1_score > team2_score:
+            team1_wins += 1
+        elif team2_score > team1_score:
+            team2_wins += 1
+        else:
+            # Tie - split
+            team1_wins += 0.5
+            team2_wins += 0.5
+
+    return team1_wins / n_simulations, team2_wins / n_simulations
+
+@st.cache_data(ttl=1800)
+def run_playoff_simulation(
+    all_rosters_df: Dict,
+    league_details: Dict,
+    league_rosters: List[Dict],
+    league_users: List[Dict],
+    all_matchups: Dict[int, List[Dict]],
+    current_week: int,
+    n_simulations: int = 10000,
+    variance_pct: float = 0.25
+) -> pd.DataFrame:
+    """
+    Run Monte Carlo playoff simulation.
+
+    Returns DataFrame with columns:
+    - Team: Team name
+    - Current Wins: Actual wins so far
+    - Current Losses: Actual losses so far
+    - Projected Wins: Average wins in simulations
+    - Projected Losses: Average losses in simulations
+    - Playoff Pct: % of simulations making playoffs
+    - Bye Pct: % of simulations getting first-round bye
+    - Championship Pct: % of simulations winning championship
+    - Avg Seed: Average playoff seed
+    - Avg Points: Average points per game
+    """
+    if not all_rosters_df or not league_details:
+        return pd.DataFrame()
+
+    # Map roster IDs to team names
+    user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
+                for user in league_users}
+    roster_id_to_team = {}
+    team_to_roster_id = {}
+    for roster in league_rosters:
+        owner_id = roster.get('owner_id')
+        roster_id = roster['roster_id']
+        team_name = user_map.get(owner_id, f"Team {roster_id}")
+        roster_id_to_team[roster_id] = team_name
+        team_to_roster_id[team_name] = roster_id
+
+    # Calculate projected points for each team
+    team_projections = {}
+    for team_name, roster_df in all_rosters_df.items():
+        team_projections[team_name] = calculate_team_projected_points(roster_df, league_details, starters_only=True)
+
+    # Get current standings
+    team_records = {team: {'wins': 0, 'losses': 0, 'ties': 0, 'points_for': 0.0, 'points_against': 0.0}
+                    for team in team_projections.keys()}
+
+    # Process completed weeks
+    for week in range(1, min(current_week, len(all_matchups) + 1)):
+        if week not in all_matchups:
+            continue
+
+        matchups = all_matchups[week]
+        matchup_dict = {}
+
+        # Group matchups by matchup_id
+        for matchup in matchups:
+            roster_id = matchup.get('roster_id')
+            matchup_id = matchup.get('matchup_id')
+            points = matchup.get('points', 0)
+
+            if matchup_id and roster_id in roster_id_to_team:
+                if matchup_id not in matchup_dict:
+                    matchup_dict[matchup_id] = []
+                matchup_dict[matchup_id].append({
+                    'roster_id': roster_id,
+                    'team': roster_id_to_team[roster_id],
+                    'points': points
+                })
+
+        # Process each matchup
+        for matchup_id, teams in matchup_dict.items():
+            if len(teams) == 2:
+                team1 = teams[0]['team']
+                team2 = teams[1]['team']
+                points1 = teams[0]['points']
+                points2 = teams[1]['points']
+
+                if team1 in team_records and team2 in team_records:
+                    team_records[team1]['points_for'] += points1
+                    team_records[team1]['points_against'] += points2
+                    team_records[team2]['points_for'] += points2
+                    team_records[team2]['points_against'] += points1
+
+                    if points1 > points2:
+                        team_records[team1]['wins'] += 1
+                        team_records[team2]['losses'] += 1
+                    elif points2 > points1:
+                        team_records[team2]['wins'] += 1
+                        team_records[team1]['losses'] += 1
+                    else:
+                        team_records[team1]['ties'] += 1
+                        team_records[team2]['ties'] += 1
+
+    # Get league settings
+    settings = league_details.get('settings', {})
+    playoff_teams = settings.get('playoff_teams', 6)
+    total_weeks = settings.get('playoff_week_start', 15) - 1  # Regular season ends before playoffs
+    playoff_bye_teams = settings.get('playoff_seed_type', 0)  # 0 = no byes, 1 = top 2 get bye
+
+    # Determine remaining weeks and matchups
+    remaining_weeks = list(range(current_week, total_weeks + 1))
+
+    # Run simulations
+    simulation_results = {team: {
+        'playoff_count': 0,
+        'bye_count': 0,
+        'championship_count': 0,
+        'total_wins': 0,
+        'total_losses': 0,
+        'seeds': [],
+        'points': []
+    } for team in team_projections.keys()}
+
+    for sim in range(n_simulations):
+        # Copy current records
+        sim_records = {team: {
+            'wins': team_records[team]['wins'],
+            'losses': team_records[team]['losses'],
+            'points_for': team_records[team]['points_for'],
+            'points_against': team_records[team]['points_against']
+        } for team in team_projections.keys()}
+
+        # Simulate remaining regular season weeks
+        for week in remaining_weeks:
+            if week in all_matchups:
+                # Use actual matchup schedule
+                matchups = all_matchups[week]
+                matchup_dict = {}
+
+                for matchup in matchups:
+                    roster_id = matchup.get('roster_id')
+                    matchup_id = matchup.get('matchup_id')
+
+                    if matchup_id and roster_id in roster_id_to_team:
+                        if matchup_id not in matchup_dict:
+                            matchup_dict[matchup_id] = []
+                        matchup_dict[matchup_id].append(roster_id_to_team[roster_id])
+
+                for matchup_id, teams in matchup_dict.items():
+                    if len(teams) == 2:
+                        team1, team2 = teams[0], teams[1]
+                        if team1 in team_projections and team2 in team_projections:
+                            # Simulate game
+                            proj1 = team_projections[team1]
+                            proj2 = team_projections[team2]
+
+                            score1 = max(0, np.random.normal(proj1, proj1 * variance_pct))
+                            score2 = max(0, np.random.normal(proj2, proj2 * variance_pct))
+
+                            sim_records[team1]['points_for'] += score1
+                            sim_records[team1]['points_against'] += score2
+                            sim_records[team2]['points_for'] += score2
+                            sim_records[team2]['points_against'] += score1
+
+                            if score1 > score2:
+                                sim_records[team1]['wins'] += 1
+                                sim_records[team2]['losses'] += 1
+                            else:
+                                sim_records[team2]['wins'] += 1
+                                sim_records[team1]['losses'] += 1
+
+        # Determine playoff seeding
+        teams_sorted = sorted(
+            sim_records.items(),
+            key=lambda x: (x[1]['wins'], x[1]['points_for']),
+            reverse=True
+        )
+
+        # Award playoff spots
+        for i, (team, record) in enumerate(teams_sorted[:playoff_teams]):
+            seed = i + 1
+            simulation_results[team]['playoff_count'] += 1
+            simulation_results[team]['seeds'].append(seed)
+            simulation_results[team]['points'].append(record['points_for'])
+
+            # First-round bye (typically top 1 or 2 seeds)
+            if seed <= min(2, playoff_bye_teams):
+                simulation_results[team]['bye_count'] += 1
+
+        # Simulate playoffs (simple model: higher seed has advantage)
+        playoff_teams_list = [team for team, _ in teams_sorted[:playoff_teams]]
+
+        # Championship simulation (simplified: weight by seed)
+        if playoff_teams_list:
+            # Weight teams inversely by seed (seed 1 has highest weight)
+            weights = [1.0 / (i + 1) for i in range(len(playoff_teams_list))]
+            total_weight = sum(weights)
+            normalized_weights = [w / total_weight for w in weights]
+
+            champion = np.random.choice(playoff_teams_list, p=normalized_weights)
+            simulation_results[champion]['championship_count'] += 1
+
+        # Track totals
+        for team, record in sim_records.items():
+            simulation_results[team]['total_wins'] += record['wins']
+            simulation_results[team]['total_losses'] += record['losses']
+
+    # Build results DataFrame
+    results_data = []
+    for team in team_projections.keys():
+        current_wins = team_records[team]['wins']
+        current_losses = team_records[team]['losses']
+        current_pf = team_records[team]['points_for']
+
+        avg_wins = simulation_results[team]['total_wins'] / n_simulations
+        avg_losses = simulation_results[team]['total_losses'] / n_simulations
+        playoff_pct = (simulation_results[team]['playoff_count'] / n_simulations) * 100
+        bye_pct = (simulation_results[team]['bye_count'] / n_simulations) * 100
+        championship_pct = (simulation_results[team]['championship_count'] / n_simulations) * 100
+
+        avg_seed = np.mean(simulation_results[team]['seeds']) if simulation_results[team]['seeds'] else 0
+        avg_points = np.mean(simulation_results[team]['points']) if simulation_results[team]['points'] else current_pf
+
+        results_data.append({
+            'Team': team,
+            'Current Record': f"{current_wins}-{current_losses}",
+            'Current Wins': current_wins,
+            'Current Losses': current_losses,
+            'Projected Wins': avg_wins,
+            'Projected Losses': avg_losses,
+            'Playoff %': playoff_pct,
+            'Bye %': bye_pct,
+            'Championship %': championship_pct,
+            'Avg Seed': avg_seed,
+            'Avg Points': avg_points,
+            'Projection': team_projections[team]
+        })
+
+    results_df = pd.DataFrame(results_data)
+    results_df = results_df.sort_values('Playoff %', ascending=False).reset_index(drop=True)
+
+    return results_df
+
 def render_searchable_pick_input(
     label: str,
     pick_options: List[str],
@@ -2623,6 +2946,235 @@ def main():
 
         else:
             st.warning("Unable to calculate rankings. Please ensure roster data is loaded.")
+
+        # Playoff Odds Simulator
+        st.markdown("---")
+        st.header("🎲 Playoff Odds Simulator")
+        st.caption("Monte Carlo simulation using SportsDataIO projections with historical variance")
+
+        # Get current week
+        current_season = league_details.get('season', '2024')
+        settings = league_details.get('settings', {})
+        playoff_week_start = settings.get('playoff_week_start', 15)
+
+        # Simple heuristic: if we're past week 1, assume season has started
+        # For demo purposes, use week 10 as default mid-season point
+        current_week_input = st.number_input(
+            "Current Week",
+            min_value=1,
+            max_value=playoff_week_start - 1,
+            value=min(10, playoff_week_start - 1),
+            help="Enter the current week of the season. Past weeks will use actual results, future weeks will be simulated."
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            n_simulations = st.selectbox(
+                "Number of Simulations",
+                [5000, 10000, 25000],
+                index=1,
+                help="More simulations = more accurate but slower. 10,000 is recommended."
+            )
+
+        with col2:
+            variance_pct = st.slider(
+                "Score Variance %",
+                min_value=10,
+                max_value=40,
+                value=25,
+                step=5,
+                help="Standard deviation as % of projected score. Higher = more randomness."
+            ) / 100
+
+        run_simulation = st.button("🎲 Run Playoff Simulation", type="primary")
+
+        if run_simulation or 'playoff_odds_df' in st.session_state:
+            with st.spinner(f"Running {n_simulations:,} Monte Carlo simulations..."):
+                # Fetch all matchups
+                total_weeks = playoff_week_start - 1
+                all_matchups = fetch_all_matchups(league_id, current_week_input, total_weeks)
+
+                # Run simulation
+                playoff_odds_df = run_playoff_simulation(
+                    all_rosters_df,
+                    league_details,
+                    league_rosters,
+                    league_users,
+                    all_matchups,
+                    current_week_input,
+                    n_simulations=n_simulations,
+                    variance_pct=variance_pct
+                )
+
+                # Store in session state
+                st.session_state['playoff_odds_df'] = playoff_odds_df
+                st.session_state['simulation_params'] = {
+                    'n_simulations': n_simulations,
+                    'variance_pct': variance_pct,
+                    'current_week': current_week_input
+                }
+
+            if not playoff_odds_df.empty:
+                st.success(f"✅ Completed {n_simulations:,} simulations for {len(playoff_odds_df)} teams")
+
+                # Find your team's odds
+                your_odds = playoff_odds_df[playoff_odds_df['Team'] == your_team].iloc[0] if your_team in playoff_odds_df['Team'].values else None
+
+                if your_odds is not None:
+                    st.markdown(f"### Your Team: {your_team}")
+                    metric_col1, metric_col2, metric_col3, metric_col4 = st.columns(4)
+
+                    with metric_col1:
+                        st.metric(
+                            "Playoff Odds",
+                            f"{your_odds['Playoff %']:.1f}%",
+                            help="Probability of making the playoffs"
+                        )
+
+                    with metric_col2:
+                        st.metric(
+                            "Championship Odds",
+                            f"{your_odds['Championship %']:.1f}%",
+                            help="Probability of winning the championship"
+                        )
+
+                    with metric_col3:
+                        st.metric(
+                            "Projected Record",
+                            f"{your_odds['Projected Wins']:.1f}-{your_odds['Projected Losses']:.1f}",
+                            help="Average wins-losses across simulations"
+                        )
+
+                    with metric_col4:
+                        st.metric(
+                            "Avg Playoff Seed",
+                            f"{your_odds['Avg Seed']:.1f}" if your_odds['Avg Seed'] > 0 else "N/A",
+                            help="Average playoff seeding when making playoffs"
+                        )
+
+                st.markdown("---")
+                st.markdown("### League-Wide Playoff Odds")
+
+                # Display table with highlighting
+                display_df = playoff_odds_df.copy()
+
+                # Create a styled table
+                for idx, row in display_df.iterrows():
+                    is_your_team = row['Team'] == your_team
+                    team_display = f"**{row['Team']}**" if is_your_team else row['Team']
+
+                    playoff_color = "🟢" if row['Playoff %'] >= 75 else "🟡" if row['Playoff %'] >= 50 else "🟠" if row['Playoff %'] >= 25 else "🔴"
+                    title_color = "🏆" if row['Championship %'] >= 20 else "🥈" if row['Championship %'] >= 10 else "🥉" if row['Championship %'] >= 5 else "📊"
+
+                    with st.expander(
+                        f"{playoff_color} {team_display} - Playoff: {row['Playoff %']:.1f}% | Title: {row['Championship %']:.1f}%",
+                        expanded=is_your_team
+                    ):
+                        detail_col1, detail_col2, detail_col3 = st.columns(3)
+
+                        with detail_col1:
+                            st.write(f"**Current:** {row['Current Record']}")
+                            st.write(f"**Projected:** {row['Projected Wins']:.1f}-{row['Projected Losses']:.1f}")
+
+                        with detail_col2:
+                            st.write(f"**Playoff %:** {row['Playoff %']:.1f}%")
+                            st.write(f"**Bye %:** {row['Bye %']:.1f}%")
+
+                        with detail_col3:
+                            st.write(f"**Title %:** {row['Championship %']:.1f}%")
+                            st.write(f"**Avg Seed:** {row['Avg Seed']:.1f}" if row['Avg Seed'] > 0 else "**Avg Seed:** N/A")
+
+                # Visual charts
+                st.markdown("---")
+                st.markdown("### Visual Odds Comparison")
+
+                odds_tab1, odds_tab2, odds_tab3 = st.tabs([
+                    "📊 Playoff Odds",
+                    "🏆 Championship Odds",
+                    "📈 Projected Wins"
+                ])
+
+                with odds_tab1:
+                    chart_data = playoff_odds_df.copy()
+                    chart_data['Your Team'] = chart_data['Team'].apply(lambda x: 'Your Team' if x == your_team else 'Other Teams')
+
+                    chart = alt.Chart(chart_data).mark_bar().encode(
+                        x=alt.X('Playoff %:Q', title='Playoff Probability (%)'),
+                        y=alt.Y('Team:N', sort='-x', title='Team'),
+                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#1f77b4', '#aec7e8'])),
+                        tooltip=[
+                            'Team',
+                            alt.Tooltip('Playoff %:Q', format='.1f'),
+                            alt.Tooltip('Championship %:Q', format='.1f'),
+                            'Current Record'
+                        ]
+                    ).properties(height=400, title='Playoff Probability by Team')
+
+                    st.altair_chart(chart, use_container_width=True)
+
+                with odds_tab2:
+                    chart_data = playoff_odds_df.copy()
+                    chart_data['Your Team'] = chart_data['Team'].apply(lambda x: 'Your Team' if x == your_team else 'Other Teams')
+
+                    chart = alt.Chart(chart_data).mark_bar().encode(
+                        x=alt.X('Championship %:Q', title='Championship Probability (%)'),
+                        y=alt.Y('Team:N', sort='-x', title='Team'),
+                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#2ca02c', '#98df8a'])),
+                        tooltip=[
+                            'Team',
+                            alt.Tooltip('Championship %:Q', format='.1f'),
+                            alt.Tooltip('Playoff %:Q', format='.1f'),
+                            alt.Tooltip('Avg Seed:Q', format='.1f')
+                        ]
+                    ).properties(height=400, title='Championship Probability by Team')
+
+                    st.altair_chart(chart, use_container_width=True)
+
+                with odds_tab3:
+                    chart_data = playoff_odds_df.copy()
+                    chart_data['Your Team'] = chart_data['Team'].apply(lambda x: 'Your Team' if x == your_team else 'Other Teams')
+
+                    chart = alt.Chart(chart_data).mark_bar().encode(
+                        x=alt.X('Projected Wins:Q', title='Projected Wins'),
+                        y=alt.Y('Team:N', sort='-x', title='Team'),
+                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#ff7f0e', '#ffbb78'])),
+                        tooltip=[
+                            'Team',
+                            alt.Tooltip('Projected Wins:Q', format='.1f'),
+                            alt.Tooltip('Projected Losses:Q', format='.1f'),
+                            alt.Tooltip('Playoff %:Q', format='.1f')
+                        ]
+                    ).properties(height=400, title='Projected Wins by Team')
+
+                    st.altair_chart(chart, use_container_width=True)
+
+                # Data table
+                st.markdown("---")
+                st.markdown("### Detailed Simulation Results")
+
+                st.dataframe(
+                    playoff_odds_df[[
+                        'Team', 'Current Record', 'Projected Wins', 'Projected Losses',
+                        'Playoff %', 'Bye %', 'Championship %', 'Avg Seed'
+                    ]],
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        'Projected Wins': st.column_config.NumberColumn('Proj Wins', format='%.1f'),
+                        'Projected Losses': st.column_config.NumberColumn('Proj Losses', format='%.1f'),
+                        'Playoff %': st.column_config.NumberColumn('Playoff %', format='%.1f%%'),
+                        'Bye %': st.column_config.NumberColumn('Bye %', format='%.1f%%'),
+                        'Championship %': st.column_config.NumberColumn('Title %', format='%.1f%%'),
+                        'Avg Seed': st.column_config.NumberColumn('Avg Seed', format='%.1f')
+                    }
+                )
+
+                st.info("💡 **Simulation Details:** Based on SportsDataIO projections with " +
+                       f"{int(variance_pct*100)}% variance. Past weeks use actual results, " +
+                       "future weeks simulated. Championship odds use seed-weighted probability.")
+
+            else:
+                st.error("Unable to run simulation. Please ensure all data is loaded correctly.")
 
         # Trade suggestions
         st.markdown("---")
