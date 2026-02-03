@@ -9,8 +9,8 @@ from typing import Optional, Dict, List
 import os
 from datetime import datetime
 
-def get_supabase_client() -> Client:
-    """Get or create Supabase client"""
+def get_supabase_client() -> Optional[Client]:
+    """Get or create Supabase client. Returns None if credentials not configured."""
     try:
         url = st.secrets["supabase"]["url"]
         key = st.secrets["supabase"]["anon_key"]
@@ -19,21 +19,7 @@ def get_supabase_client() -> Client:
         key = os.getenv("VITE_SUPABASE_ANON_KEY")
 
     if not url or not key:
-        st.error("""
-        **Supabase credentials not configured.**
-
-        For local development:
-        1. Copy `.streamlit/secrets.toml.example` to `.streamlit/secrets.toml`
-        2. Fill in your Supabase URL and anon key
-
-        For Streamlit Cloud:
-        1. Go to your app settings
-        2. Click "Secrets" in the left sidebar
-        3. Add your secrets in TOML format
-
-        See STREAMLIT_DEPLOYMENT_GUIDE.md for details.
-        """)
-        st.stop()
+        return None
 
     return create_client(url, key)
 
@@ -53,6 +39,8 @@ def init_session_state():
 def sign_up(email: str, password: str) -> Dict:
     """Sign up a new user"""
     supabase = get_supabase_client()
+    if not supabase:
+        return {"success": False, "error": "Database not configured"}
     try:
         response = supabase.auth.sign_up({
             "email": email,
@@ -65,6 +53,8 @@ def sign_up(email: str, password: str) -> Dict:
 def sign_in(email: str, password: str) -> Dict:
     """Sign in an existing user"""
     supabase = get_supabase_client()
+    if not supabase:
+        return {"success": False, "error": "Database not configured"}
     try:
         response = supabase.auth.sign_in_with_password({
             "email": email,
@@ -86,14 +76,15 @@ def sign_in(email: str, password: str) -> Dict:
 def sign_out():
     """Sign out current user"""
     supabase = get_supabase_client()
-    try:
-        supabase.auth.sign_out()
-        st.session_state.user = None
-        st.session_state.access_token = None
-        st.session_state.user_leagues = []
-        st.session_state.current_league_id = None
-    except Exception as e:
-        st.error(f"Error signing out: {e}")
+    if supabase:
+        try:
+            supabase.auth.sign_out()
+        except Exception as e:
+            st.error(f"Error signing out: {e}")
+    st.session_state.user = None
+    st.session_state.access_token = None
+    st.session_state.user_leagues = []
+    st.session_state.current_league_id = None
 
 def is_authenticated() -> bool:
     """Check if user is authenticated"""
@@ -106,6 +97,8 @@ def get_current_user():
 def create_user_preferences_if_not_exists(user_id: str):
     """Create default user preferences if they don't exist"""
     supabase = get_supabase_client()
+    if not supabase:
+        return
     try:
         result = supabase.table('user_preferences').select('*').eq('user_id', user_id).execute()
 
@@ -116,21 +109,24 @@ def create_user_preferences_if_not_exists(user_id: str):
                 'email_notifications': True
             }).execute()
     except Exception as e:
-        st.warning(f"Could not create user preferences: {e}")
+        pass
 
 def get_user_leagues(user_id: str) -> List[Dict]:
     """Get all leagues for a user"""
     supabase = get_supabase_client()
+    if not supabase:
+        return []
     try:
         response = supabase.table('user_leagues').select('*').eq('user_id', user_id).eq('is_active', True).order('created_at', desc=True).execute()
         return response.data
     except Exception as e:
-        st.error(f"Error fetching leagues: {e}")
         return []
 
 def add_user_league(user_id: str, league_id: str, league_name: str, team_name: str = None, is_superflex: bool = False) -> bool:
     """Add a league to user's saved leagues"""
     supabase = get_supabase_client()
+    if not supabase:
+        return False
     try:
         supabase.table('user_leagues').insert({
             'user_id': user_id,
@@ -145,32 +141,35 @@ def add_user_league(user_id: str, league_id: str, league_name: str, team_name: s
         if "duplicate key" in str(e).lower():
             st.warning("This league is already saved to your account.")
             return False
-        st.error(f"Error adding league: {e}")
         return False
 
 def update_user_league(league_db_id: str, user_id: str, **kwargs) -> bool:
     """Update a user's league settings"""
     supabase = get_supabase_client()
+    if not supabase:
+        return False
     try:
         supabase.table('user_leagues').update(kwargs).eq('id', league_db_id).eq('user_id', user_id).execute()
         return True
     except Exception as e:
-        st.error(f"Error updating league: {e}")
         return False
 
 def delete_user_league(league_db_id: str, user_id: str) -> bool:
     """Soft delete a user's league"""
     supabase = get_supabase_client()
+    if not supabase:
+        return False
     try:
         supabase.table('user_leagues').update({'is_active': False}).eq('id', league_db_id).eq('user_id', user_id).execute()
         return True
     except Exception as e:
-        st.error(f"Error deleting league: {e}")
         return False
 
 def save_trade(user_id: str, league_id: str, trade_data: Dict, trade_result: Dict, notes: str = None) -> bool:
     """Save a trade for future reference"""
     supabase = get_supabase_client()
+    if not supabase:
+        return False
     try:
         supabase.table('saved_trades').insert({
             'user_id': user_id,
@@ -181,12 +180,13 @@ def save_trade(user_id: str, league_id: str, trade_data: Dict, trade_result: Dic
         }).execute()
         return True
     except Exception as e:
-        st.error(f"Error saving trade: {e}")
         return False
 
 def get_saved_trades(user_id: str, league_id: str = None) -> List[Dict]:
     """Get saved trades for a user, optionally filtered by league"""
     supabase = get_supabase_client()
+    if not supabase:
+        return []
     try:
         query = supabase.table('saved_trades').select('*').eq('user_id', user_id)
         if league_id:
@@ -194,12 +194,13 @@ def get_saved_trades(user_id: str, league_id: str = None) -> List[Dict]:
         response = query.order('created_at', desc=True).execute()
         return response.data
     except Exception as e:
-        st.error(f"Error fetching saved trades: {e}")
         return []
 
 def get_user_preferences(user_id: str) -> Optional[Dict]:
     """Get user preferences"""
     supabase = get_supabase_client()
+    if not supabase:
+        return None
     try:
         response = supabase.table('user_preferences').select('*').eq('user_id', user_id).single().execute()
         return response.data
@@ -209,11 +210,12 @@ def get_user_preferences(user_id: str) -> Optional[Dict]:
 def update_user_preferences(user_id: str, **kwargs) -> bool:
     """Update user preferences"""
     supabase = get_supabase_client()
+    if not supabase:
+        return False
     try:
         supabase.table('user_preferences').update(kwargs).eq('user_id', user_id).execute()
         return True
     except Exception as e:
-        st.error(f"Error updating preferences: {e}")
         return False
 
 def render_auth_ui():

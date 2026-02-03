@@ -3507,10 +3507,6 @@ def main():
 
     init_session_state()
 
-    if not is_authenticated():
-        render_auth_ui()
-        return
-
     # Hero Header
     st.markdown("""
     <div style="text-align: center; padding: 2rem 0 3rem 0;">
@@ -3523,15 +3519,48 @@ def main():
     </div>
     """, unsafe_allow_html=True)
 
-    if st.session_state.get('show_add_league', False):
-        render_add_league_modal()
-        return
+    # Check if user is authenticated for saved league features
+    if is_authenticated():
+        if st.session_state.get('show_add_league', False):
+            render_add_league_modal()
+            return
 
-    if st.session_state.get('show_manage_leagues', False):
-        render_manage_leagues_modal()
-        return
+        if st.session_state.get('show_manage_leagues', False):
+            render_manage_leagues_modal()
+            return
 
-    league_id = render_league_selector()
+        league_id = render_league_selector()
+    else:
+        # Guest mode - direct league ID input in sidebar
+        with st.sidebar:
+            st.markdown("### 🏈 Quick Start (Guest Mode)")
+            st.info("Sign in to save multiple leagues and trades")
+
+            league_id = st.text_input(
+                "Enter Sleeper League ID",
+                value=st.session_state.get('guest_league_id', ''),
+                placeholder="e.g., 123456789",
+                help="Find your League ID in Sleeper app: League → Settings → League ID"
+            )
+
+            if league_id:
+                st.session_state['guest_league_id'] = league_id
+            else:
+                league_id = st.session_state.get('guest_league_id', '')
+
+            if st.button("🔐 Sign In to Save Leagues", use_container_width=True):
+                st.session_state['show_guest_auth'] = True
+                st.rerun()
+
+        # Show auth modal if requested
+        if st.session_state.get('show_guest_auth', False):
+            render_auth_ui()
+            if st.button("← Back to Guest Mode"):
+                st.session_state['show_guest_auth'] = False
+                st.rerun()
+            return
+
+        league_id = league_id if league_id else None
 
     if league_id:
         query_params = st.query_params
