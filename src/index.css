@@ -1,3 +1,157 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* CMG Colors and Clickability Enhancements */
+
+/* Ensure all interactive elements are clickable */
+button,
+a,
+input,
+select,
+textarea,
+label,
+[role="button"],
+[role="link"],
+[role="radio"],
+[role="checkbox"] {
+  cursor: pointer !important;
+  user-select: none;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+textarea {
+  cursor: text !important;
+  user-select: text;
+}
+
+button:disabled {
+  cursor: not-allowed !important;
+}
+
+/* Smooth transitions for all interactive elements */
+button,
+a,
+input,
+select {
+  transition: all 0.3s ease;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #3CBEDC;
+  outline-offset: 2px;
+}
+
+/* Ensure buttons are always clickable */
+button {
+  pointer-events: auto !important;
+}
+
+/* Hover states for better UX */
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+button:not(:disabled):active {
+  transform: translateY(0);
+}
+
+/* Link styles */
+a {
+  text-decoration: none;
+  pointer-events: auto !important;
+}
+
+a:hover {
+  opacity: 0.9;
+}
+
+/* Form elements */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  pointer-events: auto !important;
+}
+
+/* Checkbox and radio */
+input[type="checkbox"],
+input[type="radio"] {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1A2F4F;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3CBEDC;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0694B5;
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Body defaults */
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ensure modals are above everything */
+.fixed {
+  z-index: 50;
+}
+
+/* Animation for modals */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fixed {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.fixed > div {
+  animation: slideUp 0.3s ease-out;
+}
