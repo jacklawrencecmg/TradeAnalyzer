@@ -695,9 +695,63 @@ def parse_pick_input(pick_string: str, is_superflex: bool = False) -> List[Dict]
 
     return picks
 
+def calculate_faab_value(faab_amount: float) -> float:
+    """
+    Convert FAAB dollars to dynasty value points for consistent trade analysis.
+
+    Total budget: $300/team per season
+
+    Tiered valuation (reflecting scarcity and strategic value):
+    - $1-25: $1 = 8 pts (small adds, low value)
+    - $26-75: $1 = 12 pts (mid-season pickups)
+    - $76-150: $1 = 15 pts (premium waiver claims)
+    - $151-300: $1 = 18 pts (elite pickups, emergency starters)
+
+    Examples:
+    - $25 FAAB = 200 pts (≈ 4th round pick)
+    - $50 FAAB = 500 pts (≈ late 3rd round pick)
+    - $100 FAAB = 950 pts (≈ mid 3rd round pick)
+    - $200 FAAB = 2,050 pts (≈ mid 2nd round pick)
+
+    Adjust multipliers based on league waiver aggression:
+    - Conservative waivers: Reduce multipliers by 20%
+    - Aggressive waivers: Increase multipliers by 20%
+    """
+    if faab_amount <= 0:
+        return 0
+
+    # Calculate value using tiered system
+    value = 0
+    remaining = faab_amount
+
+    # Tier 1: $1-25 at 8 pts per dollar
+    tier1 = min(remaining, 25)
+    value += tier1 * 8
+    remaining -= tier1
+
+    if remaining > 0:
+        # Tier 2: $26-75 at 12 pts per dollar
+        tier2 = min(remaining, 50)
+        value += tier2 * 12
+        remaining -= tier2
+
+    if remaining > 0:
+        # Tier 3: $76-150 at 15 pts per dollar
+        tier3 = min(remaining, 75)
+        value += tier3 * 15
+        remaining -= tier3
+
+    if remaining > 0:
+        # Tier 4: $151-300 at 18 pts per dollar
+        tier4 = min(remaining, 150)
+        value += tier4 * 18
+
+    return value
+
 def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
-                         give_picks: List[Dict], receive_picks: List[Dict]) -> Dict:
-    """Evaluate a manually entered trade including players and draft picks."""
+                         give_picks: List[Dict], receive_picks: List[Dict],
+                         give_faab: float = 0, receive_faab: float = 0) -> Dict:
+    """Evaluate a manually entered trade including players, draft picks, and FAAB."""
     # Calculate player values
     give_player_total = sum(p['value'] for p in give_players)
     receive_player_total = sum(p['value'] for p in receive_players)
@@ -706,9 +760,13 @@ def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
     give_pick_total = sum(p['value'] for p in give_picks)
     receive_pick_total = sum(p['value'] for p in receive_picks)
 
-    # Total values
-    give_total = give_player_total + give_pick_total
-    receive_total = receive_player_total + receive_pick_total
+    # Calculate FAAB values
+    give_faab_value = calculate_faab_value(give_faab)
+    receive_faab_value = calculate_faab_value(receive_faab)
+
+    # Total values (including FAAB)
+    give_total = give_player_total + give_pick_total + give_faab_value
+    receive_total = receive_player_total + receive_pick_total + receive_faab_value
 
     difference = receive_total - give_total
     percentage_diff = (difference / give_total * 100) if give_total > 0 else 0
@@ -731,9 +789,13 @@ def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
         'color': color,
         'give_player_total': give_player_total,
         'give_pick_total': give_pick_total,
+        'give_faab': give_faab,
+        'give_faab_value': give_faab_value,
         'give_total': give_total,
         'receive_player_total': receive_player_total,
         'receive_pick_total': receive_pick_total,
+        'receive_faab': receive_faab,
+        'receive_faab_value': receive_faab_value,
         'receive_total': receive_total,
         'difference': difference,
         'percentage_diff': percentage_diff,
@@ -775,6 +837,12 @@ def main():
         - Based on typical rookie ADP curves
         - Calibrated to same scale as players
         - Future years discounted appropriately
+
+        **FAAB Values:**
+        - Tiered valuation system ($300 total)
+        - $1-25: 8 pts/$ | $26-75: 12 pts/$
+        - $76-150: 15 pts/$ | $151-300: 18 pts/$
+        - Auto-fetched from Sleeper when available
 
         **League Format:**
         - Auto-detects Superflex from Sleeper
@@ -850,15 +918,22 @@ def main():
                 # Superflex leagues have "SUPER_FLEX" position
                 is_superflex = 'SUPER_FLEX' in roster_positions or roster_positions.count('QB') > 1
 
-    # Map rosters to owners
+    # Map rosters to owners (including FAAB)
     user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
                 for user in users}
 
     roster_map = {}
+    faab_map = {}  # Track FAAB per team
     for roster in rosters:
         owner_id = roster.get('owner_id')
         owner_name = user_map.get(owner_id, f"Team {roster.get('roster_id', '?')}")
         roster_map[owner_name] = roster.get('players', [])
+        # Extract FAAB from roster settings (Sleeper stores this in settings.waiver_budget_used)
+        # Total FAAB is typically 100 or 300, remaining = total - used
+        waiver_budget_used = roster.get('settings', {}).get('waiver_budget_used', 0)
+        # Assume $300 total budget (adjust if league uses different amount)
+        faab_remaining = 300 - waiver_budget_used
+        faab_map[owner_name] = max(0, faab_remaining)
 
     # Team selection
     st.header("👥 Select Your Team")
@@ -1026,7 +1101,7 @@ def main():
         )
 
         # Pick format guide
-        with st.expander("📖 Draft Pick Format Guide", expanded=False):
+        with st.expander("📖 Draft Pick & FAAB Format Guide", expanded=False):
             st.markdown("""
             **Supported Pick Formats:**
             - **Exact Slots**: `2026 1.01`, `2026 1.05`, `2027 2.08`
@@ -1043,6 +1118,14 @@ def main():
             - 2.01: 4000 pts | 2.06: 2600 pts | 2.12: 1400 pts
             - 3.01: 1200 pts | 3.06: 700 pts | 3.12: 350 pts
             - Future years discounted: 2027 (70%), 2028 (55%), 2029 (45%)
+
+            **FAAB Valuation (Total budget: $300/team):**
+            - $25 = 200 pts (≈ 4th round pick)
+            - $50 = 500 pts (≈ late 3rd round pick)
+            - $100 = 950 pts (≈ mid 3rd round pick)
+            - $200 = 2,050 pts (≈ mid 2nd round pick)
+            - Tiered system values scarcity: higher amounts = more value per dollar
+            - Your remaining FAAB auto-fetched from Sleeper
             """)
             st.caption("💡 Values based on typical rookie ADP curves using formula: 20000 / expected_ADP")
 
@@ -1085,8 +1168,22 @@ def main():
                         help="Enter picks separated by commas. Formats: '2026 1.01', '2027 1st (early)', '2026 2.05'"
                     )
 
+                    # FAAB input for Side A
+                    your_faab_remaining = faab_map.get(your_team, 300)
+                    give_faab = st.number_input(
+                        f"FAAB ($$ - You have ${your_faab_remaining:.0f} remaining):",
+                        min_value=0.0,
+                        max_value=300.0,
+                        value=0.0,
+                        step=5.0,
+                        key="give_faab",
+                        help=f"FAAB is finite ($300/team total). Value scaled to dynasty points. Current: ${your_faab_remaining:.0f}"
+                    )
+                    if give_faab > your_faab_remaining:
+                        st.warning(f"⚠️ You only have ${your_faab_remaining:.0f} FAAB remaining!")
+
                     # Show current side A value
-                    if give_player_selections or give_pick_input:
+                    if give_player_selections or give_pick_input or give_faab > 0:
                         temp_give_value = 0
                         temp_give_picks = []
 
@@ -1099,12 +1196,19 @@ def main():
                             temp_give_picks = parse_pick_input(give_pick_input, trade_is_superflex)
                             temp_give_value += sum(p['value'] for p in temp_give_picks)
 
+                        if give_faab > 0:
+                            give_faab_value = calculate_faab_value(give_faab)
+                            temp_give_value += give_faab_value
+
                         st.info(f"Total Value: {temp_give_value:.0f} pts")
 
                         if temp_give_picks:
                             st.caption(f"Parsed {len(temp_give_picks)} pick(s):")
                             for pick in temp_give_picks:
                                 st.caption(f"  • {pick['parsed']}: {pick['value']:.0f} pts")
+
+                        if give_faab > 0:
+                            st.caption(f"FAAB: ${give_faab:.0f} = {calculate_faab_value(give_faab):.0f} pts")
 
                 with col2:
                     st.subheader(f"📥 {selected_team} Gives")
@@ -1124,8 +1228,22 @@ def main():
                         help="Enter picks separated by commas. Formats: '2026 1.01', '2027 1st (early)', '2026 2.05'"
                     )
 
+                    # FAAB input for Side B
+                    other_faab_remaining = faab_map.get(selected_team, 300)
+                    receive_faab = st.number_input(
+                        f"FAAB ($$ - {selected_team} has ${other_faab_remaining:.0f} remaining):",
+                        min_value=0.0,
+                        max_value=300.0,
+                        value=0.0,
+                        step=5.0,
+                        key="receive_faab",
+                        help=f"FAAB is finite ($300/team total). Value scaled to dynasty points. Current: ${other_faab_remaining:.0f}"
+                    )
+                    if receive_faab > other_faab_remaining:
+                        st.warning(f"⚠️ {selected_team} only has ${other_faab_remaining:.0f} FAAB remaining!")
+
                     # Show current side B value
-                    if receive_player_selections or receive_pick_input:
+                    if receive_player_selections or receive_pick_input or receive_faab > 0:
                         temp_receive_value = 0
                         temp_receive_picks = []
 
@@ -1138,6 +1256,10 @@ def main():
                             temp_receive_picks = parse_pick_input(receive_pick_input, trade_is_superflex)
                             temp_receive_value += sum(p['value'] for p in temp_receive_picks)
 
+                        if receive_faab > 0:
+                            receive_faab_value = calculate_faab_value(receive_faab)
+                            temp_receive_value += receive_faab_value
+
                         st.info(f"Total Value: {temp_receive_value:.0f} pts")
 
                         if temp_receive_picks:
@@ -1145,10 +1267,13 @@ def main():
                             for pick in temp_receive_picks:
                                 st.caption(f"  • {pick['parsed']}: {pick['value']:.0f} pts")
 
+                        if receive_faab > 0:
+                            st.caption(f"FAAB: ${receive_faab:.0f} = {calculate_faab_value(receive_faab):.0f} pts")
+
                 # Analyze button
                 st.markdown("---")
                 if st.button("🔍 Analyze Trade", type="primary", use_container_width=True):
-                    if (give_player_selections or give_pick_input) and (receive_player_selections or receive_pick_input):
+                    if (give_player_selections or give_pick_input or give_faab > 0) and (receive_player_selections or receive_pick_input or receive_faab > 0):
                         # Parse player values from selections
                         give_data = []
                         for sel in give_player_selections:
@@ -1178,12 +1303,14 @@ def main():
                         give_picks_parsed = parse_pick_input(give_pick_input, trade_is_superflex)
                         receive_picks_parsed = parse_pick_input(receive_pick_input, trade_is_superflex)
 
-                        # Evaluate trade
+                        # Evaluate trade (including FAAB)
                         evaluation = evaluate_manual_trade(
                             give_data,
                             receive_data,
                             give_picks_parsed,
-                            receive_picks_parsed
+                            receive_picks_parsed,
+                            give_faab=give_faab,
+                            receive_faab=receive_faab
                         )
 
                         # Display results
@@ -1223,6 +1350,10 @@ def main():
                                     st.write(f"• {pick['parsed']} - {pick['value']:.0f} pts")
                                 st.write(f"**Picks Total:** {evaluation['give_pick_total']:.0f} pts")
 
+                            if evaluation['give_faab'] > 0:
+                                st.markdown("*FAAB:*")
+                                st.write(f"• ${evaluation['give_faab']:.0f} - {evaluation['give_faab_value']:.0f} pts")
+
                         with detail_col2:
                             st.markdown(f"**{selected_team} Gives:**")
 
@@ -1237,6 +1368,10 @@ def main():
                                 for pick in receive_picks_parsed:
                                     st.write(f"• {pick['parsed']} - {pick['value']:.0f} pts")
                                 st.write(f"**Picks Total:** {evaluation['receive_pick_total']:.0f} pts")
+
+                            if evaluation['receive_faab'] > 0:
+                                st.markdown("*FAAB:*")
+                                st.write(f"• ${evaluation['receive_faab']:.0f} - {evaluation['receive_faab_value']:.0f} pts")
 
                         # Recommendation
                         st.markdown("---")
