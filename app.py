@@ -411,10 +411,66 @@ def suggest_trades(your_roster: pd.DataFrame, all_rosters: Dict[str, pd.DataFram
     suggestions.sort(key=lambda x: x['your_gain'], reverse=True)
     return suggestions[:5]
 
-def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict]) -> Dict:
-    """Evaluate a manually entered trade."""
-    give_total = sum(p['value'] for p in give_players)
-    receive_total = sum(p['value'] for p in receive_players)
+def get_pick_value(pick_description: str) -> float:
+    """
+    Calculate dynasty draft pick value.
+    Values are approximate and can be customized based on your league.
+    You can also integrate KeepTradeCut (KTC) API for dynamic values if available.
+    """
+    pick_values = {
+        # 2026 picks
+        '2026 1st (Early)': 3500,
+        '2026 1st (Mid)': 3000,
+        '2026 1st (Late)': 2500,
+        '2026 1st': 3000,  # Default mid-value
+        '2026 2nd (Early)': 1500,
+        '2026 2nd (Mid)': 1200,
+        '2026 2nd (Late)': 1000,
+        '2026 2nd': 1200,
+        '2026 3rd': 500,
+        '2026 4th': 200,
+
+        # 2027 picks (slightly discounted)
+        '2027 1st (Early)': 3200,
+        '2027 1st (Mid)': 2700,
+        '2027 1st (Late)': 2200,
+        '2027 1st': 2700,
+        '2027 2nd (Early)': 1300,
+        '2027 2nd (Mid)': 1000,
+        '2027 2nd (Late)': 800,
+        '2027 2nd': 1000,
+        '2027 3rd': 400,
+        '2027 4th': 150,
+
+        # 2028 picks (more discounted)
+        '2028 1st (Early)': 2900,
+        '2028 1st (Mid)': 2400,
+        '2028 1st (Late)': 2000,
+        '2028 1st': 2400,
+        '2028 2nd (Early)': 1100,
+        '2028 2nd (Mid)': 900,
+        '2028 2nd (Late)': 700,
+        '2028 2nd': 900,
+        '2028 3rd': 350,
+        '2028 4th': 100,
+    }
+
+    return pick_values.get(pick_description, 0)
+
+def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict],
+                         give_picks: List[str], receive_picks: List[str]) -> Dict:
+    """Evaluate a manually entered trade including players and draft picks."""
+    # Calculate player values
+    give_player_total = sum(p['value'] for p in give_players)
+    receive_player_total = sum(p['value'] for p in receive_players)
+
+    # Calculate pick values
+    give_pick_total = sum(get_pick_value(pick) for pick in give_picks)
+    receive_pick_total = sum(get_pick_value(pick) for pick in receive_picks)
+
+    # Total values
+    give_total = give_player_total + give_pick_total
+    receive_total = receive_player_total + receive_pick_total
 
     difference = receive_total - give_total
     percentage_diff = (difference / give_total * 100) if give_total > 0 else 0
@@ -435,7 +491,11 @@ def evaluate_manual_trade(give_players: List[Dict], receive_players: List[Dict])
     return {
         'verdict': verdict,
         'color': color,
+        'give_player_total': give_player_total,
+        'give_pick_total': give_pick_total,
         'give_total': give_total,
+        'receive_player_total': receive_player_total,
+        'receive_pick_total': receive_pick_total,
         'receive_total': receive_total,
         'difference': difference,
         'percentage_diff': percentage_diff
@@ -675,71 +735,205 @@ def main():
             st.info("No strong trade opportunities found at this time. Your roster is well-balanced!")
 
         # Manual trade analyzer
-        st.header("🔍 Manual Trade Analyzer")
+        st.header("🔍 Dynasty Trade Analyzer")
+        st.markdown("Analyze multi-player trades with draft picks included")
 
-        col1, col2 = st.columns(2)
+        # Prepare player options with detailed info
+        your_player_options = []
+        for _, player in your_roster_df.iterrows():
+            option = f"{player['Name']} ({player['Position']}, {player['Team']}, Age {player['Age']}) - {player['AdjustedValue']:.0f} pts"
+            your_player_options.append(option)
 
-        with col1:
-            st.subheader("You Give")
-            give_players = st.multiselect(
-                "Select players to trade away:",
-                options=your_roster_df['Name'].tolist(),
-                key="give_players"
-            )
+        # Available draft picks
+        available_picks = [
+            '2026 1st (Early)', '2026 1st (Mid)', '2026 1st (Late)', '2026 1st',
+            '2026 2nd (Early)', '2026 2nd (Mid)', '2026 2nd (Late)', '2026 2nd',
+            '2026 3rd', '2026 4th',
+            '2027 1st (Early)', '2027 1st (Mid)', '2027 1st (Late)', '2027 1st',
+            '2027 2nd (Early)', '2027 2nd (Mid)', '2027 2nd (Late)', '2027 2nd',
+            '2027 3rd', '2027 4th',
+            '2028 1st (Early)', '2028 1st (Mid)', '2028 1st (Late)', '2028 1st',
+            '2028 2nd (Early)', '2028 2nd (Mid)', '2028 2nd (Late)', '2028 2nd',
+            '2028 3rd', '2028 4th',
+        ]
 
-        with col2:
-            st.subheader("You Receive")
-            other_teams = [t for t in all_rosters_df.keys() if t != your_team]
-            selected_team = st.selectbox("From team:", other_teams)
+        # Select trading partner
+        other_teams = [t for t in all_rosters_df.keys() if t != your_team]
+        if other_teams:
+            selected_team = st.selectbox("Trading with:", other_teams, key="trade_partner")
 
             if selected_team in all_rosters_df:
                 other_roster_df = all_rosters_df[selected_team]
-                receive_players = st.multiselect(
-                    "Select players to receive:",
-                    options=other_roster_df['Name'].tolist(),
-                    key="receive_players"
-                )
+                other_player_options = []
+                for _, player in other_roster_df.iterrows():
+                    option = f"{player['Name']} ({player['Position']}, {player['Team']}, Age {player['Age']}) - {player['AdjustedValue']:.0f} pts"
+                    other_player_options.append(option)
 
-        if st.button("Analyze Trade", type="primary"):
-            if give_players and receive_players:
-                # Get player values
-                give_data = []
-                for name in give_players:
-                    player = your_roster_df[your_roster_df['Name'] == name].iloc[0]
-                    give_data.append({
-                        'name': name,
-                        'position': player['Position'],
-                        'value': player['AdjustedValue']
-                    })
+                # Two-column layout for trade sides
+                col1, col2 = st.columns(2)
 
-                receive_data = []
-                for name in receive_players:
-                    player = other_roster_df[other_roster_df['Name'] == name].iloc[0]
-                    receive_data.append({
-                        'name': name,
-                        'position': player['Position'],
-                        'value': player['AdjustedValue']
-                    })
+                with col1:
+                    st.subheader(f"📤 {your_team} Gives")
 
-                # Evaluate trade
-                evaluation = evaluate_manual_trade(give_data, receive_data)
+                    give_player_selections = st.multiselect(
+                        "Players:",
+                        options=your_player_options,
+                        key="give_players",
+                        help="Select multiple players to trade away"
+                    )
 
+                    give_pick_selections = st.multiselect(
+                        "Draft Picks:",
+                        options=available_picks,
+                        key="give_picks",
+                        help="Select draft picks to trade away"
+                    )
+
+                    # Show current side A value
+                    if give_player_selections or give_pick_selections:
+                        temp_give_value = 0
+                        for sel in give_player_selections:
+                            player_name = sel.split(' (')[0]
+                            player = your_roster_df[your_roster_df['Name'] == player_name].iloc[0]
+                            temp_give_value += player['AdjustedValue']
+                        for pick in give_pick_selections:
+                            temp_give_value += get_pick_value(pick)
+                        st.info(f"Total Value: {temp_give_value:.0f} pts")
+
+                with col2:
+                    st.subheader(f"📥 {selected_team} Gives")
+
+                    receive_player_selections = st.multiselect(
+                        "Players:",
+                        options=other_player_options,
+                        key="receive_players",
+                        help="Select multiple players to receive"
+                    )
+
+                    receive_pick_selections = st.multiselect(
+                        "Draft Picks:",
+                        options=available_picks,
+                        key="receive_picks",
+                        help="Select draft picks to receive"
+                    )
+
+                    # Show current side B value
+                    if receive_player_selections or receive_pick_selections:
+                        temp_receive_value = 0
+                        for sel in receive_player_selections:
+                            player_name = sel.split(' (')[0]
+                            player = other_roster_df[other_roster_df['Name'] == player_name].iloc[0]
+                            temp_receive_value += player['AdjustedValue']
+                        for pick in receive_pick_selections:
+                            temp_receive_value += get_pick_value(pick)
+                        st.info(f"Total Value: {temp_receive_value:.0f} pts")
+
+                # Analyze button
                 st.markdown("---")
-                st.markdown(f"### {evaluation['verdict']}")
+                if st.button("🔍 Analyze Trade", type="primary", use_container_width=True):
+                    if (give_player_selections or give_pick_selections) and (receive_player_selections or receive_pick_selections):
+                        # Parse player values from selections
+                        give_data = []
+                        for sel in give_player_selections:
+                            player_name = sel.split(' (')[0]
+                            player = your_roster_df[your_roster_df['Name'] == player_name].iloc[0]
+                            give_data.append({
+                                'name': player['Name'],
+                                'position': player['Position'],
+                                'team': player['Team'],
+                                'age': player['Age'],
+                                'value': player['AdjustedValue']
+                            })
 
-                col1, col2, col3 = st.columns(3)
-                col1.metric("You Give", f"{evaluation['give_total']:.1f} pts")
-                col2.metric("You Receive", f"{evaluation['receive_total']:.1f} pts")
-                col3.metric("Net Change", f"{evaluation['difference']:+.1f} pts ({evaluation['percentage_diff']:+.1f}%)")
+                        receive_data = []
+                        for sel in receive_player_selections:
+                            player_name = sel.split(' (')[0]
+                            player = other_roster_df[other_roster_df['Name'] == player_name].iloc[0]
+                            receive_data.append({
+                                'name': player['Name'],
+                                'position': player['Position'],
+                                'team': player['Team'],
+                                'age': player['Age'],
+                                'value': player['AdjustedValue']
+                            })
 
-                if evaluation['percentage_diff'] > 10:
-                    st.success("This trade significantly favors you!")
-                elif evaluation['percentage_diff'] < -10:
-                    st.error("This trade is unfavorable for you. Consider negotiating.")
-                else:
-                    st.info("This is a balanced trade.")
-            else:
-                st.warning("Please select players for both sides of the trade.")
+                        # Evaluate trade
+                        evaluation = evaluate_manual_trade(
+                            give_data,
+                            receive_data,
+                            give_pick_selections,
+                            receive_pick_selections
+                        )
+
+                        # Display results
+                        st.markdown("---")
+                        st.markdown(f"## {evaluation['verdict']}")
+
+                        # Summary metrics
+                        metric_col1, metric_col2, metric_col3 = st.columns(3)
+                        with metric_col1:
+                            st.metric("You Give", f"{evaluation['give_total']:.0f} pts",
+                                     delta=None, delta_color="off")
+                        with metric_col2:
+                            st.metric("You Receive", f"{evaluation['receive_total']:.0f} pts",
+                                     delta=None, delta_color="off")
+                        with metric_col3:
+                            delta_text = f"{evaluation['difference']:+.0f} pts"
+                            st.metric("Net Gain", delta_text,
+                                     delta=f"{evaluation['percentage_diff']:+.1f}%",
+                                     delta_color="normal")
+
+                        # Detailed breakdown
+                        st.markdown("### Trade Breakdown")
+                        detail_col1, detail_col2 = st.columns(2)
+
+                        with detail_col1:
+                            st.markdown(f"**{your_team} Gives:**")
+
+                            if give_data:
+                                st.markdown("*Players:*")
+                                for player in give_data:
+                                    st.write(f"• {player['name']} ({player['position']}, {player['team']}) - {player['value']:.0f} pts")
+                                st.write(f"**Players Total:** {evaluation['give_player_total']:.0f} pts")
+
+                            if give_pick_selections:
+                                st.markdown("*Draft Picks:*")
+                                for pick in give_pick_selections:
+                                    st.write(f"• {pick} - {get_pick_value(pick):.0f} pts")
+                                st.write(f"**Picks Total:** {evaluation['give_pick_total']:.0f} pts")
+
+                        with detail_col2:
+                            st.markdown(f"**{selected_team} Gives:**")
+
+                            if receive_data:
+                                st.markdown("*Players:*")
+                                for player in receive_data:
+                                    st.write(f"• {player['name']} ({player['position']}, {player['team']}) - {player['value']:.0f} pts")
+                                st.write(f"**Players Total:** {evaluation['receive_player_total']:.0f} pts")
+
+                            if receive_pick_selections:
+                                st.markdown("*Draft Picks:*")
+                                for pick in receive_pick_selections:
+                                    st.write(f"• {pick} - {get_pick_value(pick):.0f} pts")
+                                st.write(f"**Picks Total:** {evaluation['receive_pick_total']:.0f} pts")
+
+                        # Recommendation
+                        st.markdown("---")
+                        if evaluation['percentage_diff'] > 10:
+                            st.success("💰 This trade significantly favors you! Strong opportunity to upgrade your roster.")
+                        elif evaluation['percentage_diff'] > 5:
+                            st.success("👍 This trade favors you slightly. Good deal if it fills a positional need.")
+                        elif abs(evaluation['percentage_diff']) <= 5:
+                            st.info("⚖️ This is a balanced trade. Consider your positional needs and roster construction.")
+                        elif evaluation['percentage_diff'] < -10:
+                            st.error("⚠️ This trade is unfavorable for you. Consider negotiating or adding assets to your side.")
+                        else:
+                            st.warning("📊 This trade slightly favors the other team. Negotiate if possible.")
+
+                    else:
+                        st.warning("⚠️ Please select at least one player or pick for each side of the trade.")
+        else:
+            st.info("No other teams available for trading.")
 
     else:
         st.warning(f"No roster data found for {your_team}")
