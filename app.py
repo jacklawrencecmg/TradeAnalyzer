@@ -635,6 +635,334 @@ def run_playoff_simulation(
 
     return results_df
 
+def calculate_recent_performance(
+    all_matchups: Dict[int, List[Dict]],
+    roster_id_to_team: Dict[int, str],
+    current_week: int,
+    lookback_weeks: int = 4
+) -> Dict[str, Dict]:
+    """
+    Calculate recent performance metrics for each team based on last N weeks.
+
+    Returns dict with team -> {
+        'recent_points': average points over last N weeks,
+        'recent_wins': wins in last N weeks,
+        'recent_games': number of games played,
+        'trend': 'up', 'down', or 'stable'
+    }
+    """
+    team_performance = {}
+
+    start_week = max(1, current_week - lookback_weeks)
+
+    for team in roster_id_to_team.values():
+        team_performance[team] = {
+            'recent_points': 0.0,
+            'recent_wins': 0,
+            'recent_games': 0,
+            'weekly_points': [],
+            'trend': 'stable'
+        }
+
+    for week in range(start_week, current_week):
+        if week not in all_matchups:
+            continue
+
+        matchups = all_matchups[week]
+        matchup_dict = {}
+
+        for matchup in matchups:
+            roster_id = matchup.get('roster_id')
+            matchup_id = matchup.get('matchup_id')
+            points = matchup.get('points', 0)
+
+            if matchup_id and roster_id in roster_id_to_team:
+                if matchup_id not in matchup_dict:
+                    matchup_dict[matchup_id] = []
+                matchup_dict[matchup_id].append({
+                    'roster_id': roster_id,
+                    'team': roster_id_to_team[roster_id],
+                    'points': points
+                })
+
+        for matchup_id, teams in matchup_dict.items():
+            if len(teams) == 2:
+                team1 = teams[0]['team']
+                team2 = teams[1]['team']
+                points1 = teams[0]['points']
+                points2 = teams[1]['points']
+
+                if team1 in team_performance:
+                    team_performance[team1]['recent_points'] += points1
+                    team_performance[team1]['recent_games'] += 1
+                    team_performance[team1]['weekly_points'].append(points1)
+                    if points1 > points2:
+                        team_performance[team1]['recent_wins'] += 1
+
+                if team2 in team_performance:
+                    team_performance[team2]['recent_points'] += points2
+                    team_performance[team2]['recent_games'] += 1
+                    team_performance[team2]['weekly_points'].append(points2)
+                    if points2 > points1:
+                        team_performance[team2]['recent_wins'] += 1
+
+    for team in team_performance:
+        if team_performance[team]['recent_games'] > 0:
+            team_performance[team]['recent_points'] /= team_performance[team]['recent_games']
+
+            weekly_points = team_performance[team]['weekly_points']
+            if len(weekly_points) >= 2:
+                first_half = weekly_points[:len(weekly_points)//2]
+                second_half = weekly_points[len(weekly_points)//2:]
+
+                if len(first_half) > 0 and len(second_half) > 0:
+                    avg_first = sum(first_half) / len(first_half)
+                    avg_second = sum(second_half) / len(second_half)
+
+                    if avg_second > avg_first * 1.05:
+                        team_performance[team]['trend'] = 'up'
+                    elif avg_second < avg_first * 0.95:
+                        team_performance[team]['trend'] = 'down'
+
+    return team_performance
+
+def calculate_strength_of_schedule(
+    all_matchups: Dict[int, List[Dict]],
+    roster_id_to_team: Dict[int, str],
+    team_projections: Dict[str, float],
+    current_week: int,
+    total_weeks: int
+) -> Dict[str, Dict]:
+    """
+    Calculate strength of schedule for each team.
+
+    Returns dict with team -> {
+        'past_sos': average opponent strength (past games),
+        'future_sos': average opponent strength (remaining games),
+        'overall_sos': combined SOS,
+        'sos_rank': difficulty rank (1 = hardest)
+    }
+    """
+    team_schedules = {team: {'past_opponents': [], 'future_opponents': []}
+                     for team in roster_id_to_team.values()}
+
+    for week in range(1, total_weeks + 1):
+        if week not in all_matchups:
+            continue
+
+        matchups = all_matchups[week]
+        matchup_dict = {}
+
+        for matchup in matchups:
+            roster_id = matchup.get('roster_id')
+            matchup_id = matchup.get('matchup_id')
+
+            if matchup_id and roster_id in roster_id_to_team:
+                if matchup_id not in matchup_dict:
+                    matchup_dict[matchup_id] = []
+                matchup_dict[matchup_id].append(roster_id_to_team[roster_id])
+
+        for matchup_id, teams in matchup_dict.items():
+            if len(teams) == 2:
+                team1, team2 = teams[0], teams[1]
+
+                if week < current_week:
+                    team_schedules[team1]['past_opponents'].append(team2)
+                    team_schedules[team2]['past_opponents'].append(team1)
+                else:
+                    team_schedules[team1]['future_opponents'].append(team2)
+                    team_schedules[team2]['future_opponents'].append(team1)
+
+    sos_results = {}
+
+    for team in team_schedules:
+        past_opponents = team_schedules[team]['past_opponents']
+        future_opponents = team_schedules[team]['future_opponents']
+
+        past_sos = 0.0
+        if past_opponents:
+            past_strengths = [team_projections.get(opp, 0) for opp in past_opponents]
+            past_sos = sum(past_strengths) / len(past_strengths)
+
+        future_sos = 0.0
+        if future_opponents:
+            future_strengths = [team_projections.get(opp, 0) for opp in future_opponents]
+            future_sos = sum(future_strengths) / len(future_strengths)
+
+        total_opponents = len(past_opponents) + len(future_opponents)
+        if total_opponents > 0:
+            overall_sos = (past_sos * len(past_opponents) + future_sos * len(future_opponents)) / total_opponents
+        else:
+            overall_sos = 0.0
+
+        sos_results[team] = {
+            'past_sos': past_sos,
+            'future_sos': future_sos,
+            'overall_sos': overall_sos,
+            'sos_rank': 0
+        }
+
+    sorted_teams = sorted(sos_results.items(), key=lambda x: x[1]['overall_sos'], reverse=True)
+    for rank, (team, data) in enumerate(sorted_teams, 1):
+        sos_results[team]['sos_rank'] = rank
+
+    return sos_results
+
+def calculate_power_rankings(
+    all_rosters_df: Dict[str, pd.DataFrame],
+    playoff_odds_df: pd.DataFrame,
+    recent_performance: Dict[str, Dict],
+    team_projections: Dict[str, float],
+    sos_data: Dict[str, Dict],
+    weights: Dict[str, float] = None
+) -> pd.DataFrame:
+    """
+    Calculate power rankings using weighted formula.
+
+    Weights:
+    - roster_value: 40% (long-term strength)
+    - playoff_odds: 30% (championship probability)
+    - recent_performance: 20% (current form)
+    - strength_of_schedule: 10% (difficulty adjustment)
+
+    Returns DataFrame with power rankings.
+    """
+    if weights is None:
+        weights = {
+            'roster_value': 0.40,
+            'playoff_odds': 0.30,
+            'recent_performance': 0.20,
+            'strength_of_schedule': 0.10
+        }
+
+    power_scores = []
+
+    for team in all_rosters_df.keys():
+        roster_value = team_projections.get(team, 0)
+
+        playoff_row = playoff_odds_df[playoff_odds_df['Team'] == team]
+        playoff_pct = playoff_row['Playoff %'].iloc[0] if len(playoff_row) > 0 else 0
+        championship_pct = playoff_row['Championship %'].iloc[0] if len(playoff_row) > 0 else 0
+        playoff_score = (playoff_pct * 0.7 + championship_pct * 0.3)
+
+        recent_perf = recent_performance.get(team, {})
+        recent_points = recent_perf.get('recent_points', 0)
+        recent_wins = recent_perf.get('recent_wins', 0)
+        recent_games = recent_perf.get('recent_games', 1)
+        recent_win_pct = (recent_wins / recent_games * 100) if recent_games > 0 else 0
+        recent_score = (recent_points * 0.6 + recent_win_pct * 0.4)
+
+        sos = sos_data.get(team, {})
+        sos_rank = sos.get('sos_rank', len(all_rosters_df) / 2)
+        num_teams = len(all_rosters_df)
+        sos_score = ((num_teams - sos_rank + 1) / num_teams) * 100
+
+        max_roster_value = max(team_projections.values()) if team_projections else 1
+        normalized_roster = (roster_value / max_roster_value) * 100 if max_roster_value > 0 else 0
+
+        max_recent = max([rp.get('recent_points', 0) for rp in recent_performance.values()]) if recent_performance else 1
+        normalized_recent = (recent_score / max_recent) * 100 if max_recent > 0 else 0
+
+        power_score = (
+            normalized_roster * weights['roster_value'] +
+            playoff_score * weights['playoff_odds'] +
+            normalized_recent * weights['recent_performance'] +
+            sos_score * weights['strength_of_schedule']
+        )
+
+        trend = recent_perf.get('trend', 'stable')
+
+        power_scores.append({
+            'Team': team,
+            'Power Score': power_score,
+            'Roster Value': roster_value,
+            'Playoff %': playoff_pct,
+            'Championship %': championship_pct,
+            'Recent PPG': recent_points,
+            'Recent Record': f"{recent_wins}-{recent_games - recent_wins}" if recent_games > 0 else "0-0",
+            'Trend': trend,
+            'SOS Rank': sos_rank,
+            'Future SOS': sos.get('future_sos', 0),
+            'Overall SOS': sos.get('overall_sos', 0)
+        })
+
+    df = pd.DataFrame(power_scores)
+    df = df.sort_values('Power Score', ascending=False).reset_index(drop=True)
+    df['Rank'] = range(1, len(df) + 1)
+
+    cols = ['Rank', 'Team', 'Power Score', 'Trend', 'Roster Value', 'Playoff %',
+            'Championship %', 'Recent PPG', 'Recent Record', 'SOS Rank', 'Future SOS']
+    df = df[cols]
+
+    return df
+
+def track_power_rankings_history(
+    current_rankings: pd.DataFrame,
+    current_week: int
+) -> pd.DataFrame:
+    """
+    Track power rankings history over time.
+    Stores in session state and returns historical DataFrame.
+    """
+    if 'power_rankings_history' not in st.session_state:
+        st.session_state['power_rankings_history'] = []
+
+    history = st.session_state['power_rankings_history']
+
+    current_snapshot = []
+    for _, row in current_rankings.iterrows():
+        current_snapshot.append({
+            'Week': current_week,
+            'Team': row['Team'],
+            'Rank': row['Rank'],
+            'Power Score': row['Power Score']
+        })
+
+    existing_week = [i for i, item in enumerate(history) if item['Week'] == current_week]
+    if existing_week:
+        history = [item for item in history if item['Week'] != current_week]
+
+    history.extend(current_snapshot)
+    st.session_state['power_rankings_history'] = history
+
+    if history:
+        history_df = pd.DataFrame(history)
+        return history_df
+    else:
+        return pd.DataFrame()
+
+def calculate_rank_change(
+    current_rankings: pd.DataFrame,
+    history_df: pd.DataFrame,
+    current_week: int
+) -> pd.DataFrame:
+    """
+    Calculate rank change from previous week.
+    """
+    rankings_with_change = current_rankings.copy()
+    rankings_with_change['Δ Rank'] = 0
+    rankings_with_change['Δ Score'] = 0.0
+
+    if not history_df.empty and current_week > 1:
+        prev_week = current_week - 1
+        prev_data = history_df[history_df['Week'] == prev_week]
+
+        if not prev_data.empty:
+            for idx, row in rankings_with_change.iterrows():
+                team = row['Team']
+                current_rank = row['Rank']
+                current_score = row['Power Score']
+
+                prev_row = prev_data[prev_data['Team'] == team]
+                if len(prev_row) > 0:
+                    prev_rank = prev_row['Rank'].iloc[0]
+                    prev_score = prev_row['Power Score'].iloc[0]
+
+                    rankings_with_change.at[idx, 'Δ Rank'] = prev_rank - current_rank
+                    rankings_with_change.at[idx, 'Δ Score'] = current_score - prev_score
+
+    return rankings_with_change
+
 def render_searchable_pick_input(
     label: str,
     pick_options: List[str],
@@ -3175,6 +3503,395 @@ def main():
 
             else:
                 st.error("Unable to run simulation. Please ensure all data is loaded correctly.")
+
+        # Power Rankings Dashboard
+        st.markdown("---")
+        st.header("⚡ Power Rankings")
+        st.caption("Dynamic rankings combining roster value, playoff odds, recent performance, and strength of schedule")
+
+        if 'playoff_odds_df' in st.session_state and not st.session_state['playoff_odds_df'].empty:
+            power_current_week = st.session_state.get('simulation_params', {}).get('current_week', current_week_input)
+
+            with st.spinner("Calculating power rankings..."):
+                roster_id_to_team = {}
+                for roster in league_rosters:
+                    owner_id = roster.get('owner_id')
+                    roster_id = roster['roster_id']
+                    user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
+                               for user in league_users}
+                    team_name = user_map.get(owner_id, f"Team {roster_id}")
+                    roster_id_to_team[roster_id] = team_name
+
+                team_projections = {}
+                for team_name, roster_df in all_rosters_df.items():
+                    team_projections[team_name] = calculate_team_projected_points(roster_df, league_details, starters_only=True)
+
+                recent_performance = calculate_recent_performance(
+                    all_matchups,
+                    roster_id_to_team,
+                    power_current_week,
+                    lookback_weeks=4
+                )
+
+                sos_data = calculate_strength_of_schedule(
+                    all_matchups,
+                    roster_id_to_team,
+                    team_projections,
+                    power_current_week,
+                    total_weeks
+                )
+
+                power_rankings_df = calculate_power_rankings(
+                    all_rosters_df,
+                    st.session_state['playoff_odds_df'],
+                    recent_performance,
+                    team_projections,
+                    sos_data
+                )
+
+                history_df = track_power_rankings_history(power_rankings_df, power_current_week)
+                power_rankings_df = calculate_rank_change(power_rankings_df, history_df, power_current_week)
+
+            st.markdown(f"### Week {power_current_week} Power Rankings")
+
+            your_rank_row = power_rankings_df[power_rankings_df['Team'] == your_team]
+            if len(your_rank_row) > 0:
+                your_rank = your_rank_row['Rank'].iloc[0]
+                your_score = your_rank_row['Power Score'].iloc[0]
+                your_delta_rank = your_rank_row['Δ Rank'].iloc[0]
+                your_trend = your_rank_row['Trend'].iloc[0]
+
+                rank_col1, rank_col2, rank_col3, rank_col4 = st.columns(4)
+
+                with rank_col1:
+                    st.metric(
+                        "Your Rank",
+                        f"#{your_rank}",
+                        delta=f"{your_delta_rank:+.0f}" if your_delta_rank != 0 else None,
+                        delta_color="inverse"
+                    )
+
+                with rank_col2:
+                    st.metric(
+                        "Power Score",
+                        f"{your_score:.1f}",
+                        delta=f"{your_rank_row['Δ Score'].iloc[0]:+.1f}" if your_rank_row['Δ Score'].iloc[0] != 0 else None
+                    )
+
+                with rank_col3:
+                    trend_icon = "📈" if your_trend == "up" else "📉" if your_trend == "down" else "➡️"
+                    st.metric(
+                        "Recent Form",
+                        f"{trend_icon} {your_rank_row['Recent PPG'].iloc[0]:.1f} PPG",
+                        help="Average points per game over last 4 weeks"
+                    )
+
+                with rank_col4:
+                    sos_rank = your_rank_row['SOS Rank'].iloc[0]
+                    sos_difficulty = "Hard" if sos_rank <= 4 else "Medium" if sos_rank <= 8 else "Easy"
+                    st.metric(
+                        "Schedule",
+                        f"{sos_difficulty} (#{sos_rank})",
+                        help="Strength of schedule rank"
+                    )
+
+            st.markdown("---")
+
+            visual_tab1, visual_tab2, visual_tab3 = st.tabs([
+                "📊 Rankings Table",
+                "📈 Power Score Trends",
+                "🎯 Component Breakdown"
+            ])
+
+            with visual_tab1:
+                st.markdown("### Current Power Rankings")
+
+                display_rankings = power_rankings_df.copy()
+                display_rankings['Your Team'] = display_rankings['Team'].apply(
+                    lambda x: '⭐ ' + x if x == your_team else x
+                )
+
+                for idx, row in display_rankings.iterrows():
+                    is_your_team = row['Team'] == your_team
+                    team_display = row['Your Team']
+
+                    trend_icon = "📈" if row['Trend'] == "up" else "📉" if row['Trend'] == "down" else "➡️"
+                    delta_icon = "🔺" if row['Δ Rank'] > 0 else "🔻" if row['Δ Rank'] < 0 else "➖"
+
+                    rank_str = f"#{row['Rank']}"
+                    if row['Δ Rank'] != 0:
+                        rank_str += f" ({delta_icon} {abs(row['Δ Rank'])})"
+
+                    sos_difficulty = "🔴" if row['SOS Rank'] <= 4 else "🟡" if row['SOS Rank'] <= 8 else "🟢"
+
+                    with st.expander(
+                        f"{rank_str} {team_display} - Score: {row['Power Score']:.1f} {trend_icon}",
+                        expanded=is_your_team
+                    ):
+                        detail_col1, detail_col2, detail_col3 = st.columns(3)
+
+                        with detail_col1:
+                            st.write("**Roster & Odds**")
+                            st.write(f"Roster Value: {row['Roster Value']:.1f}")
+                            st.write(f"Playoff %: {row['Playoff %']:.1f}%")
+                            st.write(f"Title %: {row['Championship %']:.1f}%")
+
+                        with detail_col2:
+                            st.write("**Recent Performance**")
+                            st.write(f"Last 4 Weeks: {row['Recent Record']}")
+                            st.write(f"Avg PPG: {row['Recent PPG']:.1f}")
+                            st.write(f"Trend: {trend_icon} {row['Trend'].title()}")
+
+                        with detail_col3:
+                            st.write("**Schedule**")
+                            st.write(f"SOS Rank: {sos_difficulty} #{row['SOS Rank']}")
+                            st.write(f"Future SOS: {row['Future SOS']:.1f}")
+                            st.write(f"Power Score: {row['Power Score']:.1f}")
+
+                st.markdown("---")
+                st.markdown("### Detailed Rankings Table")
+
+                table_display = display_rankings[[
+                    'Rank', 'Your Team', 'Power Score', 'Δ Rank', 'Δ Score',
+                    'Trend', 'Recent PPG', 'SOS Rank'
+                ]].copy()
+
+                table_display = table_display.rename(columns={
+                    'Your Team': 'Team',
+                    'Δ Rank': 'Δ',
+                    'Δ Score': 'Score Δ'
+                })
+
+                st.dataframe(
+                    table_display,
+                    use_container_width=True,
+                    hide_index=True,
+                    column_config={
+                        'Rank': st.column_config.NumberColumn('Rank', format='#%d'),
+                        'Power Score': st.column_config.NumberColumn('Power Score', format='%.1f'),
+                        'Δ': st.column_config.NumberColumn('Δ', format='%+d'),
+                        'Score Δ': st.column_config.NumberColumn('Score Δ', format='%+.1f'),
+                        'Recent PPG': st.column_config.NumberColumn('Recent PPG', format='%.1f'),
+                        'SOS Rank': st.column_config.NumberColumn('SOS', format='#%d')
+                    }
+                )
+
+            with visual_tab2:
+                st.markdown("### Power Score Trends Over Time")
+
+                if not history_df.empty and len(history_df['Week'].unique()) > 1:
+                    chart_data = history_df.copy()
+                    chart_data['Your Team'] = chart_data['Team'].apply(
+                        lambda x: 'Your Team' if x == your_team else 'Other Teams'
+                    )
+
+                    base_chart = alt.Chart(chart_data).mark_line(point=True).encode(
+                        x=alt.X('Week:Q', title='Week', scale=alt.Scale(domain=[
+                            chart_data['Week'].min(),
+                            chart_data['Week'].max()
+                        ])),
+                        y=alt.Y('Power Score:Q', title='Power Score'),
+                        color=alt.Color(
+                            'Team:N',
+                            legend=alt.Legend(title='Team', orient='right'),
+                            scale=alt.Scale(scheme='tableau20')
+                        ),
+                        strokeWidth=alt.condition(
+                            alt.datum.Team == your_team,
+                            alt.value(3),
+                            alt.value(1)
+                        ),
+                        opacity=alt.condition(
+                            alt.datum.Team == your_team,
+                            alt.value(1.0),
+                            alt.value(0.3)
+                        ),
+                        tooltip=[
+                            alt.Tooltip('Week:Q', title='Week'),
+                            alt.Tooltip('Team:N', title='Team'),
+                            alt.Tooltip('Power Score:Q', title='Power Score', format='.1f'),
+                            alt.Tooltip('Rank:Q', title='Rank')
+                        ]
+                    ).properties(
+                        height=400,
+                        title='Power Score Progression by Team'
+                    ).interactive()
+
+                    st.altair_chart(base_chart, use_container_width=True)
+
+                    st.markdown("#### Rank Movement Chart")
+
+                    rank_chart = alt.Chart(chart_data).mark_line(point=True).encode(
+                        x=alt.X('Week:Q', title='Week'),
+                        y=alt.Y('Rank:Q', title='Power Rank', scale=alt.Scale(reverse=True)),
+                        color=alt.Color(
+                            'Team:N',
+                            legend=alt.Legend(title='Team', orient='right'),
+                            scale=alt.Scale(scheme='tableau20')
+                        ),
+                        strokeWidth=alt.condition(
+                            alt.datum.Team == your_team,
+                            alt.value(3),
+                            alt.value(1)
+                        ),
+                        opacity=alt.condition(
+                            alt.datum.Team == your_team,
+                            alt.value(1.0),
+                            alt.value(0.3)
+                        ),
+                        tooltip=[
+                            alt.Tooltip('Week:Q', title='Week'),
+                            alt.Tooltip('Team:N', title='Team'),
+                            alt.Tooltip('Rank:Q', title='Rank'),
+                            alt.Tooltip('Power Score:Q', title='Power Score', format='.1f')
+                        ]
+                    ).properties(
+                        height=400,
+                        title='Power Rank Progression (Lower is Better)'
+                    ).interactive()
+
+                    st.altair_chart(rank_chart, use_container_width=True)
+
+                    your_history = chart_data[chart_data['Team'] == your_team].sort_values('Week')
+                    if len(your_history) > 1:
+                        st.markdown(f"#### Your Team's Journey")
+
+                        weeks = your_history['Week'].tolist()
+                        scores = your_history['Power Score'].tolist()
+                        ranks = your_history['Rank'].tolist()
+
+                        journey_cols = st.columns(min(len(weeks), 5))
+                        for i, week in enumerate(weeks):
+                            with journey_cols[i % 5]:
+                                rank_change = ""
+                                if i > 0:
+                                    rank_diff = ranks[i-1] - ranks[i]
+                                    if rank_diff > 0:
+                                        rank_change = f" 🔺+{rank_diff}"
+                                    elif rank_diff < 0:
+                                        rank_change = f" 🔻{rank_diff}"
+
+                                st.metric(
+                                    f"Week {int(week)}",
+                                    f"#{int(ranks[i])}{rank_change}",
+                                    f"{scores[i]:.1f} pts"
+                                )
+
+                else:
+                    st.info("📊 Power rankings history will appear here as you run simulations across multiple weeks. " +
+                           "Update the current week and re-run to track changes over time.")
+
+            with visual_tab3:
+                st.markdown("### Power Score Component Breakdown")
+
+                st.markdown("""
+                **Power Score Formula:**
+                - 40% Roster Value (long-term strength)
+                - 30% Playoff Odds (championship probability)
+                - 20% Recent Performance (current form)
+                - 10% Strength of Schedule (difficulty adjustment)
+                """)
+
+                component_data = []
+                for _, row in power_rankings_df.iterrows():
+                    team = row['Team']
+                    is_your_team = team == your_team
+
+                    playoff_score = (row['Playoff %'] * 0.7 + row['Championship %'] * 0.3)
+
+                    max_roster = power_rankings_df['Roster Value'].max()
+                    normalized_roster = (row['Roster Value'] / max_roster * 100) if max_roster > 0 else 0
+
+                    max_recent = power_rankings_df['Recent PPG'].max()
+                    normalized_recent = (row['Recent PPG'] / max_recent * 100) if max_recent > 0 else 0
+
+                    num_teams = len(power_rankings_df)
+                    sos_score = ((num_teams - row['SOS Rank'] + 1) / num_teams) * 100
+
+                    component_data.append({
+                        'Team': team,
+                        'Roster': normalized_roster * 0.40,
+                        'Playoff Odds': playoff_score * 0.30,
+                        'Recent Form': normalized_recent * 0.20,
+                        'Schedule': sos_score * 0.10,
+                        'Your Team': 'Your Team' if is_your_team else 'Other Teams'
+                    })
+
+                component_df = pd.DataFrame(component_data)
+
+                melted_components = component_df.melt(
+                    id_vars=['Team', 'Your Team'],
+                    value_vars=['Roster', 'Playoff Odds', 'Recent Form', 'Schedule'],
+                    var_name='Component',
+                    value_name='Score'
+                )
+
+                component_chart = alt.Chart(melted_components).mark_bar().encode(
+                    x=alt.X('Score:Q', title='Contribution to Power Score', stack='zero'),
+                    y=alt.Y('Team:N', sort='-x', title='Team'),
+                    color=alt.Color(
+                        'Component:N',
+                        scale=alt.Scale(scheme='category10'),
+                        legend=alt.Legend(title='Component')
+                    ),
+                    opacity=alt.condition(
+                        alt.datum['Your Team'] == 'Your Team',
+                        alt.value(1.0),
+                        alt.value(0.6)
+                    ),
+                    tooltip=[
+                        'Team',
+                        'Component',
+                        alt.Tooltip('Score:Q', format='.1f')
+                    ]
+                ).properties(
+                    height=400,
+                    title='Power Score Component Breakdown by Team'
+                ).interactive()
+
+                st.altair_chart(component_chart, use_container_width=True)
+
+                if len(your_rank_row) > 0:
+                    st.markdown("#### Your Team's Component Analysis")
+
+                    your_components = component_df[component_df['Team'] == your_team].iloc[0]
+
+                    comp_col1, comp_col2, comp_col3, comp_col4 = st.columns(4)
+
+                    with comp_col1:
+                        st.metric(
+                            "Roster (40%)",
+                            f"{your_components['Roster']:.1f}",
+                            help="Normalized roster value contribution"
+                        )
+
+                    with comp_col2:
+                        st.metric(
+                            "Playoff Odds (30%)",
+                            f"{your_components['Playoff Odds']:.1f}",
+                            help="Playoff & championship probability contribution"
+                        )
+
+                    with comp_col3:
+                        st.metric(
+                            "Recent Form (20%)",
+                            f"{your_components['Recent Form']:.1f}",
+                            help="Last 4 weeks performance contribution"
+                        )
+
+                    with comp_col4:
+                        st.metric(
+                            "Schedule (10%)",
+                            f"{your_components['Schedule']:.1f}",
+                            help="Strength of schedule contribution"
+                        )
+
+            st.info("💡 **How to Use Power Rankings:** These rankings combine multiple factors to show true team strength. " +
+                   "Rising ranks indicate improving teams, while falling ranks may signal concern. " +
+                   "Use this alongside playoff odds and trade analysis for strategic decisions.")
+
+        else:
+            st.info("⚡ Run the Playoff Odds Simulator above to unlock Power Rankings analysis.")
 
         # Trade suggestions
         st.markdown("---")
