@@ -2804,6 +2804,47 @@ def calculate_news_adjusted_value(base_value: float, impact_pct: float) -> float
     """Calculate value adjusted for news impact."""
     return base_value * (1 + impact_pct / 100)
 
+def configure_chart_theme():
+    """Configure Altair chart theme with dark colors."""
+    return {
+        'config': {
+            'view': {
+                'continuousHeight': 300,
+                'continuousWidth': 400,
+                'strokeWidth': 0
+            },
+            'background': '#001428',
+            'title': {
+                'color': '#EAF2FF',
+                'fontSize': 16,
+                'font': 'Inter',
+                'fontWeight': 600
+            },
+            'axis': {
+                'domainColor': '#1A2A44',
+                'gridColor': '#1A2A44',
+                'labelColor': '#8FA2BF',
+                'tickColor': '#1A2A44',
+                'titleColor': '#C7CBD6',
+                'labelFont': 'Inter',
+                'titleFont': 'Inter',
+                'titleFontWeight': 600,
+                'labelFontSize': 11,
+                'titleFontSize': 12
+            },
+            'legend': {
+                'labelColor': '#C7CBD6',
+                'titleColor': '#EAF2FF',
+                'labelFont': 'Inter',
+                'titleFont': 'Inter',
+                'titleFontWeight': 600
+            },
+            'mark': {
+                'color': '#3CBEDC'
+            }
+        }
+    }
+
 def analyze_trade_question(
     question: str,
     all_rosters_df: Dict[str, pd.DataFrame],
@@ -2976,7 +3017,408 @@ def analyze_trade_question(
     return '\n'.join(response)
 
 def main():
-    st.set_page_config(page_title="Fantasy Football Trade Analyzer", layout="wide")
+    st.set_page_config(
+        page_title="Fantasy Football Trade Analyzer",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+
+    # Configure Altair dark theme
+    alt.themes.register('dark_theme', configure_chart_theme)
+    alt.themes.enable('dark_theme')
+
+    st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Color Variables */
+        :root {
+            --bg-0: #000A1E;
+            --bg-1: #0A141E;
+            --bg-2: #0A1428;
+            --surface-1: #001428;
+            --surface-2: #0B1B33;
+            --border-1: #1A2A44;
+            --text-1: #EAF2FF;
+            --text-2: #C7CBD6;
+            --text-3: #8FA2BF;
+            --accent-1: #3CBEDC;
+            --accent-2: #5BC0FF;
+            --accent-glow: #9AF0FF;
+            --pos: #2EE59D;
+            --neg: #FF4D6D;
+            --warn: #F5C542;
+        }
+
+        /* Global Styles */
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        }
+
+        /* Main Background */
+        .stApp {
+            background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-0) 100%);
+        }
+
+        /* Main Content Area */
+        .main .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+            max-width: 1400px;
+        }
+
+        /* Headers */
+        h1 {
+            font-weight: 800 !important;
+            background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 3rem !important;
+            margin-bottom: 0.5rem !important;
+            letter-spacing: -0.02em;
+        }
+
+        h2 {
+            font-weight: 700 !important;
+            color: var(--text-1) !important;
+            font-size: 2rem !important;
+            margin-top: 2rem !important;
+            margin-bottom: 1rem !important;
+            letter-spacing: -0.01em;
+        }
+
+        h3 {
+            font-weight: 600 !important;
+            color: var(--text-2) !important;
+            font-size: 1.5rem !important;
+            margin-top: 1.5rem !important;
+        }
+
+        /* Body Text */
+        p, span, div {
+            color: var(--text-2) !important;
+            font-weight: 400;
+            line-height: 1.6;
+        }
+
+        /* Sidebar Styling */
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, var(--surface-1) 0%, var(--bg-1) 100%);
+            border-right: 1px solid var(--border-1);
+        }
+
+        section[data-testid="stSidebar"] .block-container {
+            padding-top: 2rem;
+        }
+
+        /* Cards & Expanders */
+        .stExpander {
+            background: var(--surface-1) !important;
+            border: 1px solid var(--border-1) !important;
+            border-radius: 12px !important;
+            margin: 0.75rem 0 !important;
+            transition: all 0.3s ease;
+        }
+
+        .stExpander:hover {
+            border-color: var(--accent-1) !important;
+            box-shadow: 0 0 20px rgba(60, 190, 220, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .stExpander summary {
+            color: var(--text-1) !important;
+            font-weight: 600 !important;
+        }
+
+        /* Buttons - Glowing Effect */
+        .stButton > button {
+            background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            border: none !important;
+            border-radius: 8px !important;
+            padding: 0.75rem 2rem !important;
+            transition: all 0.3s ease !important;
+            box-shadow: 0 4px 15px rgba(60, 190, 220, 0.4);
+        }
+
+        .stButton > button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(60, 190, 220, 0.6);
+        }
+
+        .stButton > button:active {
+            transform: translateY(-1px);
+        }
+
+        /* Download Buttons */
+        .stDownloadButton > button {
+            background: linear-gradient(135deg, var(--pos) 0%, #00D9A3 100%) !important;
+            color: white !important;
+            font-weight: 600 !important;
+            border: none !important;
+            border-radius: 8px !important;
+            box-shadow: 0 4px 15px rgba(46, 229, 157, 0.4);
+        }
+
+        .stDownloadButton > button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(46, 229, 157, 0.6);
+        }
+
+        /* Input Fields */
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {
+            background: var(--surface-2) !important;
+            border: 1px solid var(--border-1) !important;
+            border-radius: 8px !important;
+            color: var(--text-1) !important;
+            padding: 0.75rem !important;
+            transition: all 0.3s ease;
+        }
+
+        .stTextInput > div > div > input:focus,
+        .stNumberInput > div > div > input:focus,
+        .stTextArea > div > div > textarea:focus {
+            border-color: var(--accent-1) !important;
+            box-shadow: 0 0 0 1px var(--accent-1), 0 0 20px rgba(60, 190, 220, 0.3) !important;
+        }
+
+        /* Select Boxes */
+        .stSelectbox > div > div {
+            background: var(--surface-2) !important;
+            border: 1px solid var(--border-1) !important;
+            border-radius: 8px !important;
+        }
+
+        .stSelectbox > div > div:hover {
+            border-color: var(--accent-1) !important;
+        }
+
+        /* Multiselect */
+        .stMultiSelect > div > div {
+            background: var(--surface-2) !important;
+            border: 1px solid var(--border-1) !important;
+            border-radius: 8px !important;
+        }
+
+        /* DataFrames / Tables */
+        .stDataFrame {
+            background: var(--surface-1) !important;
+            border-radius: 12px !important;
+            overflow: hidden;
+            border: 1px solid var(--border-1) !important;
+        }
+
+        .stDataFrame [data-testid="stTable"] {
+            background: var(--surface-1) !important;
+        }
+
+        .stDataFrame thead tr {
+            background: var(--surface-2) !important;
+        }
+
+        .stDataFrame thead th {
+            color: var(--text-1) !important;
+            font-weight: 700 !important;
+            padding: 1rem !important;
+            border-bottom: 2px solid var(--accent-1) !important;
+        }
+
+        .stDataFrame tbody tr {
+            border-bottom: 1px solid var(--border-1) !important;
+        }
+
+        .stDataFrame tbody tr:nth-child(even) {
+            background: var(--surface-2) !important;
+        }
+
+        .stDataFrame tbody tr:hover {
+            background: rgba(60, 190, 220, 0.1) !important;
+        }
+
+        .stDataFrame tbody td {
+            color: var(--text-2) !important;
+            padding: 0.75rem 1rem !important;
+        }
+
+        /* Metrics */
+        [data-testid="stMetricValue"] {
+            color: var(--text-1) !important;
+            font-weight: 700 !important;
+            font-size: 2rem !important;
+        }
+
+        [data-testid="stMetricDelta"] {
+            font-weight: 600 !important;
+        }
+
+        /* Success/Info/Warning/Error Messages */
+        .stSuccess {
+            background: rgba(46, 229, 157, 0.15) !important;
+            border-left: 4px solid var(--pos) !important;
+            border-radius: 8px !important;
+            color: var(--pos) !important;
+        }
+
+        .stInfo {
+            background: rgba(60, 190, 220, 0.15) !important;
+            border-left: 4px solid var(--accent-1) !important;
+            border-radius: 8px !important;
+            color: var(--accent-2) !important;
+        }
+
+        .stWarning {
+            background: rgba(245, 197, 66, 0.15) !important;
+            border-left: 4px solid var(--warn) !important;
+            border-radius: 8px !important;
+            color: var(--warn) !important;
+        }
+
+        .stError {
+            background: rgba(255, 77, 109, 0.15) !important;
+            border-left: 4px solid var(--neg) !important;
+            border-radius: 8px !important;
+            color: var(--neg) !important;
+        }
+
+        /* Progress Bar */
+        .stProgress > div > div > div {
+            background: linear-gradient(90deg, var(--accent-1) 0%, var(--accent-2) 100%) !important;
+        }
+
+        /* Spinner */
+        .stSpinner > div {
+            border-top-color: var(--accent-1) !important;
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px;
+            background: var(--surface-1);
+            border-radius: 8px;
+            padding: 0.5rem;
+        }
+
+        .stTabs [data-baseweb="tab"] {
+            background: transparent;
+            border-radius: 6px;
+            color: var(--text-3) !important;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+        }
+
+        .stTabs [data-baseweb="tab"]:hover {
+            background: var(--surface-2);
+            color: var(--text-2) !important;
+        }
+
+        .stTabs [aria-selected="true"] {
+            background: linear-gradient(135deg, var(--accent-1) 0%, var(--accent-2) 100%) !important;
+            color: white !important;
+        }
+
+        /* Code Blocks */
+        .stCodeBlock, code {
+            background: var(--surface-2) !important;
+            border: 1px solid var(--border-1) !important;
+            border-radius: 8px !important;
+            color: var(--accent-glow) !important;
+        }
+
+        /* Divider */
+        hr {
+            border-color: var(--border-1) !important;
+            margin: 2rem 0 !important;
+        }
+
+        /* Checkbox & Radio */
+        .stCheckbox, .stRadio {
+            color: var(--text-2) !important;
+        }
+
+        /* Slider */
+        .stSlider > div > div > div > div {
+            background: var(--accent-1) !important;
+        }
+
+        /* Caption Text */
+        .caption {
+            color: var(--text-3) !important;
+            font-size: 0.875rem;
+        }
+
+        /* Link Buttons */
+        .stLinkButton > a {
+            background: var(--surface-2) !important;
+            border: 1px solid var(--border-1) !important;
+            border-radius: 8px !important;
+            color: var(--accent-2) !important;
+            font-weight: 600 !important;
+            padding: 0.75rem 1.5rem !important;
+            text-decoration: none !important;
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .stLinkButton > a:hover {
+            border-color: var(--accent-1) !important;
+            box-shadow: 0 0 20px rgba(60, 190, 220, 0.4);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem !important;
+            }
+
+            h2 {
+                font-size: 1.5rem !important;
+            }
+
+            .main .block-container {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-1);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface-2);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-1);
+        }
+
+        /* Glow Animation */
+        @keyframes glow {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(60, 190, 220, 0.3);
+            }
+            50% {
+                box-shadow: 0 0 30px rgba(60, 190, 220, 0.6);
+            }
+        }
+
+        .glow-effect {
+            animation: glow 2s ease-in-out infinite;
+        }
+    </style>
+    """, unsafe_allow_html=True)
 
     init_session_state()
 
@@ -2984,8 +3426,17 @@ def main():
         render_auth_ui()
         return
 
-    st.title("🏈 Ultimate Fantasy Football Trade Analyzer")
-    st.markdown("### (IDP, Historical, & League Import)")
+    # Hero Header
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem 0 3rem 0;">
+        <h1 style="margin-bottom: 0.5rem;">
+            <span style="font-size: 3.5rem;">🏈</span> Ultimate Fantasy Football Trade Analyzer
+        </h1>
+        <p style="font-size: 1.1rem; color: var(--text-3); font-weight: 500;">
+            IDP Support • Historical Analysis • League Import • AI-Powered Insights
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
 
     if st.session_state.get('show_add_league', False):
         render_add_league_modal()
@@ -3601,12 +4052,15 @@ def main():
                 st.markdown("##### Visual Comparison")
 
                 chart_data = players_only_df.copy()
-                chart_data['Color'] = chart_data['Team'].apply(lambda x: '#1f77b4' if x == your_team else '#aec7e8')
 
                 chart = alt.Chart(chart_data).mark_bar().encode(
                     x=alt.X('Player Value:Q', title='Total Player Value (pts)'),
                     y=alt.Y('Team:N', sort='-x', title='Team'),
-                    color=alt.Color('Color:N', scale=None, legend=None),
+                    color=alt.condition(
+                        alt.datum.Team == your_team,
+                        alt.value('#3CBEDC'),
+                        alt.value('#0B1B33')
+                    ),
                     tooltip=['Team', alt.Tooltip('Player Value:Q', format=',.0f')]
                 ).properties(height=400)
 
@@ -3653,7 +4107,7 @@ def main():
                 chart = alt.Chart(chart_data).mark_bar().encode(
                     x=alt.X('Total Value:Q', title='Total Value (pts)'),
                     y=alt.Y('Team:N', sort='-x', title='Team'),
-                    color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#1f77b4', '#aec7e8'])),
+                    color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#3CBEDC', '#0B1B33'])),
                     tooltip=[
                         'Team',
                         alt.Tooltip('Total Value:Q', format=',.0f'),
@@ -3680,7 +4134,7 @@ def main():
                 stacked_chart = alt.Chart(chart_data_stacked).mark_bar().encode(
                     x=alt.X('sum(Value):Q', title='Value (pts)', stack='zero'),
                     y=alt.Y('Team:N', sort=alt.EncodingSortField(field='Value', op='sum', order='descending'), title='Team'),
-                    color=alt.Color('Value Type:N', scale=alt.Scale(domain=['Players', 'Picks'], range=['#2ca02c', '#ff7f0e'])),
+                    color=alt.Color('Value Type:N', scale=alt.Scale(domain=['Players', 'Picks'], range=['#2EE59D', '#F5C542'])),
                     tooltip=['Team', 'Value Type', alt.Tooltip('Value:Q', format=',.0f')]
                 ).properties(height=400, title='Team Value Breakdown: Players vs Picks')
 
@@ -3858,7 +4312,7 @@ def main():
                     chart = alt.Chart(chart_data).mark_bar().encode(
                         x=alt.X('Playoff %:Q', title='Playoff Probability (%)'),
                         y=alt.Y('Team:N', sort='-x', title='Team'),
-                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#1f77b4', '#aec7e8'])),
+                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#3CBEDC', '#0B1B33'])),
                         tooltip=[
                             'Team',
                             alt.Tooltip('Playoff %:Q', format='.1f'),
@@ -3876,7 +4330,7 @@ def main():
                     chart = alt.Chart(chart_data).mark_bar().encode(
                         x=alt.X('Championship %:Q', title='Championship Probability (%)'),
                         y=alt.Y('Team:N', sort='-x', title='Team'),
-                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#2ca02c', '#98df8a'])),
+                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#2EE59D', '#5BC0FF'])),
                         tooltip=[
                             'Team',
                             alt.Tooltip('Championship %:Q', format='.1f'),
@@ -3894,7 +4348,7 @@ def main():
                     chart = alt.Chart(chart_data).mark_bar().encode(
                         x=alt.X('Projected Wins:Q', title='Projected Wins'),
                         y=alt.Y('Team:N', sort='-x', title='Team'),
-                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#ff7f0e', '#ffbb78'])),
+                        color=alt.Color('Your Team:N', scale=alt.Scale(domain=['Your Team', 'Other Teams'], range=['#F5C542', '#9AF0FF'])),
                         tooltip=[
                             'Team',
                             alt.Tooltip('Projected Wins:Q', format='.1f'),
@@ -4510,8 +4964,8 @@ def main():
                         y=alt.Y('Team:N', sort='-x', title='Team'),
                         color=alt.condition(
                             alt.datum.Team == your_team,
-                            alt.value('#1f77b4'),
-                            alt.value('#aec7e8')
+                            alt.value('#3CBEDC'),
+                            alt.value('#0B1B33')
                         ),
                         tooltip=['Team', 'Trades']
                     ).properties(height=300)
@@ -4533,7 +4987,7 @@ def main():
                         theta='Count:Q',
                         color=alt.Color('Quality:N', scale=alt.Scale(
                             domain=['Fair', 'Lopsided'],
-                            range=['#2ca02c', '#d62728']
+                            range=['#2EE59D', '#FF4D6D']
                         )),
                         tooltip=['Quality', 'Count']
                     ).properties(height=300)
@@ -5436,8 +5890,8 @@ def main():
         y=alt.Y('Team:N', sort='-x'),
         color=alt.condition(
             alt.datum.Team == your_team,
-            alt.value('#1f77b4'),
-            alt.value('lightgray')
+            alt.value('#3CBEDC'),
+            alt.value('#0B1B33')
         ),
         tooltip=['Team', 'Total Value', 'Avg Player Value']
     ).properties(height=400, title="League Power Rankings")
