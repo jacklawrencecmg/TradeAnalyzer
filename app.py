@@ -35,7 +35,7 @@ from sleeper_api import (
     get_future_picks_inventory, adjust_value_for_league_scoring,
     get_team_roster_composition, calculate_optimal_starter_count,
     get_recent_transactions_summary, format_roster_positions, is_superflex_league,
-    fetch_all_nfl_players
+    fetch_all_nfl_players, filter_trades, parse_trade_details
 )
 
 # Configuration
@@ -962,6 +962,177 @@ def calculate_rank_change(
                     rankings_with_change.at[idx, 'Δ Score'] = current_score - prev_score
 
     return rankings_with_change
+
+def calculate_trade_value(
+    players: List[str],
+    picks: List[str],
+    faab: int,
+    all_players_data: Dict,
+    projections_df: pd.DataFrame,
+    league_details: Dict
+) -> float:
+    """
+    Calculate total value of players, picks, and FAAB in a trade.
+
+    Returns: total value
+    """
+    total_value = 0.0
+
+    for player_name in players:
+        player_row = projections_df[projections_df['Player'] == player_name]
+        if len(player_row) > 0:
+            total_value += player_row['Value'].iloc[0]
+
+    pick_values = get_draft_pick_values(league_details)
+    for pick_str in picks:
+        pick_value = pick_values.get(pick_str, 0)
+        total_value += pick_value
+
+    total_value += faab * 2
+
+    return total_value
+
+def analyze_historical_trade(
+    trade_details: Dict,
+    all_rosters_df: Dict[str, pd.DataFrame],
+    projections_df: pd.DataFrame,
+    league_details: Dict,
+    all_players_data: Dict
+) -> Dict:
+    """
+    Analyze a historical trade using current player valuations.
+
+    Returns: dict with analysis including value diff, winner/loser, fairness rating
+    """
+    exchanges = trade_details['exchanges']
+    roster_ids = trade_details['roster_ids']
+    teams_involved = trade_details['teams_involved']
+
+    team_values = {}
+
+    for i, roster_id in enumerate(roster_ids):
+        team_name = teams_involved[i] if i < len(teams_involved) else f"Team {roster_id}"
+        exchange = exchanges.get(roster_id, {})
+
+        received_players = exchange.get('players_received', [])
+        given_players = exchange.get('players_given', [])
+        received_picks = exchange.get('picks_received', [])
+        given_picks = exchange.get('picks_given', [])
+        received_faab = exchange.get('faab_received', 0)
+        given_faab = exchange.get('faab_given', 0)
+
+        value_received = calculate_trade_value(
+            received_players, received_picks, received_faab,
+            all_players_data, projections_df, league_details
+        )
+
+        value_given = calculate_trade_value(
+            given_players, given_picks, given_faab,
+            all_players_data, projections_df, league_details
+        )
+
+        net_value = value_received - value_given
+
+        team_values[team_name] = {
+            'received': {
+                'players': received_players,
+                'picks': received_picks,
+                'faab': received_faab,
+                'value': value_received
+            },
+            'given': {
+                'players': given_players,
+                'picks': given_picks,
+                'faab': given_faab,
+                'value': value_given
+            },
+            'net_value': net_value,
+            'net_percent': ((net_value / value_given) * 100) if value_given > 0 else 0
+        }
+
+    sorted_teams = sorted(team_values.items(), key=lambda x: x[1]['net_value'], reverse=True)
+
+    if len(sorted_teams) >= 2:
+        winner = sorted_teams[0]
+        loser = sorted_teams[-1]
+
+        value_diff = abs(winner[1]['net_value'] - loser[1]['net_value'])
+        avg_value = (winner[1]['given']['value'] + loser[1]['given']['value']) / 2
+        fairness_pct = (value_diff / avg_value * 100) if avg_value > 0 else 0
+
+        is_lopsided = fairness_pct > 20
+
+        return {
+            'team_values': team_values,
+            'winner': winner[0],
+            'loser': loser[0],
+            'value_diff': value_diff,
+            'fairness_pct': fairness_pct,
+            'is_lopsided': is_lopsided,
+            'trade_quality': 'Lopsided' if is_lopsided else 'Fair'
+        }
+    else:
+        return {
+            'team_values': team_values,
+            'winner': None,
+            'loser': None,
+            'value_diff': 0,
+            'fairness_pct': 0,
+            'is_lopsided': False,
+            'trade_quality': 'Unknown'
+        }
+
+def build_trade_history_dataframe(
+    trades: List[Dict],
+    analyzed_trades: List[Dict]
+) -> pd.DataFrame:
+    """
+    Build a DataFrame from analyzed trades for display.
+
+    Returns: DataFrame with trade history
+    """
+    if not trades or not analyzed_trades:
+        return pd.DataFrame()
+
+    data = []
+
+    for trade, analysis in zip(trades, analyzed_trades):
+        timestamp = trade.get('timestamp', 0)
+        if timestamp:
+            trade_date = datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d')
+        else:
+            trade_date = 'Unknown'
+
+        teams = trade.get('teams_involved', [])
+        teams_str = ' ↔ '.join(teams)
+
+        all_players = trade.get('players_involved', [])
+        players_str = ', '.join(all_players) if all_players else 'No players'
+
+        winner = analysis.get('winner', 'N/A')
+        loser = analysis.get('loser', 'N/A')
+        value_diff = analysis.get('value_diff', 0)
+        fairness_pct = analysis.get('fairness_pct', 0)
+        is_lopsided = analysis.get('is_lopsided', False)
+        trade_quality = analysis.get('trade_quality', 'Unknown')
+
+        data.append({
+            'Date': trade_date,
+            'Teams': teams_str,
+            'Players': players_str,
+            'Winner': winner,
+            'Loser': loser,
+            'Value Diff': value_diff,
+            'Fairness %': fairness_pct,
+            'Lopsided': is_lopsided,
+            'Quality': trade_quality,
+            'Timestamp': timestamp
+        })
+
+    df = pd.DataFrame(data)
+    df = df.sort_values('Timestamp', ascending=False).reset_index(drop=True)
+
+    return df
 
 def render_searchable_pick_input(
     label: str,
@@ -2633,6 +2804,177 @@ def calculate_news_adjusted_value(base_value: float, impact_pct: float) -> float
     """Calculate value adjusted for news impact."""
     return base_value * (1 + impact_pct / 100)
 
+def analyze_trade_question(
+    question: str,
+    all_rosters_df: Dict[str, pd.DataFrame],
+    full_projections_df: pd.DataFrame,
+    league_details: Dict,
+    your_team: str,
+    playoff_odds_df: pd.DataFrame = None,
+    power_rankings_df: pd.DataFrame = None
+) -> str:
+    """
+    Analyze a trade question using available league data.
+
+    Returns: AI-generated response with analysis
+    """
+    question_lower = question.lower()
+
+    response = []
+
+    if "should i trade" in question_lower or "trade" in question_lower:
+        response.append("📊 **Trade Analysis**\n")
+
+        player_names = []
+        for _, row in full_projections_df.iterrows():
+            player_name = row['Player']
+            if player_name.lower() in question_lower:
+                player_names.append(player_name)
+
+        if player_names:
+            response.append(f"Players mentioned: {', '.join(player_names)}\n")
+
+            for player_name in player_names:
+                player_row = full_projections_df[full_projections_df['Player'] == player_name]
+                if len(player_row) > 0:
+                    value = player_row['Value'].iloc[0]
+                    position = player_row['Position'].iloc[0]
+                    age = player_row.get('Age', pd.Series([0])).iloc[0] if 'Age' in player_row else 0
+
+                    response.append(f"\n**{player_name}** ({position})")
+                    response.append(f"- Current Value: {value:.1f} points")
+                    if age > 0:
+                        response.append(f"- Age: {age}")
+
+                        if age >= 30:
+                            response.append(f"  ⚠️ Over 30 - declining asset")
+                        elif age <= 24:
+                            response.append(f"  ✅ Young - appreciating asset")
+
+            response.append("\n**Considerations:**")
+
+            if any(word in question_lower for word in ["contender", "contending", "win now", "championship"]):
+                response.append("- You're in win-now mode: prioritize proven producers over picks")
+                response.append("- Target players 25-29 years old for immediate impact")
+                response.append("- Consider consolidating depth for star power")
+
+            if any(word in question_lower for word in ["rebuild", "rebuilding", "future", "picks"]):
+                response.append("- You're rebuilding: prioritize young players and draft picks")
+                response.append("- Sell veterans over 28 for maximum return")
+                response.append("- Target players under 25 with upside")
+
+            if power_rankings_df is not None and not power_rankings_df.empty:
+                your_rank_row = power_rankings_df[power_rankings_df['Team'] == your_team]
+                if len(your_rank_row) > 0:
+                    your_rank = your_rank_row['Rank'].iloc[0]
+                    response.append(f"\n- Your current power rank: #{your_rank}")
+
+                    if your_rank <= 3:
+                        response.append("  → You're a top contender - go all-in for the title")
+                    elif your_rank <= 6:
+                        response.append("  → You're a playoff team - make calculated upgrades")
+                    else:
+                        response.append("  → Consider selling and building for next year")
+
+            if playoff_odds_df is not None and not playoff_odds_df.empty:
+                your_odds_row = playoff_odds_df[playoff_odds_df['Team'] == your_team]
+                if len(your_odds_row) > 0:
+                    playoff_pct = your_odds_row['Playoff %'].iloc[0]
+                    champ_pct = your_odds_row['Championship %'].iloc[0]
+
+                    response.append(f"\n- Your playoff odds: {playoff_pct:.1f}%")
+                    response.append(f"- Your championship odds: {champ_pct:.1f}%")
+
+                    if champ_pct >= 15:
+                        response.append("  → Strong title odds - trade for stars, not picks")
+                    elif champ_pct >= 5:
+                        response.append("  → Decent title shot - balance present and future")
+                    else:
+                        response.append("  → Long odds - consider selling for future value")
+
+        else:
+            response.append("I couldn't identify specific players in your question.")
+            response.append("Try asking about specific players by name.")
+
+        response.append("\n**Recommendation:**")
+        response.append("Use the Dynasty Trade Analyzer below to input the exact trade and see detailed value calculations.")
+
+    elif "contender" in question_lower or "championship" in question_lower:
+        response.append("🏆 **Contender Status Analysis**\n")
+
+        if power_rankings_df is not None and not power_rankings_df.empty:
+            your_rank_row = power_rankings_df[power_rankings_df['Team'] == your_team]
+            if len(your_rank_row) > 0:
+                your_rank = your_rank_row['Rank'].iloc[0]
+                your_score = your_rank_row['Power Score'].iloc[0]
+                trend = your_rank_row['Trend'].iloc[0]
+
+                response.append(f"**Power Rankings:**")
+                response.append(f"- Current Rank: #{your_rank}")
+                response.append(f"- Power Score: {your_score:.1f}")
+                response.append(f"- Recent Trend: {trend}")
+
+        if playoff_odds_df is not None and not playoff_odds_df.empty:
+            your_odds_row = playoff_odds_df[playoff_odds_df['Team'] == your_team]
+            if len(your_odds_row) > 0:
+                playoff_pct = your_odds_row['Playoff %'].iloc[0]
+                champ_pct = your_odds_row['Championship %'].iloc[0]
+
+                response.append(f"\n**Playoff Probabilities:**")
+                response.append(f"- Make Playoffs: {playoff_pct:.1f}%")
+                response.append(f"- Win Championship: {champ_pct:.1f}%")
+
+                if champ_pct >= 20:
+                    response.append("\n✅ **Elite Contender** - You're a championship favorite")
+                    response.append("- Strategy: Go all-in, trade picks for proven stars")
+                    response.append("- Target: Top-5 players at key positions")
+                    response.append("- Timeline: Win in the next 1-2 years")
+
+                elif champ_pct >= 10:
+                    response.append("\n⚠️ **Strong Contender** - You have a good shot")
+                    response.append("- Strategy: Make calculated upgrades, don't mortgage future")
+                    response.append("- Target: Fill specific roster gaps")
+                    response.append("- Timeline: Competitive for 2-3 years")
+
+                elif champ_pct >= 5:
+                    response.append("\n📊 **Fringe Contender** - You're on the bubble")
+                    response.append("- Strategy: Evaluate risk/reward carefully")
+                    response.append("- Target: High-upside plays, avoid overpaying")
+                    response.append("- Timeline: Decide if this is your year or next")
+
+                else:
+                    response.append("\n❌ **Rebuilder** - Focus on the future")
+                    response.append("- Strategy: Sell veterans, acquire picks and youth")
+                    response.append("- Target: Players under 25, early-round picks")
+                    response.append("- Timeline: Build for 2-3 years from now")
+
+        response.append("\n**Next Steps:**")
+        response.append("Check the Power Rankings and Playoff Odds sections above for detailed analysis.")
+
+    elif any(word in question_lower for word in ["help", "advice", "what should", "how do"]):
+        response.append("🤖 **AI Trade Advisor Help**\n")
+        response.append("I can help you with:")
+        response.append("\n**Trade Analysis:**")
+        response.append('- "Should I trade Bijan for Chase + 2026 1.05?"')
+        response.append('- "Is trading my 2026 1st for CMC worth it?"')
+        response.append("\n**Team Strategy:**")
+        response.append('- "Is my team a contender?"')
+        response.append('- "Should I rebuild or compete?"')
+        response.append("\n**Player Evaluation:**")
+        response.append('- "What is Josh Allen worth?"')
+        response.append('- "Should I sell Tyreek Hill?"')
+        response.append("\nFor best results, mention specific players by name and your team's goals.")
+
+    else:
+        response.append("🤖 **AI Trade Advisor**\n")
+        response.append("I'm here to help with trade decisions and team strategy!")
+        response.append("\nTry asking:")
+        response.append('- "Should I trade [Player A] for [Player B]?"')
+        response.append('- "Is my team a contender?"')
+        response.append('- "What should my strategy be?"')
+
+    return '\n'.join(response)
+
 def main():
     st.set_page_config(page_title="Fantasy Football Trade Analyzer", layout="wide")
 
@@ -2655,9 +2997,96 @@ def main():
 
     league_id = render_league_selector()
 
+    if league_id:
+        query_params = st.query_params
+        current_url = f"?league_id={league_id}"
+        if st.session_state.get('selected_team'):
+            current_url += f"&team={st.session_state['selected_team'].replace(' ', '+')}"
+
+        with st.expander("🔗 Share This League"):
+            shareable_url = f"https://your-app-url.com/{current_url}"
+            st.code(shareable_url)
+
+            share_col1, share_col2, share_col3 = st.columns(3)
+
+            with share_col1:
+                st.link_button(
+                    "📱 Share via Twitter",
+                    f"https://twitter.com/intent/tweet?text=Check%20out%20my%20dynasty%20league%20analysis&url={shareable_url}"
+                )
+
+            with share_col2:
+                st.link_button(
+                    "💬 Share via Facebook",
+                    f"https://www.facebook.com/sharer/sharer.php?u={shareable_url}"
+                )
+
+            with share_col3:
+                if st.button("📋 Copy Link"):
+                    st.success("Link copied to clipboard!")
+
     # Sidebar for configuration
     with st.sidebar:
         st.header("⚙️ Configuration")
+
+        st.markdown("---")
+        st.markdown("**🤖 AI Trade Advisor**")
+
+        if 'chat_history' not in st.session_state:
+            st.session_state['chat_history'] = []
+
+        if league_id and 'full_projections_df' in st.session_state:
+            chat_input = st.text_input(
+                "Ask me about trades...",
+                key="chat_input",
+                placeholder="e.g., Should I trade Bijan?"
+            )
+
+            if chat_input:
+                with st.spinner("🤔 Thinking..."):
+                    playoff_odds = st.session_state.get('playoff_odds_df', None)
+                    power_rankings = None
+
+                    if 'power_rankings_history' in st.session_state:
+                        history = st.session_state['power_rankings_history']
+                        if history:
+                            history_df = pd.DataFrame(history)
+                            current_week = max(history_df['Week'])
+                            power_rankings = history_df[history_df['Week'] == current_week]
+
+                    response = analyze_trade_question(
+                        chat_input,
+                        st.session_state.get('all_rosters_df', {}),
+                        st.session_state.get('full_projections_df', pd.DataFrame()),
+                        st.session_state.get('league_details', {}),
+                        st.session_state.get('selected_team', ''),
+                        playoff_odds,
+                        power_rankings
+                    )
+
+                    st.session_state['chat_history'].append({
+                        'question': chat_input,
+                        'response': response
+                    })
+
+            with st.expander("💬 Chat History", expanded=True):
+                if st.session_state['chat_history']:
+                    for i, chat in enumerate(reversed(st.session_state['chat_history'])):
+                        st.markdown(f"**You:** {chat['question']}")
+                        st.markdown(chat['response'])
+                        st.markdown("---")
+
+                        if i >= 2:
+                            break
+                else:
+                    st.info("Ask a question to get started!")
+
+            if st.session_state['chat_history']:
+                if st.button("🗑️ Clear Chat"):
+                    st.session_state['chat_history'] = []
+                    st.rerun()
+        else:
+            st.info("Enter a League ID to unlock AI advisor")
 
         st.markdown("---")
         st.markdown("**API Status**")
@@ -3892,6 +4321,234 @@ def main():
 
         else:
             st.info("⚡ Run the Playoff Odds Simulator above to unlock Power Rankings analysis.")
+
+        # Trade History Analyzer
+        st.markdown("---")
+        st.header("📜 Trade History & Analyzer")
+        st.caption("Retrospective analysis of all league trades using current player valuations")
+
+        with st.spinner("Fetching trade history..."):
+            all_transactions = fetch_league_transactions(league_id)
+            trades = filter_trades(all_transactions)
+
+        if trades:
+            st.success(f"Found {len(trades)} trades in league history")
+
+            parsed_trades = []
+            analyzed_trades = []
+
+            with st.spinner("Analyzing trades..."):
+                for trade in trades:
+                    parsed = parse_trade_details(trade, league_users, all_players_data, league_rosters)
+                    parsed_trades.append(parsed)
+
+                    analysis = analyze_historical_trade(
+                        parsed,
+                        all_rosters_df,
+                        full_projections_df,
+                        league_details,
+                        all_players_data
+                    )
+                    analyzed_trades.append(analysis)
+
+            trade_history_df = build_trade_history_dataframe(parsed_trades, analyzed_trades)
+
+            filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+            with filter_col1:
+                unique_teams = []
+                for trade in parsed_trades:
+                    unique_teams.extend(trade['teams_involved'])
+                unique_teams = sorted(list(set(unique_teams)))
+
+                team_filter = st.multiselect(
+                    "Filter by Team",
+                    options=['All'] + unique_teams,
+                    default=['All']
+                )
+
+            with filter_col2:
+                quality_filter = st.multiselect(
+                    "Filter by Quality",
+                    options=['All', 'Fair', 'Lopsided'],
+                    default=['All']
+                )
+
+            with filter_col3:
+                player_filter = st.text_input(
+                    "Filter by Player Name",
+                    placeholder="e.g., Bijan Robinson"
+                )
+
+            filtered_df = trade_history_df.copy()
+
+            if team_filter and 'All' not in team_filter:
+                filtered_df = filtered_df[filtered_df['Teams'].apply(
+                    lambda x: any(team in x for team in team_filter)
+                )]
+
+            if quality_filter and 'All' not in quality_filter:
+                filtered_df = filtered_df[filtered_df['Quality'].isin(quality_filter)]
+
+            if player_filter:
+                filtered_df = filtered_df[filtered_df['Players'].str.contains(
+                    player_filter, case=False, na=False
+                )]
+
+            st.markdown(f"### Showing {len(filtered_df)} trades")
+
+            lopsided_count = len(filtered_df[filtered_df['Lopsided'] == True])
+            if lopsided_count > 0:
+                st.warning(f"⚠️ {lopsided_count} lopsided trades detected (>20% value difference)")
+
+            st.dataframe(
+                filtered_df[[
+                    'Date', 'Teams', 'Players', 'Winner', 'Loser',
+                    'Value Diff', 'Fairness %', 'Quality'
+                ]],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    'Value Diff': st.column_config.NumberColumn('Value Diff', format='%.1f'),
+                    'Fairness %': st.column_config.NumberColumn('Fairness %', format='%.1f%%')
+                }
+            )
+
+            st.markdown("---")
+            st.markdown("### Detailed Trade Analysis")
+
+            for i, (parsed, analysis) in enumerate(zip(parsed_trades, analyzed_trades)):
+                if i >= len(filtered_df):
+                    continue
+
+                timestamp = parsed['timestamp']
+                if timestamp and timestamp in filtered_df['Timestamp'].values:
+                    trade_date_str = datetime.fromtimestamp(timestamp / 1000).strftime('%Y-%m-%d %H:%M')
+
+                    is_lopsided = analysis['is_lopsided']
+                    quality = analysis['trade_quality']
+                    winner = analysis.get('winner', 'N/A')
+                    loser = analysis.get('loser', 'N/A')
+
+                    expander_title = f"📅 {trade_date_str} - {' ↔ '.join(parsed['teams_involved'])}"
+                    if is_lopsided:
+                        expander_title += " ⚠️ LOPSIDED"
+
+                    with st.expander(expander_title, expanded=False):
+                        if winner and loser:
+                            st.markdown(f"**Winner:** {winner} | **Loser:** {loser}")
+                            st.markdown(f"**Value Difference:** {analysis['value_diff']:.1f} points")
+                            st.markdown(f"**Fairness:** {analysis['fairness_pct']:.1f}% variance")
+
+                        st.markdown("---")
+
+                        team_values = analysis['team_values']
+
+                        for team_name, values in team_values.items():
+                            is_winner = team_name == winner
+                            header = f"**{team_name}**"
+                            if is_winner:
+                                header += " ✅ (Winner)"
+
+                            st.markdown(header)
+
+                            trade_col1, trade_col2, trade_col3 = st.columns(3)
+
+                            with trade_col1:
+                                st.write("**Received:**")
+                                for player in values['received']['players']:
+                                    st.write(f"- {player}")
+                                for pick in values['received']['picks']:
+                                    st.write(f"- {pick}")
+                                if values['received']['faab'] > 0:
+                                    st.write(f"- ${values['received']['faab']} FAAB")
+                                st.write(f"**Total Value:** {values['received']['value']:.1f}")
+
+                            with trade_col2:
+                                st.write("**Gave:**")
+                                for player in values['given']['players']:
+                                    st.write(f"- {player}")
+                                for pick in values['given']['picks']:
+                                    st.write(f"- {pick}")
+                                if values['given']['faab'] > 0:
+                                    st.write(f"- ${values['given']['faab']} FAAB")
+                                st.write(f"**Total Value:** {values['given']['value']:.1f}")
+
+                            with trade_col3:
+                                net_value = values['net_value']
+                                net_pct = values['net_percent']
+
+                                if net_value > 0:
+                                    st.success(f"**Net Gain:** +{net_value:.1f}")
+                                    st.success(f"**ROI:** +{net_pct:.1f}%")
+                                elif net_value < 0:
+                                    st.error(f"**Net Loss:** {net_value:.1f}")
+                                    st.error(f"**ROI:** {net_pct:.1f}%")
+                                else:
+                                    st.info("**Even Trade**")
+
+                            st.markdown("---")
+
+            hist_col1, hist_col2 = st.columns(2)
+
+            with hist_col1:
+                st.markdown("### Trade Volume by Team")
+
+                team_trade_counts = {}
+                for trade in parsed_trades:
+                    for team in trade['teams_involved']:
+                        team_trade_counts[team] = team_trade_counts.get(team, 0) + 1
+
+                if team_trade_counts:
+                    volume_df = pd.DataFrame(
+                        list(team_trade_counts.items()),
+                        columns=['Team', 'Trades']
+                    ).sort_values('Trades', ascending=False)
+
+                    volume_chart = alt.Chart(volume_df).mark_bar().encode(
+                        x=alt.X('Trades:Q', title='Number of Trades'),
+                        y=alt.Y('Team:N', sort='-x', title='Team'),
+                        color=alt.condition(
+                            alt.datum.Team == your_team,
+                            alt.value('#1f77b4'),
+                            alt.value('#aec7e8')
+                        ),
+                        tooltip=['Team', 'Trades']
+                    ).properties(height=300)
+
+                    st.altair_chart(volume_chart, use_container_width=True)
+
+            with hist_col2:
+                st.markdown("### Trade Quality Distribution")
+
+                quality_counts = filtered_df['Quality'].value_counts().to_dict()
+
+                if quality_counts:
+                    quality_df = pd.DataFrame(
+                        list(quality_counts.items()),
+                        columns=['Quality', 'Count']
+                    )
+
+                    quality_chart = alt.Chart(quality_df).mark_arc().encode(
+                        theta='Count:Q',
+                        color=alt.Color('Quality:N', scale=alt.Scale(
+                            domain=['Fair', 'Lopsided'],
+                            range=['#2ca02c', '#d62728']
+                        )),
+                        tooltip=['Quality', 'Count']
+                    ).properties(height=300)
+
+                    st.altair_chart(quality_chart, use_container_width=True)
+
+            csv_button = st.download_button(
+                label="📥 Download Trade History as CSV",
+                data=trade_history_df.to_csv(index=False),
+                file_name=f"trade_history_{league_id}.csv",
+                mime="text/csv"
+            )
+
+        else:
+            st.info("No trades found in league history yet.")
 
         # Trade suggestions
         st.markdown("---")

@@ -415,3 +415,128 @@ def is_superflex_league(league_details: Dict) -> bool:
 
     positions = league_details.get('roster_positions', [])
     return 'SUPER_FLEX' in positions or positions.count('QB') >= 2
+
+@st.cache_data(ttl=3600)
+def fetch_league_transactions(league_id: str, week: int = None) -> List[Dict]:
+    """
+    Fetch all transactions for a league.
+    If week is provided, fetch for that specific week (round).
+    If week is None, fetch all transactions for the season.
+
+    Returns: list of transaction dicts
+    """
+    try:
+        if week is not None:
+            url = f"{SLEEPER_BASE_URL}/league/{league_id}/transactions/{week}"
+            response = requests.get(url)
+            if response.status_code == 200:
+                return response.json()
+        else:
+            all_transactions = []
+            for wk in range(1, 19):
+                url = f"{SLEEPER_BASE_URL}/league/{league_id}/transactions/{wk}"
+                response = requests.get(url)
+                if response.status_code == 200:
+                    transactions = response.json()
+                    if transactions:
+                        all_transactions.extend(transactions)
+            return all_transactions
+        return []
+    except Exception as e:
+        st.error(f"Error fetching transactions: {e}")
+        return []
+
+def filter_trades(transactions: List[Dict]) -> List[Dict]:
+    """
+    Filter transactions to only include trades.
+    Returns: list of trade transactions
+    """
+    return [t for t in transactions if t.get('type') == 'trade']
+
+def parse_trade_details(trade: Dict, users: List[Dict], nfl_players: Dict,
+                       rosters: List[Dict]) -> Dict:
+    """
+    Parse trade transaction into readable format.
+
+    Returns: dict with:
+        - transaction_id
+        - timestamp
+        - teams_involved (list of team names)
+        - roster_ids (list of roster IDs)
+        - exchanges (dict mapping roster_id to what they received)
+        - players_involved (list of player names)
+    """
+    transaction_id = trade.get('transaction_id', 'Unknown')
+    timestamp = trade.get('created')
+
+    user_map = {user['user_id']: user.get('display_name', user.get('username', 'Unknown'))
+                for user in users}
+    roster_to_user = {roster['roster_id']: roster.get('owner_id') for roster in rosters}
+
+    roster_ids = trade.get('roster_ids', [])
+    teams_involved = []
+    for roster_id in roster_ids:
+        owner_id = roster_to_user.get(roster_id)
+        team_name = user_map.get(owner_id, f"Team {roster_id}")
+        teams_involved.append(team_name)
+
+    adds = trade.get('adds', {})
+    drops = trade.get('drops', {})
+    draft_picks = trade.get('draft_picks', [])
+    waiver_budget = trade.get('waiver_budget', [])
+
+    exchanges = {}
+    players_involved = set()
+
+    for roster_id in roster_ids:
+        exchanges[roster_id] = {
+            'players_received': [],
+            'players_given': [],
+            'picks_received': [],
+            'picks_given': [],
+            'faab_received': 0,
+            'faab_given': 0
+        }
+
+    for player_id, receiving_roster_id in adds.items():
+        player_name = nfl_players.get(player_id, {}).get('full_name', player_id)
+        players_involved.add(player_name)
+
+        if receiving_roster_id in exchanges:
+            exchanges[receiving_roster_id]['players_received'].append(player_name)
+
+        giving_roster_id = drops.get(player_id)
+        if giving_roster_id and giving_roster_id in exchanges:
+            exchanges[giving_roster_id]['players_given'].append(player_name)
+
+    for pick in draft_picks:
+        season = pick.get('season')
+        round_num = pick.get('round')
+        owner_id = pick.get('owner_id')
+        previous_owner_id = pick.get('previous_owner_id')
+
+        pick_str = f"{season} Round {round_num}"
+
+        if owner_id in exchanges:
+            exchanges[owner_id]['picks_received'].append(pick_str)
+        if previous_owner_id in exchanges:
+            exchanges[previous_owner_id]['picks_given'].append(pick_str)
+
+    for budget_entry in waiver_budget:
+        sender = budget_entry.get('sender')
+        receiver = budget_entry.get('receiver')
+        amount = budget_entry.get('amount', 0)
+
+        if sender in exchanges:
+            exchanges[sender]['faab_given'] = amount
+        if receiver in exchanges:
+            exchanges[receiver]['faab_received'] = amount
+
+    return {
+        'transaction_id': transaction_id,
+        'timestamp': timestamp,
+        'teams_involved': teams_involved,
+        'roster_ids': roster_ids,
+        'exchanges': exchanges,
+        'players_involved': list(players_involved)
+    }
