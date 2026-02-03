@@ -21,6 +21,12 @@ from sklearn.metrics import mean_absolute_error, r2_score
 import warnings
 warnings.filterwarnings('ignore')
 
+from auth_utils import (
+    init_session_state, is_authenticated, render_auth_ui,
+    render_league_selector, render_add_league_modal, render_manage_leagues_modal,
+    get_current_user, save_trade, get_saved_trades
+)
+
 # Configuration
 API_KEY = "73280229e64f4083b54094d6745b3a7d"  # SportsDataIO API key
 BASE_URL = "https://api.sportsdata.io/v3/nfl"
@@ -1617,14 +1623,28 @@ def calculate_news_adjusted_value(base_value: float, impact_pct: float) -> float
 def main():
     st.set_page_config(page_title="Fantasy Football Trade Analyzer", layout="wide")
 
+    init_session_state()
+
+    if not is_authenticated():
+        render_auth_ui()
+        return
+
     st.title("🏈 Ultimate Fantasy Football Trade Analyzer")
     st.markdown("### (IDP, Historical, & League Import)")
+
+    if st.session_state.get('show_add_league', False):
+        render_add_league_modal()
+        return
+
+    if st.session_state.get('show_manage_leagues', False):
+        render_manage_leagues_modal()
+        return
+
+    league_id = render_league_selector()
 
     # Sidebar for configuration
     with st.sidebar:
         st.header("⚙️ Configuration")
-
-        league_id = st.text_input("Sleeper League ID", placeholder="e.g., 123456789")
 
         st.markdown("---")
         st.markdown("**API Status**")
@@ -1637,6 +1657,13 @@ def main():
         st.markdown("**About**")
         st.info("""
         This tool analyzes fantasy football trades using SportsDataIO data + ML:
+
+        **User Features:**
+        - 🔐 Secure authentication via Supabase
+        - 📁 Save multiple leagues per account
+        - 💾 Save trades with notes
+        - 🔄 Switch leagues instantly
+        - 🔒 Private - only you see your data
 
         **Player Values (Unified Scale):**
         - 🏆 Dynasty ADP (60%) - Market value
@@ -2363,6 +2390,42 @@ def main():
                             except Exception as e:
                                 st.warning(f"Could not run playoff simulation: {str(e)}")
 
+                        # Save Trade Feature
+                        st.markdown("---")
+                        st.markdown("### 💾 Save This Trade")
+
+                        col_save1, col_save2 = st.columns([3, 1])
+                        with col_save1:
+                            trade_notes = st.text_area("Notes (optional)", placeholder="Add notes about this trade...")
+                        with col_save2:
+                            st.write("")
+                            st.write("")
+                            if st.button("💾 Save Trade", use_container_width=True):
+                                user = get_current_user()
+                                if user:
+                                    trade_data = {
+                                        'give_players': [{'name': p['name'], 'position': p['position'], 'value': p['value']} for p in give_data],
+                                        'receive_players': [{'name': p['name'], 'position': p['position'], 'value': p['value']} for p in receive_data],
+                                        'give_picks': give_picks_parsed,
+                                        'receive_picks': receive_picks_parsed,
+                                        'give_faab': give_faab,
+                                        'receive_faab': receive_faab,
+                                        'partner_team': selected_team
+                                    }
+
+                                    trade_result = {
+                                        'verdict': evaluation['verdict'],
+                                        'give_total': evaluation['give_total'],
+                                        'receive_total': evaluation['receive_total'],
+                                        'difference': evaluation['difference'],
+                                        'percentage_diff': evaluation['percentage_diff']
+                                    }
+
+                                    if save_trade(user.id, league_id, trade_data, trade_result, trade_notes):
+                                        st.success("✅ Trade saved successfully!")
+                                    else:
+                                        st.error("Failed to save trade")
+
                     else:
                         st.warning("⚠️ Please select at least one player or pick for each side of the trade.")
         else:
@@ -2841,10 +2904,72 @@ def main():
             - Complements dynasty ADP with data-driven insights
             """)
 
+    # Saved Trades Section
+    st.markdown("---")
+    st.header("💾 Your Saved Trades")
+
+    user = get_current_user()
+    if user:
+        saved_trades_list = get_saved_trades(user.id, league_id)
+
+        if saved_trades_list:
+            st.write(f"**{len(saved_trades_list)}** saved trades for this league")
+
+            for idx, trade in enumerate(saved_trades_list[:10], 1):
+                trade_data = trade.get('trade_data', {})
+                trade_result = trade.get('trade_result', {})
+                created_at = trade.get('created_at', '')
+
+                with st.expander(f"Trade #{idx} - {trade_result.get('verdict', 'N/A')} ({created_at[:10]})", expanded=False):
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.markdown("**You Give:**")
+                        for player in trade_data.get('give_players', []):
+                            st.write(f"• {player['name']} ({player['position']}) - {player['value']:.0f} pts")
+                        for pick in trade_data.get('give_picks', []):
+                            st.write(f"• {pick['parsed']} - {pick['value']:.0f} pts")
+                        if trade_data.get('give_faab', 0) > 0:
+                            st.write(f"• ${trade_data['give_faab']:.0f} FAAB")
+
+                    with col2:
+                        st.markdown(f"**{trade_data.get('partner_team', 'Partner')} Gives:**")
+                        for player in trade_data.get('receive_players', []):
+                            st.write(f"• {player['name']} ({player['position']}) - {player['value']:.0f} pts")
+                        for pick in trade_data.get('receive_picks', []):
+                            st.write(f"• {pick['parsed']} - {pick['value']:.0f} pts")
+                        if trade_data.get('receive_faab', 0) > 0:
+                            st.write(f"• ${trade_data['receive_faab']:.0f} FAAB")
+
+                    st.markdown("---")
+                    result_col1, result_col2, result_col3 = st.columns(3)
+                    with result_col1:
+                        st.metric("You Give", f"{trade_result.get('give_total', 0):.0f} pts")
+                    with result_col2:
+                        st.metric("You Receive", f"{trade_result.get('receive_total', 0):.0f} pts")
+                    with result_col3:
+                        st.metric("Net Gain", f"{trade_result.get('difference', 0):+.0f} pts",
+                                 delta=f"{trade_result.get('percentage_diff', 0):+.1f}%")
+
+                    if trade.get('notes'):
+                        st.markdown(f"**Notes:** {trade['notes']}")
+
+            if len(saved_trades_list) > 10:
+                st.info(f"Showing 10 most recent trades. {len(saved_trades_list) - 10} more in history.")
+        else:
+            st.info("No saved trades yet. Analyze a trade above and save it!")
+    else:
+        st.warning("Please log in to view saved trades.")
+
     # Footer
     st.markdown("---")
     st.markdown("""
     ### ✅ Implemented Features
+    - **User Authentication**: ✅ Email/password auth via Supabase
+    - **Multi-League Support**: ✅ Save and switch between multiple Sleeper leagues
+    - **Trade History**: ✅ Save trades with notes and review past evaluations
+    - **Privacy & Security**: ✅ RLS policies ensure data isolation per user
+    - **League Management**: ✅ Add, edit, remove, and switch leagues instantly
     - **Machine Learning**: ✅ Random Forest regressor trained on SportsDataIO data
     - **ML Features**: ✅ Age, position, stats, team performance, career trajectory
     - **Monte Carlo Simulation**: ✅ 1,000 playoff simulations per trade scenario
@@ -2857,11 +2982,13 @@ def main():
     - **IDP Support**: ✅ DL, LB, DB positions with valuations
 
     ### 🔧 Future Enhancement Ideas
+    - **Google OAuth**: Add OAuth providers for easier sign-in
+    - **Cross-League Comparison**: Compare player values across your leagues
+    - **Email Notifications**: Trade alerts and weekly roster analysis
     - **Model Persistence**: Store trained models in Supabase for faster loading
     - **X/Twitter Integration**: Add semantic search for real-time trade rumors
     - **Custom Scoring**: Adjust position weights and scoring settings
     - **Advanced Metrics**: Add snap counts, target share, red zone usage
-    - **Trade History**: Track completed trades and accuracy of predictions
     """)
 
 if __name__ == "__main__":
