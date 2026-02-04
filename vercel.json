@@ -4,7 +4,10 @@
     {
       "src": "app.py",
       "use": "@vercel/static-build",
-      "config": { "distDir": "public" }
+      "config": {
+        "distDir": "public",
+        "buildCommand": "pip install -r requirements.txt && streamlit build app.py --server.headless true"
+      }
     }
   ],
   "routes": [
