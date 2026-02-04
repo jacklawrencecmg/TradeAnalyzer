@@ -3,14 +3,13 @@
   "builds": [
     {
       "src": "app.py",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "public",
-        "buildCommand": "pip install -r requirements.txt && streamlit build app.py --server.headless true"
-      }
+      "use": "@vercel/python"
     }
   ],
   "routes": [
-    { "src": "/(.*)", "dest": "app.py" }
+    {
+      "src": "/(.*)",
+      "dest": "app.py"
+    }
   ]
 }
