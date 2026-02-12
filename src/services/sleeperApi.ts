@@ -146,6 +146,21 @@ export async function fetchLeagueUsers(leagueId: string): Promise<SleeperUser[]>
   return data;
 }
 
+export async function fetchTradedPicks(leagueId: string): Promise<any[]> {
+  const cacheKey = `traded_picks_${leagueId}`;
+  const cached = getCachedData(cacheKey);
+  if (cached) return cached;
+
+  const response = await fetch(`${SLEEPER_API_BASE}/league/${leagueId}/traded_picks`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch traded picks: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  setCachedData(cacheKey, data);
+  return data;
+}
+
 export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> {
   const cacheKey = 'all_players';
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
@@ -470,15 +485,29 @@ export interface TeamRanking {
     position: string;
     value: number;
   }>;
+  all_players: Array<{
+    player_id: string;
+    name: string;
+    position: string;
+    team: string | null;
+    value: number;
+  }>;
+  draft_picks: Array<{
+    season: string;
+    round: number;
+    original_owner_id: string;
+  }>;
+  faab_remaining: number;
   rank: number;
 }
 
 export async function calculatePowerRankings(leagueId: string): Promise<TeamRanking[]> {
-  const [league, rosters, users, players] = await Promise.all([
+  const [league, rosters, users, players, tradedPicks] = await Promise.all([
     fetchLeagueDetails(leagueId),
     fetchLeagueRosters(leagueId),
     fetchLeagueUsers(leagueId),
     fetchAllPlayers(),
+    fetchTradedPicks(leagueId).catch(() => []),
   ]);
 
   const settings: LeagueSettings = {
@@ -500,6 +529,7 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
           player_id: playerId,
           name: player.full_name || 'Unknown Player',
           position: player.position || 'N/A',
+          team: player.team || null,
           value: getPlayerValue(player, settings),
         };
       })
@@ -508,6 +538,47 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
 
     const totalValue = playerValues.reduce((sum, p) => sum + p.value, 0);
     const topPlayers = playerValues.slice(0, 5);
+
+    const currentYear = parseInt(league.season);
+    const teamPicks: Array<{ season: string; round: number; original_owner_id: string }> = [];
+
+    for (let year = currentYear; year <= currentYear + 3; year++) {
+      for (let round = 1; round <= 4; round++) {
+        const tradedPick = tradedPicks.find(
+          (tp: any) =>
+            tp.season === year.toString() &&
+            tp.round === round &&
+            tp.owner_id === roster.roster_id
+        );
+
+        if (tradedPick) {
+          teamPicks.push({
+            season: year.toString(),
+            round: round,
+            original_owner_id: tradedPick.roster_id.toString(),
+          });
+        } else {
+          const tradedAway = tradedPicks.find(
+            (tp: any) =>
+              tp.season === year.toString() &&
+              tp.round === round &&
+              tp.roster_id === roster.roster_id
+          );
+
+          if (!tradedAway) {
+            teamPicks.push({
+              season: year.toString(),
+              round: round,
+              original_owner_id: roster.roster_id.toString(),
+            });
+          }
+        }
+      }
+    }
+
+    const faabRemaining = roster.settings.waiver_budget_used
+      ? 100 - roster.settings.waiver_budget_used
+      : (roster.settings as any).waiver_budget || 100;
 
     return {
       roster_id: roster.roster_id,
@@ -519,6 +590,9 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
       }`,
       points_for: Math.round(roster.settings.fpts || 0),
       top_players: topPlayers,
+      all_players: playerValues,
+      draft_picks: teamPicks,
+      faab_remaining: faabRemaining,
       rank: 0,
     };
   });
