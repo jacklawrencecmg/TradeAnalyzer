@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import TradeAnalyzer from './TradeAnalyzer';
 import PowerRankings from './PowerRankings';
@@ -23,8 +23,9 @@ import LeagueChat from './LeagueChat';
 import NotificationsPanel from './NotificationsPanel';
 import PlayerNewsFeed from './PlayerNewsFeed';
 import ExportShare from './ExportShare';
+import { PlayerValues } from './PlayerValues';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values';
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
@@ -221,6 +222,7 @@ export function Dashboard() {
                 <div>
                   <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Analytics & Insights</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={DollarSign} label="Player Values" shortLabel="Values" tab="values" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Search} label="Waiver Assistant" shortLabel="Waiver" tab="waiver" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Users} label="Lineup Optimizer" shortLabel="Lineup" tab="lineup" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={TrendingUp} label="Value Trends" shortLabel="Trends" tab="trends" activeTab={activeTab} onClick={setActiveTab} />
@@ -272,6 +274,7 @@ export function Dashboard() {
               {activeTab === 'rankings' && <PowerRankings leagueId={currentLeague.league_id} />}
               {activeTab === 'playoffs' && <PlayoffSimulator leagueId={currentLeague.league_id} />}
               {activeTab === 'history' && <TradeHistory leagueId={currentLeague.league_id} />}
+              {activeTab === 'values' && <PlayerValues leagueId={currentLeague.league_id} isSuperflex={currentLeague.is_superflex} />}
               {activeTab === 'waiver' && <WaiverAssistant leagueId={currentLeague.league_id} rosterId="1" userId={user?.id || ''} />}
               {activeTab === 'lineup' && <LineupOptimizer leagueId={currentLeague.league_id} rosterId="1" />}
               {activeTab === 'trends' && <ValueTrendTracker leagueId={currentLeague.league_id} />}

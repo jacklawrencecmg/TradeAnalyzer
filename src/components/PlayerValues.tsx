@@ -1,0 +1,304 @@
+import { useState, useEffect } from 'react';
+import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter } from 'lucide-react';
+import { playerValuesApi, PlayerValue } from '../services/playerValuesApi';
+import { useAuth } from '../hooks/useAuth';
+import { ListSkeleton } from './LoadingSkeleton';
+
+interface PlayerValuesProps {
+  leagueId: string;
+  isSuperflex: boolean;
+}
+
+export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
+  const { user } = useAuth();
+  const [players, setPlayers] = useState<PlayerValue[]>([]);
+  const [filteredPlayers, setFilteredPlayers] = useState<PlayerValue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [positionFilter, setPositionFilter] = useState<string>('ALL');
+  const [trendFilter, setTrendFilter] = useState<string>('ALL');
+  const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
+
+  useEffect(() => {
+    loadPlayerValues();
+  }, []);
+
+  useEffect(() => {
+    filterPlayers();
+  }, [players, searchTerm, positionFilter, trendFilter, showOnlyDifferences]);
+
+  const loadPlayerValues = async () => {
+    setLoading(true);
+    try {
+      const data = await playerValuesApi.getPlayerValues(undefined, 500);
+      setPlayers(data);
+    } catch (error) {
+      console.error('Error loading player values:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterPlayers = () => {
+    let filtered = players;
+
+    if (searchTerm) {
+      filtered = filtered.filter(p =>
+        p.player_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.team?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (positionFilter !== 'ALL') {
+      filtered = filtered.filter(p => p.position === positionFilter);
+    }
+
+    if (trendFilter !== 'ALL') {
+      filtered = filtered.filter(p => p.trend === trendFilter);
+    }
+
+    if (showOnlyDifferences) {
+      filtered = filtered.filter(p => Math.abs(p.ktc_value - p.fdp_value) > 100);
+    }
+
+    setFilteredPlayers(filtered);
+  };
+
+  const getValueDifferenceColor = (ktcValue: number, fdpValue: number) => {
+    const diff = fdpValue - ktcValue;
+    const percentage = ktcValue !== 0 ? (diff / ktcValue) * 100 : 0;
+
+    if (Math.abs(percentage) < 2) return 'text-fdp-text-3';
+    if (diff > 0) return 'text-fdp-pos';
+    return 'text-fdp-accent-2';
+  };
+
+  const getValueDifferenceText = (ktcValue: number, fdpValue: number) => {
+    const diff = fdpValue - ktcValue;
+    if (Math.abs(diff) < 20) return '≈';
+    return diff > 0 ? `+${playerValuesApi.formatValue(diff)}` : playerValuesApi.formatValue(diff);
+  };
+
+  const getTrendIcon = (trend: string) => {
+    switch (trend) {
+      case 'up':
+        return <TrendingUp className="w-4 h-4 text-fdp-pos" />;
+      case 'down':
+        return <TrendingDown className="w-4 h-4 text-fdp-neg" />;
+      default:
+        return <Minus className="w-4 h-4 text-fdp-text-3" />;
+    }
+  };
+
+  const positions = ['ALL', 'QB', 'RB', 'WR', 'TE'];
+  const trends = ['ALL', 'up', 'down', 'stable'];
+
+  if (loading) {
+    return (
+      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg p-6">
+        <div className="mb-4">
+          <h2 className="text-2xl font-bold text-fdp-text-1">Loading Player Values...</h2>
+        </div>
+        <ListSkeleton count={10} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-fdp-text-1 flex items-center gap-2">
+              <DollarSign className="w-6 h-6" />
+              Player Values
+            </h2>
+            <p className="text-fdp-text-3 text-sm mt-1">
+              KTC values with FDP custom adjustments
+            </p>
+          </div>
+          <span title="FDP Values apply custom adjustments for playoff schedules, recent performance, team situations, and league settings to give you a competitive edge.">
+            <Info className="w-5 h-5 text-fdp-text-3 cursor-help" />
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-fdp-text-3" />
+            <input
+              type="text"
+              placeholder="Search players..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+            />
+          </div>
+
+          <select
+            value={positionFilter}
+            onChange={(e) => setPositionFilter(e.target.value)}
+            className="px-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+          >
+            {positions.map(pos => (
+              <option key={pos} value={pos}>{pos === 'ALL' ? 'All Positions' : pos}</option>
+            ))}
+          </select>
+
+          <select
+            value={trendFilter}
+            onChange={(e) => setTrendFilter(e.target.value)}
+            className="px-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+          >
+            {trends.map(trend => (
+              <option key={trend} value={trend}>
+                {trend === 'ALL' ? 'All Trends' : trend.charAt(0).toUpperCase() + trend.slice(1)}
+              </option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setShowOnlyDifferences(!showOnlyDifferences)}
+            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
+              showOnlyDifferences
+                ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0'
+                : 'bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 hover:bg-fdp-border-1'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            Key Differences
+          </button>
+        </div>
+
+        {isSuperflex && (
+          <div className="mb-4 p-3 bg-fdp-accent-1 bg-opacity-10 border border-fdp-accent-1 rounded-lg">
+            <p className="text-fdp-text-1 text-sm flex items-center gap-2">
+              <Info className="w-4 h-4" />
+              Superflex league detected - QB values are boosted in FDP calculations
+            </p>
+          </div>
+        )}
+
+        <div className="bg-fdp-surface-2 rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-fdp-surface-1 border-b border-fdp-border-1">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    Rank
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    Player
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    Pos
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    Team
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    Trend
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    KTC Value
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    <span className="text-fdp-accent-2">FDP Value</span>
+                  </th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
+                    Diff
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-fdp-border-1">
+                {filteredPlayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-8 text-center text-fdp-text-3">
+                      No players found matching your filters
+                    </td>
+                  </tr>
+                ) : (
+                  filteredPlayers.map((player, index) => (
+                    <tr
+                      key={player.id}
+                      className="hover:bg-fdp-surface-1 transition-colors"
+                    >
+                      <td className="px-4 py-3 text-fdp-text-3 text-sm">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-fdp-text-1">
+                          {player.player_name}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-semibold rounded-full bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
+                          {player.position}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center text-fdp-text-2 text-sm">
+                        {player.team || '-'}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {getTrendIcon(player.trend)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-fdp-text-1 font-medium">
+                        {playerValuesApi.formatValue(player.ktc_value)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-fdp-accent-2 font-bold">
+                        {playerValuesApi.formatValue(player.fdp_value)}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`text-sm font-medium ${getValueDifferenceColor(player.ktc_value, player.fdp_value)}`}>
+                          {getValueDifferenceText(player.ktc_value, player.fdp_value)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-fdp-surface-2 border border-fdp-border-1 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-fdp-text-3 mb-2">Total Players</h3>
+            <p className="text-2xl font-bold text-fdp-text-1">{filteredPlayers.length}</p>
+          </div>
+          <div className="bg-fdp-surface-2 border border-fdp-border-1 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-fdp-text-3 mb-2 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-fdp-pos" />
+              Rising Value
+            </h3>
+            <p className="text-2xl font-bold text-fdp-text-1">
+              {filteredPlayers.filter(p => p.trend === 'up').length}
+            </p>
+          </div>
+          <div className="bg-fdp-surface-2 border border-fdp-border-1 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-fdp-text-3 mb-2 flex items-center gap-2">
+              <TrendingDown className="w-4 h-4 text-fdp-neg" />
+              Falling Value
+            </h3>
+            <p className="text-2xl font-bold text-fdp-text-1">
+              {filteredPlayers.filter(p => p.trend === 'down').length}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-fdp-surface-1 to-fdp-surface-2 border border-fdp-accent-1 rounded-lg p-4">
+        <h3 className="text-sm font-semibold text-fdp-text-1 mb-2 flex items-center gap-2">
+          <Info className="w-4 h-4" />
+          About FDP Value Adjustments
+        </h3>
+        <ul className="text-sm text-fdp-text-3 space-y-1">
+          <li>• <span className="text-fdp-accent-2 font-medium">Playoff Schedule:</span> Adjusts for strength of schedule in weeks 15-17</li>
+          <li>• <span className="text-fdp-accent-2 font-medium">Recent Performance:</span> Weights last 4 weeks more heavily</li>
+          <li>• <span className="text-fdp-accent-2 font-medium">Team Situation:</span> Factors in coaching changes and offensive scheme</li>
+          <li>• <span className="text-fdp-accent-2 font-medium">Injury Risk:</span> Applies discount for injury-prone players</li>
+          <li>• <span className="text-fdp-accent-2 font-medium">League Settings:</span> Superflex leagues see QB value boosts</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
