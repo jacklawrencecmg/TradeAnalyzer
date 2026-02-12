@@ -369,6 +369,46 @@ export default function PlayoffSimulator({ leagueId }: PlayoffSimulatorProps) {
 
         {results.length > 0 && (
           <div className="space-y-4">
+            {(() => {
+              const championshipFavorite = [...results].sort((a, b) => b.championship_odds - a.championship_odds)[0];
+              const playoffFavorite = [...results].sort((a, b) => b.playoff_odds - a.playoff_odds)[0];
+
+              return (
+                <div className="bg-gradient-to-br from-yellow-900/20 to-yellow-800/10 rounded-lg border border-yellow-500/30 p-6 mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Trophy className="w-6 h-6 text-yellow-400" />
+                    <h3 className="text-xl font-bold text-white">Championship Favorite</h3>
+                  </div>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="bg-gray-900/50 rounded-lg p-4 border border-yellow-500/20">
+                      <div className="text-sm text-gray-400 mb-2">Most Likely Champion</div>
+                      <div className="text-2xl font-bold text-yellow-400 mb-1">
+                        {championshipFavorite.team_name}
+                      </div>
+                      <div className="text-lg text-white">
+                        {championshipFavorite.championship_odds.toFixed(1)}% chance to win it all
+                      </div>
+                      <div className="text-sm text-gray-400 mt-2">
+                        {championshipFavorite.current_record} • {championshipFavorite.playoff_odds.toFixed(1)}% playoff odds
+                      </div>
+                    </div>
+                    <div className="bg-gray-900/50 rounded-lg p-4 border border-[#00d4ff]/20">
+                      <div className="text-sm text-gray-400 mb-2">Most Likely Playoff Team</div>
+                      <div className="text-2xl font-bold text-[#00d4ff] mb-1">
+                        {playoffFavorite.team_name}
+                      </div>
+                      <div className="text-lg text-white">
+                        {playoffFavorite.playoff_odds.toFixed(1)}% chance to make playoffs
+                      </div>
+                      <div className="text-sm text-gray-400 mt-2">
+                        {playoffFavorite.current_record} • {playoffFavorite.championship_odds.toFixed(1)}% title odds
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-4">
                 <h3 className="text-lg font-bold text-white">Simulation Results</h3>
