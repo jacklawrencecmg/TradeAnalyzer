@@ -30,7 +30,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [leagueSettings, setLeagueSettings] = useState<LeagueSettings>({
+  const [leagueSettings, setLeagueSettings] = useState<Partial<LeagueSettings>>({
     isSuperflex: false,
     isTEPremium: false,
   });
@@ -77,14 +77,16 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       const searchPick = match[3] ? parseInt(match[3]) : null;
 
       const yearsToSearch = searchYear ? [searchYear] : [currentYear, currentYear + 1, currentYear + 2, currentYear + 3, currentYear + 4];
-      const roundsToSearch = searchRound ? [searchRound] : [1, 2, 3, 4];
+      const maxRounds = leagueSettings.draftRounds || 5;
+      const roundsToSearch = searchRound ? [searchRound] : Array.from({ length: maxRounds }, (_, i) => i + 1);
 
       for (const year of yearsToSearch) {
         for (const round of roundsToSearch) {
-          if (round < 1 || round > 4) continue;
+          if (round < 1 || round > maxRounds) continue;
 
+          const numTeams = leagueSettings.numTeams || 12;
           // If specific pick number is provided, show only that pick
-          if (searchPick !== null && searchPick >= 1 && searchPick <= 12) {
+          if (searchPick !== null && searchPick >= 1 && searchPick <= numTeams) {
             const pickNum = searchPick;
             const displayName = `${year} Pick ${round}.${pickNum.toString().padStart(2, '0')}`;
             results.push({
@@ -93,7 +95,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             });
           } else {
             // Show all picks for that round
-            for (let pickNum = 1; pickNum <= 12; pickNum++) {
+            for (let pickNum = 1; pickNum <= numTeams; pickNum++) {
               const displayName = `${year} Pick ${round}.${pickNum.toString().padStart(2, '0')}`;
               const searchableText = `${year} ${round}.${pickNum.toString().padStart(2, '0')} pick`.toLowerCase();
 
@@ -109,9 +111,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       }
     } else if (isPickSearch) {
       // General pick search without specific numbers
+      const maxRounds = leagueSettings.draftRounds || 5;
+      const numTeams = leagueSettings.numTeams || 12;
       for (let year = currentYear; year <= currentYear + 4; year++) {
-        for (let round = 1; round <= 4; round++) {
-          for (let pickNum = 1; pickNum <= 12; pickNum++) {
+        for (let round = 1; round <= maxRounds; round++) {
+          for (let pickNum = 1; pickNum <= numTeams; pickNum++) {
             const displayName = `${year} Pick ${round}.${pickNum.toString().padStart(2, '0')}`;
             const searchableText = `${year} ${getOrdinal(round)} round pick ${round}.${pickNum.toString().padStart(2, '0')}`.toLowerCase();
 

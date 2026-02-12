@@ -232,18 +232,36 @@ export async function fetchPlayerValues(): Promise<void> {
   }
 }
 
-export function getDraftPickValue(round: number, year: number): number {
+export function getDraftPickValue(
+  round: number,
+  year: number,
+  settings?: { totalRounds?: number; isSuperflex?: boolean; hasIDP?: boolean }
+): number {
   const currentYear = new Date().getFullYear();
   const yearDiff = year - currentYear;
+  const totalRounds = settings?.totalRounds || 4;
 
   const baseValues: Record<number, number> = {
     1: 7000,
     2: 3500,
     3: 1500,
     4: 600,
+    5: 350,
   };
 
-  let value = baseValues[round] || 300;
+  let value = baseValues[round] || Math.max(100, 600 * Math.pow(0.5, round - 4));
+
+  if (round > totalRounds) {
+    value *= 0.5;
+  }
+
+  if (settings?.isSuperflex && round <= 2) {
+    value *= 1.15;
+  }
+
+  if (settings?.hasIDP && round >= 3) {
+    value *= 1.1;
+  }
 
   if (yearDiff > 0) {
     value *= Math.pow(0.85, yearDiff);
@@ -254,27 +272,79 @@ export function getDraftPickValue(round: number, year: number): number {
   return Math.round(value);
 }
 
-export function getFAABValue(amount: number): number {
-  return Math.round(amount * 7);
+export function getFAABValue(amount: number, maxBudget: number = 100): number {
+  if (maxBudget === 0) return 0;
+  const percentage = amount / maxBudget;
+  return Math.round(percentage * maxBudget * 7);
+}
+
+export function getLeagueSettings(league: SleeperLeague): LeagueSettings {
+  const rosterPositions = league.roster_positions || [];
+  const scoringSettings = league.scoring_settings || {};
+
+  const isSuperflex = rosterPositions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
+  const tePremiumPoints = scoringSettings.rec_te || 0;
+  const standardRecPoints = scoringSettings.rec || 0;
+  const isTEPremium = tePremiumPoints > standardRecPoints;
+
+  const idpPositions = ['DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S', 'IDP_FLEX'];
+  const hasIDP = rosterPositions.some(pos => idpPositions.includes(pos));
+
+  const draftRounds = league.settings?.draft_rounds || league.settings?.rounds || 0;
+  const faabBudget = league.settings?.waiver_budget || league.settings?.reserve_budget || 100;
+  const numTeams = league.settings?.num_teams || 12;
+  const bestBall = league.settings?.best_ball === 1;
+
+  return {
+    isSuperflex,
+    isTEPremium,
+    draftRounds,
+    faabBudget,
+    numTeams,
+    rosterPositions,
+    scoringSettings,
+    hasIDP,
+    bestBall,
+  };
 }
 
 export interface LeagueSettings {
   isSuperflex: boolean;
   isTEPremium: boolean;
+  draftRounds: number;
+  faabBudget: number;
+  numTeams: number;
+  rosterPositions: string[];
+  scoringSettings: Record<string, number>;
+  hasIDP: boolean;
+  bestBall: boolean;
 }
 
 export function getPlayerValue(
   player: SleeperPlayer,
-  settings: LeagueSettings = { isSuperflex: false, isTEPremium: false }
+  settings: Partial<LeagueSettings> = {}
 ): number {
+  const defaultSettings: LeagueSettings = {
+    isSuperflex: false,
+    isTEPremium: false,
+    draftRounds: 4,
+    faabBudget: 100,
+    numTeams: 12,
+    rosterPositions: [],
+    scoringSettings: {},
+    hasIDP: false,
+    bestBall: false,
+  };
+
+  const finalSettings = { ...defaultSettings, ...settings };
   if (ktcValues[player.player_id]) {
     let value = ktcValues[player.player_id];
 
-    if (player.position === 'QB' && settings.isSuperflex) {
+    if (player.position === 'QB' && finalSettings.isSuperflex) {
       value *= 1.3;
     }
 
-    if (player.position === 'TE' && settings.isTEPremium) {
+    if (player.position === 'TE' && finalSettings.isTEPremium) {
       value *= 1.4;
     }
 
@@ -306,11 +376,11 @@ export function getPlayerValue(
 
   const isIDP = ['DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position);
 
-  if (player.position === 'QB' && settings.isSuperflex) {
+  if (player.position === 'QB' && finalSettings.isSuperflex) {
     baseValue *= 1.8;
   }
 
-  if (player.position === 'TE' && settings.isTEPremium) {
+  if (player.position === 'TE' && finalSettings.isTEPremium) {
     baseValue *= 1.5;
   }
 
@@ -413,21 +483,31 @@ export async function analyzeTrade(
   teamAGetsPicks: DraftPick[] = [],
   teamAGivesFAAB: number = 0,
   teamAGetsFAAB: number = 0,
-  leagueSettings?: LeagueSettings
+  leagueSettings?: Partial<LeagueSettings>
 ): Promise<TradeAnalysis> {
   await fetchPlayerValues();
 
   const players = await fetchAllPlayers();
 
-  let settings: LeagueSettings = leagueSettings || { isSuperflex: false, isTEPremium: false };
+  let settings: LeagueSettings | Partial<LeagueSettings>;
 
-  if (leagueId && !leagueSettings) {
+  if (leagueSettings) {
+    settings = leagueSettings;
+  } else if (leagueId) {
     const league = await fetchLeagueDetails(leagueId);
-    settings.isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
-
-    const tePremiumPoints = league.scoring_settings?.rec_te || 0;
-    const standardRecPoints = league.scoring_settings?.rec || 0;
-    settings.isTEPremium = tePremiumPoints > standardRecPoints;
+    settings = getLeagueSettings(league);
+  } else {
+    settings = {
+      isSuperflex: false,
+      isTEPremium: false,
+      draftRounds: 4,
+      faabBudget: 100,
+      numTeams: 12,
+      rosterPositions: [],
+      scoringSettings: {},
+      hasIDP: false,
+      bestBall: false,
+    };
   }
 
   const teamAItems: TradeItem[] = [];
@@ -449,7 +529,11 @@ export async function analyzeTrade(
   }
 
   for (const pick of teamAGivesPicks) {
-    const value = getDraftPickValue(pick.round, pick.year);
+    const value = getDraftPickValue(pick.round, pick.year, {
+      totalRounds: settings.draftRounds,
+      isSuperflex: settings.isSuperflex,
+      hasIDP: settings.hasIDP,
+    });
     teamAValue += value;
     teamAItems.push({
       type: 'pick',
@@ -460,7 +544,7 @@ export async function analyzeTrade(
   }
 
   if (teamAGivesFAAB > 0) {
-    const value = getFAABValue(teamAGivesFAAB);
+    const value = getFAABValue(teamAGivesFAAB, settings.faabBudget || 100);
     teamAValue += value;
     teamAItems.push({
       type: 'faab',
@@ -489,7 +573,11 @@ export async function analyzeTrade(
   }
 
   for (const pick of teamAGetsPicks) {
-    const value = getDraftPickValue(pick.round, pick.year);
+    const value = getDraftPickValue(pick.round, pick.year, {
+      totalRounds: settings.draftRounds,
+      isSuperflex: settings.isSuperflex,
+      hasIDP: settings.hasIDP,
+    });
     teamBValue += value;
     teamBItems.push({
       type: 'pick',
@@ -500,7 +588,7 @@ export async function analyzeTrade(
   }
 
   if (teamAGetsFAAB > 0) {
-    const value = getFAABValue(teamAGetsFAAB);
+    const value = getFAABValue(teamAGetsFAAB, settings.faabBudget || 100);
     teamBValue += value;
     teamBItems.push({
       type: 'faab',
@@ -576,10 +664,7 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
     fetchTradedPicks(leagueId).catch(() => []),
   ]);
 
-  const settings: LeagueSettings = {
-    isSuperflex: league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0,
-    isTEPremium: (league.scoring_settings?.rec_te || 0) > (league.scoring_settings?.rec || 0),
-  };
+  const settings = getLeagueSettings(league);
 
   const rankings: TeamRanking[] = rosters.map((roster) => {
     const user = users.find((u) => u.user_id === roster.owner_id);
@@ -609,9 +694,10 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
     const calendarYear = new Date().getFullYear();
     const currentYear = Math.max(leagueYear, calendarYear);
     const teamPicks: Array<{ season: string; round: number; original_owner_id: string }> = [];
+    const totalRounds = settings.draftRounds || 4;
 
     for (let year = currentYear; year <= currentYear + 3; year++) {
-      for (let round = 1; round <= 4; round++) {
+      for (let round = 1; round <= totalRounds; round++) {
         const pickInTradedList = tradedPicks.find(
           (tp: any) =>
             tp.season === year.toString() &&
@@ -637,9 +723,10 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
       }
     }
 
+    const totalBudget = settings.faabBudget || 100;
     const faabRemaining = roster.settings.waiver_budget_used
-      ? 100 - roster.settings.waiver_budget_used
-      : (roster.settings as any).waiver_budget || 100;
+      ? totalBudget - roster.settings.waiver_budget_used
+      : (roster.settings as any).waiver_budget || totalBudget;
 
     return {
       roster_id: roster.roster_id,
