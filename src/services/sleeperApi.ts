@@ -564,7 +564,9 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
     const totalValue = playerValues.reduce((sum, p) => sum + p.value, 0);
     const topPlayers = playerValues.slice(0, 5);
 
-    const currentYear = parseInt(league.season);
+    const leagueYear = parseInt(league.season);
+    const calendarYear = new Date().getFullYear();
+    const currentYear = Math.max(leagueYear, calendarYear);
     const teamPicks: Array<{ season: string; round: number; original_owner_id: string }> = [];
 
     for (let year = currentYear; year <= currentYear + 3; year++) {
