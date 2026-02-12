@@ -147,6 +147,7 @@ Each player row now displays:
 4. Recent performance weighting
 5. Team situation analysis
 6. Integrated with your actual league data
+7. Injury status displayed for info only (no value penalties)
 
 ## Future Enhancement Opportunities
 

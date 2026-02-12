@@ -277,10 +277,6 @@ class PlayerValuesApi {
       adjustedValue *= (1 + factors.recent_performance);
     }
 
-    if (factors.injury_risk) {
-      adjustedValue *= (1 - Math.abs(factors.injury_risk));
-    }
-
     if (factors.age_factor) {
       adjustedValue *= (1 + factors.age_factor);
     }

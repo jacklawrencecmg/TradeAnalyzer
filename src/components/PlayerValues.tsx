@@ -669,7 +669,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
           <li>• <span className="text-fdp-accent-2 font-medium">Playoff Schedule:</span> Adjusts for strength of schedule in weeks 15-17</li>
           <li>• <span className="text-fdp-accent-2 font-medium">Recent Performance:</span> Weights last 4 weeks more heavily</li>
           <li>• <span className="text-fdp-accent-2 font-medium">Team Situation:</span> Factors in coaching changes and offensive scheme</li>
-          <li>• <span className="text-fdp-accent-2 font-medium">Injury Risk:</span> Applies discount for injury-prone players</li>
+          <li>• <span className="text-fdp-accent-2 font-medium">Injury Status:</span> Displayed for information only - does not affect values</li>
           <li>• <span className="text-fdp-accent-2 font-medium">League Settings:</span> Superflex leagues see QB value boosts</li>
         </ul>
       </div>
