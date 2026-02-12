@@ -50,6 +50,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [teamBName, setTeamBName] = useState('Their Team');
   const [selectedTeamA, setSelectedTeamA] = useState<string>('');
   const [selectedTeamB, setSelectedTeamB] = useState<string>('');
+  const [assetTypeA, setAssetTypeA] = useState<'players' | 'picks' | 'faab'>('players');
+  const [assetTypeB, setAssetTypeB] = useState<'players' | 'picks' | 'faab'>('players');
+  const [tradeDirectionA, setTradeDirectionA] = useState<'gives' | 'gets'>('gives');
+  const [tradeDirectionB, setTradeDirectionB] = useState<'gives' | 'gets'>('gets');
 
   useEffect(() => {
     loadPlayers();
@@ -400,6 +404,51 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     setAnalysis(null);
   }
 
+  function getRosterPlayers(rosterId: string): string[] {
+    const roster = rosters.find(r => r.roster_id.toString() === rosterId);
+    return roster?.players || [];
+  }
+
+  function getRosterPicks(rosterId: string): DraftPick[] {
+    const roster = rosters.find(r => r.roster_id.toString() === rosterId);
+    if (!roster?.draft_picks) return [];
+
+    return roster.draft_picks.map((pick, index) => ({
+      id: `${pick.season}-${pick.round}-${roster.roster_id}-${index}`,
+      year: pick.season,
+      round: pick.round,
+      displayName: `${pick.season} Round ${pick.round} Pick`,
+      pickNumber: undefined,
+    }));
+  }
+
+  function getRosterFAAB(rosterId: string): number {
+    const roster = rosters.find(r => r.roster_id.toString() === rosterId);
+    return roster?.settings?.waiver_budget_used
+      ? (roster.settings.waiver_budget_used)
+      : 0;
+  }
+
+  function addRosterPlayer(playerId: string, direction: 'gives' | 'gets') {
+    if (direction === 'gives') {
+      if (!teamAGives.includes(playerId)) {
+        setTeamAGives([...teamAGives, playerId]);
+      }
+    } else {
+      if (!teamAGets.includes(playerId)) {
+        setTeamAGets([...teamAGets, playerId]);
+      }
+    }
+  }
+
+  function addRosterPick(pick: DraftPick, direction: 'gives' | 'gets') {
+    if (direction === 'gives') {
+      setTeamAGivesPicks([...teamAGivesPicks, pick]);
+    } else {
+      setTeamAGetsPicks([...teamAGetsPicks, pick]);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -432,51 +481,336 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         </div>
 
         {leagueId && rosters.length > 0 && (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Select Teams</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Team 1</label>
-                <select
-                  value={selectedTeamA}
-                  onChange={(e) => {
-                    setSelectedTeamA(e.target.value);
-                    if (e.target.value) {
-                      setTeamAName(getTeamName(e.target.value));
-                    }
-                  }}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
-                >
-                  <option value="">Select a team...</option>
-                  {rosters.map((roster) => (
-                    <option key={roster.roster_id} value={roster.roster_id.toString()}>
-                      {getTeamName(roster.roster_id.toString())}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Team 2</label>
-                <select
-                  value={selectedTeamB}
-                  onChange={(e) => {
-                    setSelectedTeamB(e.target.value);
-                    if (e.target.value) {
-                      setTeamBName(getTeamName(e.target.value));
-                    }
-                  }}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
-                >
-                  <option value="">Select a team...</option>
-                  {rosters.map((roster) => (
-                    <option key={roster.roster_id} value={roster.roster_id.toString()}>
-                      {getTeamName(roster.roster_id.toString())}
-                    </option>
-                  ))}
-                </select>
+          <>
+            <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-semibold text-white mb-4">Select Teams</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Team 1</label>
+                  <select
+                    value={selectedTeamA}
+                    onChange={(e) => {
+                      setSelectedTeamA(e.target.value);
+                      if (e.target.value) {
+                        setTeamAName(getTeamName(e.target.value));
+                      }
+                    }}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
+                  >
+                    <option value="">Select a team...</option>
+                    {rosters.map((roster) => (
+                      <option key={roster.roster_id} value={roster.roster_id.toString()}>
+                        {getTeamName(roster.roster_id.toString())}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Team 2</label>
+                  <select
+                    value={selectedTeamB}
+                    onChange={(e) => {
+                      setSelectedTeamB(e.target.value);
+                      if (e.target.value) {
+                        setTeamBName(getTeamName(e.target.value));
+                      }
+                    }}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
+                  >
+                    <option value="">Select a team...</option>
+                    {rosters.map((roster) => (
+                      <option key={roster.roster_id} value={roster.roster_id.toString()}>
+                        {getTeamName(roster.roster_id.toString())}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
+
+            {(selectedTeamA || selectedTeamB) && (
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Team Rosters</h3>
+                <div className="grid md:grid-cols-2 gap-6">
+                  {selectedTeamA && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-md font-semibold text-gray-300">{teamAName}</h4>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-400">Add to:</label>
+                          <select
+                            value={tradeDirectionA}
+                            onChange={(e) => setTradeDirectionA(e.target.value as 'gives' | 'gets')}
+                            className="text-xs px-2 py-1 bg-gray-900 border border-gray-700 rounded text-white focus:outline-none focus:border-[#00d4ff]"
+                          >
+                            <option value="gives">Gives</option>
+                            <option value="gets">Gets</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={() => setAssetTypeA('players')}
+                          className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            assetTypeA === 'players'
+                              ? 'bg-[#00d4ff] text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          Players
+                        </button>
+                        <button
+                          onClick={() => setAssetTypeA('picks')}
+                          className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            assetTypeA === 'picks'
+                              ? 'bg-[#00d4ff] text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          Picks
+                        </button>
+                        <button
+                          onClick={() => setAssetTypeA('faab')}
+                          className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            assetTypeA === 'faab'
+                              ? 'bg-[#00d4ff] text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          FAAB
+                        </button>
+                      </div>
+
+                      <div className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto">
+                        {assetTypeA === 'players' && (
+                          <div className="space-y-2">
+                            {getRosterPlayers(selectedTeamA).map((playerId) => {
+                              const player = players[playerId];
+                              if (!player) return null;
+                              const alreadyAdded = tradeDirectionA === 'gives'
+                                ? teamAGives.includes(playerId)
+                                : teamAGets.includes(playerId);
+
+                              return (
+                                <button
+                                  key={playerId}
+                                  onClick={() => addRosterPlayer(playerId, tradeDirectionA)}
+                                  disabled={alreadyAdded}
+                                  className={`w-full flex items-center gap-3 p-2 rounded hover:bg-gray-800 transition-colors text-left ${
+                                    alreadyAdded ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  <img
+                                    src={getPlayerImageUrl(playerId)}
+                                    alt={player.full_name}
+                                    className="w-10 h-10 rounded-full object-cover bg-gray-700"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                  <div className="flex-1">
+                                    <div className="text-white text-sm font-medium">{player.full_name}</div>
+                                    <div className="text-xs text-gray-400">
+                                      {player.position} - {player.team || 'FA'}
+                                    </div>
+                                  </div>
+                                  {alreadyAdded && (
+                                    <span className="text-xs text-gray-500">Added</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {assetTypeA === 'picks' && (
+                          <div className="space-y-2">
+                            {getRosterPicks(selectedTeamA).map((pick) => {
+                              const alreadyAdded = tradeDirectionA === 'gives'
+                                ? teamAGivesPicks.some(p => p.year === pick.year && p.round === pick.round)
+                                : teamAGetsPicks.some(p => p.year === pick.year && p.round === pick.round);
+
+                              return (
+                                <button
+                                  key={pick.id}
+                                  onClick={() => !alreadyAdded && addRosterPick(pick, tradeDirectionA)}
+                                  disabled={alreadyAdded}
+                                  className={`w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition-colors ${
+                                    alreadyAdded ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-[#00d4ff]" />
+                                    <span className="text-white text-sm">{pick.displayName}</span>
+                                  </div>
+                                  {alreadyAdded && (
+                                    <span className="text-xs text-gray-500">Added</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                            {getRosterPicks(selectedTeamA).length === 0 && (
+                              <p className="text-gray-400 text-sm text-center py-4">No draft picks</p>
+                            )}
+                          </div>
+                        )}
+
+                        {assetTypeA === 'faab' && (
+                          <div className="p-3">
+                            <div className="text-gray-300 text-sm mb-2">
+                              Available FAAB: ${getRosterFAAB(selectedTeamA)}
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              Use the FAAB input fields in the trade sections to add FAAB to the trade.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedTeamB && (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-md font-semibold text-gray-300">{teamBName}</h4>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-400">Add to:</label>
+                          <select
+                            value={tradeDirectionB}
+                            onChange={(e) => setTradeDirectionB(e.target.value as 'gives' | 'gets')}
+                            className="text-xs px-2 py-1 bg-gray-900 border border-gray-700 rounded text-white focus:outline-none focus:border-[#00d4ff]"
+                          >
+                            <option value="gives">Gives</option>
+                            <option value="gets">Gets</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2 mb-3">
+                        <button
+                          onClick={() => setAssetTypeB('players')}
+                          className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            assetTypeB === 'players'
+                              ? 'bg-[#00d4ff] text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          Players
+                        </button>
+                        <button
+                          onClick={() => setAssetTypeB('picks')}
+                          className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            assetTypeB === 'picks'
+                              ? 'bg-[#00d4ff] text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          Picks
+                        </button>
+                        <button
+                          onClick={() => setAssetTypeB('faab')}
+                          className={`flex-1 px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            assetTypeB === 'faab'
+                              ? 'bg-[#00d4ff] text-white'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          FAAB
+                        </button>
+                      </div>
+
+                      <div className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto">
+                        {assetTypeB === 'players' && (
+                          <div className="space-y-2">
+                            {getRosterPlayers(selectedTeamB).map((playerId) => {
+                              const player = players[playerId];
+                              if (!player) return null;
+                              const alreadyAdded = tradeDirectionB === 'gives'
+                                ? teamAGives.includes(playerId)
+                                : teamAGets.includes(playerId);
+
+                              return (
+                                <button
+                                  key={playerId}
+                                  onClick={() => addRosterPlayer(playerId, tradeDirectionB)}
+                                  disabled={alreadyAdded}
+                                  className={`w-full flex items-center gap-3 p-2 rounded hover:bg-gray-800 transition-colors text-left ${
+                                    alreadyAdded ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  <img
+                                    src={getPlayerImageUrl(playerId)}
+                                    alt={player.full_name}
+                                    className="w-10 h-10 rounded-full object-cover bg-gray-700"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                  <div className="flex-1">
+                                    <div className="text-white text-sm font-medium">{player.full_name}</div>
+                                    <div className="text-xs text-gray-400">
+                                      {player.position} - {player.team || 'FA'}
+                                    </div>
+                                  </div>
+                                  {alreadyAdded && (
+                                    <span className="text-xs text-gray-500">Added</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {assetTypeB === 'picks' && (
+                          <div className="space-y-2">
+                            {getRosterPicks(selectedTeamB).map((pick) => {
+                              const alreadyAdded = tradeDirectionB === 'gives'
+                                ? teamAGivesPicks.some(p => p.year === pick.year && p.round === pick.round)
+                                : teamAGetsPicks.some(p => p.year === pick.year && p.round === pick.round);
+
+                              return (
+                                <button
+                                  key={pick.id}
+                                  onClick={() => !alreadyAdded && addRosterPick(pick, tradeDirectionB)}
+                                  disabled={alreadyAdded}
+                                  className={`w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition-colors ${
+                                    alreadyAdded ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4 text-[#00d4ff]" />
+                                    <span className="text-white text-sm">{pick.displayName}</span>
+                                  </div>
+                                  {alreadyAdded && (
+                                    <span className="text-xs text-gray-500">Added</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                            {getRosterPicks(selectedTeamB).length === 0 && (
+                              <p className="text-gray-400 text-sm text-center py-4">No draft picks</p>
+                            )}
+                          </div>
+                        )}
+
+                        {assetTypeB === 'faab' && (
+                          <div className="p-3">
+                            <div className="text-gray-300 text-sm mb-2">
+                              Available FAAB: ${getRosterFAAB(selectedTeamB)}
+                            </div>
+                            <p className="text-xs text-gray-400">
+                              Use the FAAB input fields in the trade sections to add FAAB to the trade.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
