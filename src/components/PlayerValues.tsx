@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw } from 'lucide-react';
 import { playerValuesApi, PlayerValue } from '../services/playerValuesApi';
 import { useAuth } from '../hooks/useAuth';
@@ -23,6 +23,8 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<PlayerValue[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadPlayerValues();
@@ -31,6 +33,15 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   useEffect(() => {
     filterPlayers();
   }, [players, searchTerm, positionFilter, trendFilter, showOnlyDifferences]);
+
+  useEffect(() => {
+    // Cleanup timeout on unmount
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const loadPlayerValues = async () => {
     setLoading(true);
@@ -63,21 +74,34 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     }
   };
 
-  const handleSearchChange = (value: string) => {
+  const handleSearchChange = async (value: string) => {
     setSearchTerm(value);
 
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
     if (value.trim().length >= 2) {
-      const matchingPlayers = players
-        .filter(p =>
-          p.player_name.toLowerCase().includes(value.toLowerCase()) ||
-          p.team?.toLowerCase().includes(value.toLowerCase())
-        )
-        .slice(0, 8);
-      setSuggestions(matchingPlayers);
+      setSearchLoading(true);
       setShowSuggestions(true);
+
+      // Debounce API call by 300ms
+      searchTimeoutRef.current = setTimeout(async () => {
+        try {
+          const results = await playerValuesApi.searchPlayers(value.trim(), 10);
+          setSuggestions(results);
+        } catch (error) {
+          console.error('Error searching players:', error);
+          setSuggestions([]);
+        } finally {
+          setSearchLoading(false);
+        }
+      }, 300);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
+      setSearchLoading(false);
     }
   };
 
@@ -183,46 +207,73 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-fdp-text-3 z-10" />
+            {searchLoading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 z-10">
+                <div className="animate-spin w-4 h-4 border-2 border-fdp-accent-1 border-t-transparent rounded-full"></div>
+              </div>
+            )}
             <input
               type="text"
-              placeholder="Search players..."
+              placeholder="Search players by name..."
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => {
-                if (searchTerm.trim().length >= 2) {
+                if (searchTerm.trim().length >= 2 && suggestions.length > 0) {
                   setShowSuggestions(true);
                 }
               }}
               onBlur={() => {
                 setTimeout(() => setShowSuggestions(false), 200);
               }}
-              className="w-full pl-10 pr-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+              className="w-full pl-10 pr-10 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none transition-all"
             />
 
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute z-50 w-full mt-2 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-h-80 overflow-y-auto">
-                {suggestions.map((player) => (
-                  <button
-                    key={player.id}
-                    onClick={() => selectSuggestion(player)}
-                    className="w-full px-4 py-3 text-left hover:bg-fdp-surface-2 transition-colors border-b border-fdp-border-1 last:border-b-0"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-fdp-text-1 font-medium">{player.player_name}</div>
-                        <div className="text-fdp-text-3 text-sm">
-                          {player.position} • {player.team || 'FA'}
+            {showSuggestions && (
+              <div className="absolute z-50 w-full mt-2 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-h-96 overflow-y-auto">
+                {searchLoading ? (
+                  <div className="px-4 py-6 text-center">
+                    <div className="animate-spin w-6 h-6 border-2 border-fdp-accent-1 border-t-transparent rounded-full mx-auto mb-2"></div>
+                    <p className="text-fdp-text-3 text-sm">Searching players...</p>
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  suggestions.map((player) => (
+                    <button
+                      key={player.id}
+                      onClick={() => selectSuggestion(player)}
+                      className="w-full px-4 py-3 text-left hover:bg-fdp-surface-2 transition-colors border-b border-fdp-border-1 last:border-b-0 group"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="text-fdp-text-1 font-medium group-hover:text-fdp-accent-2 transition-colors">
+                            {player.player_name}
+                          </div>
+                          <div className="text-fdp-text-3 text-sm flex items-center gap-2">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
+                              {player.position}
+                            </span>
+                            <span>{player.team || 'FA'}</span>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-fdp-accent-2 font-bold text-lg">
+                            {playerValuesApi.formatValue(player.fdp_value)}
+                          </div>
+                          <div className="text-fdp-text-3 text-xs">
+                            KTC: {playerValuesApi.formatValue(player.ktc_value)}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {getTrendIcon(player.trend)}
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-fdp-accent-2 font-bold">
-                          {playerValuesApi.formatValue(player.fdp_value)}
-                        </div>
-                        <div className="text-fdp-text-3 text-xs">FDP Value</div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-6 text-center">
+                    <Search className="w-8 h-8 text-fdp-text-3 mx-auto mb-2 opacity-50" />
+                    <p className="text-fdp-text-3 text-sm">No players found</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
