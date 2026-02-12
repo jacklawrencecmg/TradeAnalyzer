@@ -815,6 +815,52 @@ export async function getPlayerValueById(playerId: string): Promise<number> {
   return getPlayerValue(player);
 }
 
+export interface TradeBlockPlayer {
+  player_id: string;
+  player_name: string;
+  position: string;
+  team: string | null;
+  value: number;
+  owner_id: string;
+  roster_id: number;
+}
+
+export async function fetchTradeBlockPlayers(leagueId: string): Promise<TradeBlockPlayer[]> {
+  const [rosters, users, players] = await Promise.all([
+    fetchLeagueRosters(leagueId),
+    fetchLeagueUsers(leagueId),
+    fetchAllPlayers(),
+  ]);
+
+  await fetchPlayerValues();
+
+  const tradeBlockPlayers: TradeBlockPlayer[] = [];
+
+  rosters.forEach((roster) => {
+    const metadata = roster.metadata as any;
+    const tradeBlock = metadata?.trade_block || [];
+
+    if (Array.isArray(tradeBlock) && tradeBlock.length > 0) {
+      tradeBlock.forEach((playerId: string) => {
+        const player = players[playerId];
+        if (player) {
+          tradeBlockPlayers.push({
+            player_id: playerId,
+            player_name: player.full_name,
+            position: player.position,
+            team: player.team,
+            value: getPlayerValue(player),
+            owner_id: roster.owner_id,
+            roster_id: roster.roster_id,
+          });
+        }
+      });
+    }
+  });
+
+  return tradeBlockPlayers;
+}
+
 export async function simulatePlayoffOdds(
   leagueId: string,
   simulations: number = 1000
