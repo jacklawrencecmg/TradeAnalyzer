@@ -11,6 +11,8 @@ import {
 } from '../services/sleeperApi';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { useToast } from './Toast';
+import Tooltip from './Tooltip';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -19,6 +21,7 @@ interface TradeAnalyzerProps {
 
 export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerProps) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [players, setPlayers] = useState<Record<string, SleeperPlayer>>({});
   const [searchTermA, setSearchTermA] = useState('');
   const [searchTermB, setSearchTermB] = useState('');
@@ -296,9 +299,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       if (user) {
         await saveTrade(result);
       }
+      showToast('Trade analyzed successfully!', 'success');
     } catch (error) {
       console.error('Failed to analyze trade:', error);
-      alert('Failed to analyze trade. Please try again.');
+      showToast('Failed to analyze trade. Please try again.', 'error');
     } finally {
       setAnalyzing(false);
     }
@@ -333,8 +337,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       if (error) throw error;
 
       if (onTradeSaved) onTradeSaved();
+      showToast('Trade saved to history', 'info');
     } catch (error) {
       console.error('Failed to save trade:', error);
+      showToast('Failed to save trade to history', 'error');
     }
   }
 

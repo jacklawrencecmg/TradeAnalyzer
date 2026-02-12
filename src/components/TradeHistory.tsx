@@ -3,6 +3,9 @@ import { History, Trash2, TrendingUp, TrendingDown, Minus, Calendar } from 'luci
 import { supabase, type SavedTrade } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { fetchAllPlayers, getPlayerImageUrl, type SleeperPlayer } from '../services/sleeperApi';
+import { useToast } from './Toast';
+import ConfirmDialog from './ConfirmDialog';
+import { TradeCardSkeleton } from './LoadingSkeleton';
 
 interface TradeHistoryProps {
   leagueId: string;
@@ -10,10 +13,12 @@ interface TradeHistoryProps {
 
 export default function TradeHistory({ leagueId }: TradeHistoryProps) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [trades, setTrades] = useState<SavedTrade[]>([]);
   const [players, setPlayers] = useState<Record<string, SleeperPlayer>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -53,19 +58,16 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
   }
 
   async function deleteTrade(tradeId: string) {
-    if (!confirm('Are you sure you want to delete this trade analysis?')) {
-      return;
-    }
-
     try {
       const { error } = await supabase.from('saved_trades').delete().eq('id', tradeId);
 
       if (error) throw error;
 
       setTrades(trades.filter((t) => t.id !== tradeId));
+      showToast('Trade deleted successfully', 'success');
     } catch (err) {
       console.error('Failed to delete trade:', err);
-      alert('Failed to delete trade. Please try again.');
+      showToast('Failed to delete trade. Please try again.', 'error');
     }
   }
 
@@ -91,8 +93,10 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-lg text-gray-400">Loading trade history...</div>
+      <div className="space-y-4">
+        <TradeCardSkeleton />
+        <TradeCardSkeleton />
+        <TradeCardSkeleton />
       </div>
     );
   }
@@ -165,7 +169,7 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                   </div>
                 </div>
                 <button
-                  onClick={() => deleteTrade(trade.id)}
+                  onClick={() => setDeleteConfirm(trade.id)}
                   className="text-gray-400 hover:text-red-400 transition-colors p-2"
                   title="Delete trade"
                 >
@@ -377,6 +381,16 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
           ))}
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm !== null}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => deleteConfirm && deleteTrade(deleteConfirm)}
+        title="Delete Trade Analysis"
+        message="Are you sure you want to delete this trade analysis? This action cannot be undone."
+        confirmText="Delete"
+        type="danger"
+      />
     </div>
   );
 }

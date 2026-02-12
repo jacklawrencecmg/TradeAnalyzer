@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { AuthForm } from './components/AuthForm';
 import { Dashboard } from './components/Dashboard';
 import TradeAnalyzer from './components/TradeAnalyzer';
+import { ToastProvider } from './components/Toast';
 import { LogIn, TrendingUp } from 'lucide-react';
 
 function AppContent() {
@@ -77,7 +78,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </AuthProvider>
   );
 }
