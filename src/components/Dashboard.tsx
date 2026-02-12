@@ -1,14 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import TradeAnalyzer from './TradeAnalyzer';
 import PowerRankings from './PowerRankings';
 import PlayoffSimulator from './PlayoffSimulator';
 import TradeHistory from './TradeHistory';
+import WaiverAssistant from './WaiverAssistant';
+import LineupOptimizer from './LineupOptimizer';
+import ValueTrendTracker from './ValueTrendTracker';
+import ChampionshipCalculator from './ChampionshipCalculator';
+import TradeFinder from './TradeFinder';
+import TradeBlockMarketplace from './TradeBlockMarketplace';
+import CounterOfferGenerator from './CounterOfferGenerator';
+import DraftKit from './DraftKit';
+import KeeperCalculator from './KeeperCalculator';
+import RosterHealth from './RosterHealth';
+import WeeklyRecap from './WeeklyRecap';
+import RivalryTracker from './RivalryTracker';
+import LeagueChat from './LeagueChat';
+import NotificationsPanel from './NotificationsPanel';
+import PlayerNewsFeed from './PlayerNewsFeed';
+import ExportShare from './ExportShare';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export';
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
@@ -179,70 +195,88 @@ export function Dashboard() {
         {currentLeague && (
           <div className="space-y-6">
             {/* Tab Navigation */}
-            <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-2">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <button
-                  onClick={() => setActiveTab('trade')}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-                    activeTab === 'trade'
-                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
-                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
-                  }`}
-                >
-                  <TrendingUp className="w-5 h-5" />
-                  <span className="hidden sm:inline">Trade Analyzer</span>
-                  <span className="sm:hidden">Trade</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('rankings')}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-                    activeTab === 'rankings'
-                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
-                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
-                  }`}
-                >
-                  <Trophy className="w-5 h-5" />
-                  <span className="hidden sm:inline">Power Rankings</span>
-                  <span className="sm:hidden">Rankings</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('playoffs')}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-                    activeTab === 'playoffs'
-                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
-                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
-                  }`}
-                >
-                  <Activity className="w-5 h-5" />
-                  <span className="hidden sm:inline">Playoff Odds</span>
-                  <span className="sm:hidden">Playoffs</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('history')}
-                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
-                    activeTab === 'history'
-                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
-                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
-                  }`}
-                >
-                  <History className="w-5 h-5" />
-                  <span className="hidden sm:inline">Trade History</span>
-                  <span className="sm:hidden">History</span>
-                </button>
+            <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-4">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Core Features</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={TrendingUp} label="Trade Analyzer" shortLabel="Trade" tab="trade" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Trophy} label="Power Rankings" shortLabel="Rankings" tab="rankings" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Activity} label="Playoff Odds" shortLabel="Playoffs" tab="playoffs" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={History} label="Trade History" shortLabel="History" tab="history" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Analytics & Insights</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={Search} label="Waiver Assistant" shortLabel="Waiver" tab="waiver" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Users} label="Lineup Optimizer" shortLabel="Lineup" tab="lineup" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={TrendingUp} label="Value Trends" shortLabel="Trends" tab="trends" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Trophy} label="Championship Odds" shortLabel="Champion" tab="championship" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Trading Tools</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={ArrowLeftRight} label="Trade Finder" shortLabel="Finder" tab="tradeFinder" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={ShoppingCart} label="Trade Block" shortLabel="Block" tab="tradeBlock" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={RefreshCw} label="Counter Offer" shortLabel="Counter" tab="counterOffer" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Draft & Management</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={Clipboard} label="Draft Kit" shortLabel="Draft" tab="draft" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Shield} label="Keeper Calculator" shortLabel="Keeper" tab="keeper" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Calendar} label="Roster Health" shortLabel="Health" tab="health" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">League Social</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={FileText} label="Weekly Recap" shortLabel="Recap" tab="recap" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Swords} label="Rivalry Tracker" shortLabel="Rivalry" tab="rivalry" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={MessageCircle} label="League Chat" shortLabel="Chat" tab="chat" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Bell} label="Notifications" shortLabel="Alerts" tab="notifications" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">News & Sharing</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={Newspaper} label="Player News" shortLabel="News" tab="news" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Share2} label="Export & Share" shortLabel="Share" tab="export" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* Tab Content */}
             <div>
-              {activeTab === 'trade' && (
-                <TradeAnalyzer
-                  leagueId={currentLeague.league_id}
-                  onTradeSaved={() => setActiveTab('history')}
-                />
-              )}
+              {activeTab === 'trade' && <TradeAnalyzer leagueId={currentLeague.league_id} onTradeSaved={() => setActiveTab('history')} />}
               {activeTab === 'rankings' && <PowerRankings leagueId={currentLeague.league_id} />}
               {activeTab === 'playoffs' && <PlayoffSimulator leagueId={currentLeague.league_id} />}
               {activeTab === 'history' && <TradeHistory leagueId={currentLeague.league_id} />}
+              {activeTab === 'waiver' && <WaiverAssistant leagueId={currentLeague.league_id} rosterId="1" userId={user?.id || ''} />}
+              {activeTab === 'lineup' && <LineupOptimizer leagueId={currentLeague.league_id} rosterId="1" />}
+              {activeTab === 'trends' && <ValueTrendTracker leagueId={currentLeague.league_id} />}
+              {activeTab === 'championship' && <ChampionshipCalculator leagueId={currentLeague.league_id} />}
+              {activeTab === 'tradeFinder' && <TradeFinder leagueId={currentLeague.league_id} rosterId="1" />}
+              {activeTab === 'tradeBlock' && <TradeBlockMarketplace leagueId={currentLeague.league_id} userId={user?.id || ''} />}
+              {activeTab === 'counterOffer' && <CounterOfferGenerator />}
+              {activeTab === 'draft' && <DraftKit leagueId={currentLeague.league_id} userId={user?.id || ''} />}
+              {activeTab === 'keeper' && <KeeperCalculator leagueId={currentLeague.league_id} rosterId="1" />}
+              {activeTab === 'health' && <RosterHealth leagueId={currentLeague.league_id} rosterId="1" />}
+              {activeTab === 'recap' && <WeeklyRecap leagueId={currentLeague.league_id} />}
+              {activeTab === 'rivalry' && <RivalryTracker leagueId={currentLeague.league_id} />}
+              {activeTab === 'chat' && <LeagueChat leagueId={currentLeague.league_id} userId={user?.id || ''} username={user?.email || 'User'} />}
+              {activeTab === 'notifications' && <NotificationsPanel userId={user?.id || ''} leagueId={currentLeague.league_id} />}
+              {activeTab === 'news' && <PlayerNewsFeed />}
+              {activeTab === 'export' && <ExportShare leagueId={currentLeague.league_id} rosterId="1" />}
             </div>
           </div>
         )}
@@ -264,6 +298,32 @@ export function Dashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+interface NavButtonProps {
+  icon: any;
+  label: string;
+  shortLabel: string;
+  tab: TabType;
+  activeTab: TabType;
+  onClick: (tab: TabType) => void;
+}
+
+function NavButton({ icon: Icon, label, shortLabel, tab, activeTab, onClick }: NavButtonProps) {
+  return (
+    <button
+      onClick={() => onClick(tab)}
+      className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg font-semibold transition-all ${
+        activeTab === tab
+          ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
+          : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+      <span className="hidden sm:inline text-sm">{label}</span>
+      <span className="sm:hidden text-sm">{shortLabel}</span>
+    </button>
   );
 }
 

@@ -798,6 +798,18 @@ export interface PlayoffOdds {
   elimination_scenario: string | null;
 }
 
+export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[]> {
+  return fetchLeagueRosters(leagueId);
+}
+
+export async function getPlayerValueById(playerId: string): Promise<number> {
+  await fetchPlayerValues();
+  const players = await fetchAllPlayers();
+  const player = players[playerId];
+  if (!player) return 0;
+  return getPlayerValue(player);
+}
+
 export async function simulatePlayoffOdds(
   leagueId: string,
   simulations: number = 1000
