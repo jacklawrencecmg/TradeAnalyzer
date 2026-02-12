@@ -177,19 +177,19 @@ export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> 
 }
 
 const POSITION_BASE_VALUES: Record<string, number> = {
-  QB: 2500,
-  RB: 2800,
-  WR: 2600,
-  TE: 2000,
-  K: 400,
-  DEF: 800,
-  DL: 1000,
-  LB: 1100,
-  DB: 1000,
-  DE: 1050,
-  DT: 950,
-  CB: 1000,
-  S: 950,
+  QB: 3500,
+  RB: 4000,
+  WR: 3800,
+  TE: 2500,
+  K: 100,
+  DEF: 200,
+  DL: 800,
+  LB: 1200,
+  DB: 900,
+  DE: 900,
+  DT: 700,
+  CB: 850,
+  S: 850,
 };
 
 let ktcValues: Record<string, number> = {};
@@ -237,25 +237,25 @@ export function getDraftPickValue(round: number, year: number): number {
   const yearDiff = year - currentYear;
 
   const baseValues: Record<number, number> = {
-    1: 5500,
-    2: 2800,
-    3: 1400,
-    4: 700,
+    1: 7000,
+    2: 3500,
+    3: 1500,
+    4: 600,
   };
 
-  let value = baseValues[round] || 400;
+  let value = baseValues[round] || 300;
 
   if (yearDiff > 0) {
-    value *= Math.pow(0.80, yearDiff);
+    value *= Math.pow(0.85, yearDiff);
   } else if (yearDiff < 0) {
-    value *= 1.2;
+    value *= 1.15;
   }
 
   return Math.round(value);
 }
 
 export function getFAABValue(amount: number): number {
-  return amount * 5;
+  return Math.round(amount * 7);
 }
 
 export interface LeagueSettings {
@@ -304,6 +304,8 @@ export function getPlayerValue(
 
   let baseValue = POSITION_BASE_VALUES[player.position];
 
+  const isIDP = ['DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position);
+
   if (player.position === 'QB' && settings.isSuperflex) {
     baseValue *= 1.8;
   }
@@ -313,39 +315,78 @@ export function getPlayerValue(
   }
 
   if (player.years_exp !== undefined) {
-    if (player.years_exp === 0) {
-      baseValue *= 0.85;
-    } else if (player.years_exp === 1) {
-      baseValue *= 0.95;
-    } else if (player.years_exp <= 3) {
-      baseValue *= 1.05;
-    } else if (player.years_exp <= 5) {
-      baseValue *= 1.15;
-    } else if (player.years_exp <= 7) {
-      baseValue *= 1.1;
-    } else if (player.years_exp >= 10) {
-      baseValue *= 0.65;
-    } else if (player.years_exp >= 8) {
-      baseValue *= 0.8;
+    if (isIDP) {
+      if (player.years_exp === 0) {
+        baseValue *= 0.70;
+      } else if (player.years_exp === 1) {
+        baseValue *= 0.85;
+      } else if (player.years_exp <= 3) {
+        baseValue *= 1.15;
+      } else if (player.years_exp <= 6) {
+        baseValue *= 1.25;
+      } else if (player.years_exp <= 8) {
+        baseValue *= 1.15;
+      } else if (player.years_exp >= 11) {
+        baseValue *= 0.75;
+      } else {
+        baseValue *= 0.95;
+      }
+    } else {
+      if (player.years_exp === 0) {
+        baseValue *= 0.85;
+      } else if (player.years_exp === 1) {
+        baseValue *= 0.95;
+      } else if (player.years_exp <= 3) {
+        baseValue *= 1.05;
+      } else if (player.years_exp <= 5) {
+        baseValue *= 1.15;
+      } else if (player.years_exp <= 7) {
+        baseValue *= 1.1;
+      } else if (player.years_exp >= 10) {
+        baseValue *= 0.65;
+      } else if (player.years_exp >= 8) {
+        baseValue *= 0.8;
+      }
     }
   }
 
   if (player.age) {
-    if (player.age < 22) {
-      baseValue *= 1.05;
-    } else if (player.age >= 23 && player.age <= 27) {
-      baseValue *= 1.15;
-    } else if (player.age >= 28 && player.age <= 29) {
-      baseValue *= 1.05;
-    } else if (player.age > 32) {
-      baseValue *= 0.55;
-    } else if (player.age > 29) {
-      baseValue *= 0.75;
+    if (isIDP) {
+      if (player.age < 23) {
+        baseValue *= 0.95;
+      } else if (player.age >= 24 && player.age <= 28) {
+        baseValue *= 1.20;
+      } else if (player.age >= 29 && player.age <= 30) {
+        baseValue *= 1.10;
+      } else if (player.age > 33) {
+        baseValue *= 0.60;
+      } else if (player.age > 30) {
+        baseValue *= 0.80;
+      }
+    } else {
+      if (player.age < 22) {
+        baseValue *= 1.05;
+      } else if (player.age >= 23 && player.age <= 27) {
+        baseValue *= 1.15;
+      } else if (player.age >= 28 && player.age <= 29) {
+        baseValue *= 1.05;
+      } else if (player.age > 32) {
+        baseValue *= 0.55;
+      } else if (player.age > 29) {
+        baseValue *= 0.75;
+      }
     }
   }
 
   if (player.injury_status) {
-    const injuryMultipliers: Record<string, number> = {
+    const injuryMultipliers: Record<string, number> = isIDP ? {
+      Out: 0.75,
+      Doubtful: 0.85,
+      Questionable: 0.96,
+      IR: 0.55,
+      PUP: 0.65,
+      COV: 0.45,
+    } : {
       Out: 0.7,
       Doubtful: 0.8,
       Questionable: 0.95,
