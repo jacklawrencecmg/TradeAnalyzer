@@ -35,6 +35,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     isTEPremium: false,
   });
   const [showInactiveWarning, setShowInactiveWarning] = useState(false);
+  const [showInactivePlayers, setShowInactivePlayers] = useState(false);
 
   useEffect(() => {
     loadPlayers();
@@ -138,7 +139,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           (player) =>
             player.full_name?.toLowerCase().includes(term) &&
             player.position &&
-            ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position)
+            ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position) &&
+            (showInactivePlayers || (player.status !== 'Retired' && player.status !== 'Inactive'))
         )
         .sort((a, b) => {
           const aName = a.full_name?.toLowerCase() || '';
@@ -376,13 +378,13 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           )}
         </div>
 
-        {!leagueId && (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2 mb-3">
-              <Settings className="w-5 h-5 text-[#00d4ff]" />
-              <h3 className="text-lg font-semibold text-white">League Settings</h3>
-            </div>
-            <div className="flex flex-wrap gap-4">
+        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Settings className="w-5 h-5 text-[#00d4ff]" />
+            <h3 className="text-lg font-semibold text-white">{leagueId ? 'Search Settings' : 'League & Search Settings'}</h3>
+          </div>
+          {!leagueId && (
+            <div className="flex flex-wrap gap-4 mb-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -406,11 +408,22 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 <span className="text-gray-300">TE Premium</span>
               </label>
             </div>
-            <p className="text-sm text-gray-400 mt-3">
-              These settings adjust player values to match your league format. Superflex increases QB values, TE Premium increases TE values.
+          )}
+          <div className={!leagueId ? 'border-t border-gray-700 pt-3' : ''}>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showInactivePlayers}
+                onChange={(e) => setShowInactivePlayers(e.target.checked)}
+                className="w-4 h-4 text-[#00d4ff] bg-gray-700 border-gray-600 rounded focus:ring-[#00d4ff] focus:ring-2"
+              />
+              <span className="text-gray-300">Show Retired/Inactive Players</span>
+            </label>
+            <p className="text-sm text-gray-400 mt-2">
+              {!leagueId && 'League settings adjust player values. '}By default, retired and inactive players are hidden from search results to prevent trading for players who aren't playing.
             </p>
           </div>
-        )}
+        </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">

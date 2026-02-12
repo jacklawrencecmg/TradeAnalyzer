@@ -25,6 +25,7 @@ export interface SleeperPlayer {
   team: string | null;
   age: number;
   injury_status: string | null;
+  status?: string;
   fantasy_positions?: string[];
   years_exp?: number;
 }
