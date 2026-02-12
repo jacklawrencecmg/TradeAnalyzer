@@ -195,7 +195,9 @@ const POSITION_BASE_VALUES: Record<string, number> = {
 let ktcValues: Record<string, number> = {};
 
 export async function fetchPlayerValues(): Promise<void> {
-  const cacheKey = 'ktc_values';
+  const currentYear = new Date().getFullYear();
+  const targetYear = currentYear >= 2025 ? currentYear : 2025;
+  const cacheKey = `ktc_values_${targetYear}`;
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
   if (cached) {
     ktcValues = cached;
@@ -203,7 +205,7 @@ export async function fetchPlayerValues(): Promise<void> {
   }
 
   try {
-    const response = await fetch('https://api.keeptradecut.com/bff/dynasty/players', {
+    const response = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?season=${targetYear}`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -224,7 +226,32 @@ export async function fetchPlayerValues(): Promise<void> {
       if (Object.keys(values).length > 0) {
         ktcValues = values;
         setCachedData(cacheKey, values);
-        console.log(`Loaded ${Object.keys(values).length} player values from KTC`);
+        console.log(`Loaded ${Object.keys(values).length} player values from KTC (${targetYear} season)`);
+      }
+    } else {
+      const fallbackResponse = await fetch('https://api.keeptradecut.com/bff/dynasty/players', {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (fallbackResponse.ok) {
+        const data = await fallbackResponse.json();
+        const values: Record<string, number> = {};
+
+        if (Array.isArray(data)) {
+          data.forEach((item: any) => {
+            if (item.sleeperId && item.value) {
+              values[item.sleeperId] = parseInt(item.value, 10);
+            }
+          });
+        }
+
+        if (Object.keys(values).length > 0) {
+          ktcValues = values;
+          setCachedData(cacheKey, values);
+          console.log(`Loaded ${Object.keys(values).length} player values from KTC (current season)`);
+        }
       }
     }
   } catch (error) {
