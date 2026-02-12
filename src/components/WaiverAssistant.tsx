@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, Search, Star, X } from 'lucide-react';
+import { TrendingUp, Search, Star, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getPlayerValueById as getPlayerValue, getLeagueRosters } from '../services/sleeperApi';
+import { getPlayerValueById as getPlayerValue, getLeagueRosters, fetchPlayerValues } from '../services/sleeperApi';
 
 interface Player {
   player_id: string;
@@ -11,6 +11,11 @@ interface Player {
   value: number;
   recommendation_score: number;
   reasoning: string;
+}
+
+interface WaiverPlayer extends Player {
+  injury_status?: string;
+  years_exp?: number;
 }
 
 interface WaiverAssistantProps {
@@ -24,14 +29,38 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
   const [recommendations, setRecommendations] = useState<Player[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState('ALL');
+  const [sortBy, setSortBy] = useState<'value' | 'recommendation'>('value');
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadRecommendations();
   }, [leagueId, rosterId]);
 
+  useEffect(() => {
+    if (recommendations.length > 0) {
+      setRecommendations([...recommendations].sort((a, b) =>
+        sortBy === 'value' ? b.value - a.value : b.recommendation_score - a.recommendation_score
+      ));
+    }
+  }, [sortBy]);
+
+  const forceRefreshValues = async () => {
+    setRefreshing(true);
+    try {
+      localStorage.clear();
+      await fetchPlayerValues();
+      await loadRecommendations();
+    } catch (error) {
+      console.error('Error refreshing values:', error);
+    }
+    setRefreshing(false);
+  };
+
   const loadRecommendations = async () => {
     setLoading(true);
     try {
+      await fetchPlayerValues();
+
       const rosters = await getLeagueRosters(leagueId);
       const userRoster = rosters.find((r: any) => r.roster_id.toString() === rosterId);
 
@@ -52,6 +81,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
           team: player.team || 'FA',
           status: player.status,
           injury_status: player.injury_status,
+          years_exp: player.years_exp,
           value: 0,
           recommendation_score: 0,
           reasoning: ''
@@ -63,7 +93,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
           return true;
         });
 
-      const playersToAnalyze = availablePlayers.slice(0, 200);
+      const playersToAnalyze = availablePlayers.slice(0, 300);
 
       const withValues = await Promise.all(
         playersToAnalyze.map(async (player) => {
@@ -76,8 +106,8 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
 
       const topRecommendations = withValues
         .filter(p => p.value > 50)
-        .sort((a, b) => b.recommendation_score - a.recommendation_score)
-        .slice(0, 30);
+        .sort((a, b) => sortBy === 'value' ? b.value - a.value : b.recommendation_score - a.recommendation_score)
+        .slice(0, 50);
 
       setRecommendations(topRecommendations);
     } catch (error) {
@@ -148,7 +178,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
     const matchesSearch = p.full_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPosition = positionFilter === 'ALL' || p.position === positionFilter;
     return matchesSearch && matchesPosition;
-  });
+  }).sort((a, b) => sortBy === 'value' ? b.value - a.value : b.recommendation_score - a.recommendation_score);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white p-6">
@@ -159,13 +189,26 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
         </div>
 
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-6 mb-6">
-          <div className="mb-4">
-            <p className="text-sm text-gray-400">
-              Showing available players from your league's waiver wire, ranked by value and positional need
-            </p>
+          <div className="mb-4 flex items-start justify-between">
+            <div>
+              <p className="text-sm text-gray-400 mb-2">
+                Showing available players from your league's waiver wire, sorted by dynasty value
+              </p>
+              <p className="text-xs text-gray-500">
+                Values from KeepTradeCut API • Higher values indicate more valuable players
+              </p>
+            </div>
+            <button
+              onClick={forceRefreshValues}
+              disabled={refreshing}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-semibold transition disabled:opacity-50"
+              title="Clear cache and reload fresh player values"
+            >
+              {refreshing ? 'Refreshing...' : 'Force Refresh'}
+            </button>
           </div>
-          <div className="flex gap-4">
-            <div className="flex-1 relative">
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex-1 min-w-[200px] relative">
               <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               <input
                 type="text"
@@ -186,12 +229,20 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
               <option value="WR">WR</option>
               <option value="TE">TE</option>
             </select>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'value' | 'recommendation')}
+              className="px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+            >
+              <option value="value">Sort by KTC Value</option>
+              <option value="recommendation">Sort by Team Fit</option>
+            </select>
             <button
               onClick={loadRecommendations}
               disabled={loading}
               className="px-6 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold transition disabled:opacity-50"
             >
-              {loading ? 'Loading...' : 'Refresh'}
+              {loading ? 'Loading...' : 'Reload'}
             </button>
           </div>
         </div>
