@@ -571,34 +571,27 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
 
     for (let year = currentYear; year <= currentYear + 3; year++) {
       for (let round = 1; round <= 4; round++) {
-        const tradedPick = tradedPicks.find(
+        const pickInTradedList = tradedPicks.find(
           (tp: any) =>
             tp.season === year.toString() &&
             tp.round === round &&
-            tp.owner_id === roster.roster_id
+            (tp.owner_id === roster.roster_id || tp.roster_id === roster.roster_id)
         );
 
-        if (tradedPick) {
-          teamPicks.push({
-            season: year.toString(),
-            round: round,
-            original_owner_id: tradedPick.roster_id.toString(),
-          });
-        } else {
-          const tradedAway = tradedPicks.find(
-            (tp: any) =>
-              tp.season === year.toString() &&
-              tp.round === round &&
-              tp.roster_id === roster.roster_id
-          );
-
-          if (!tradedAway) {
+        if (pickInTradedList) {
+          if (pickInTradedList.owner_id === roster.roster_id) {
             teamPicks.push({
               season: year.toString(),
               round: round,
-              original_owner_id: roster.roster_id.toString(),
+              original_owner_id: pickInTradedList.roster_id.toString(),
             });
           }
+        } else {
+          teamPicks.push({
+            season: year.toString(),
+            round: round,
+            original_owner_id: roster.roster_id.toString(),
+          });
         }
       }
     }
