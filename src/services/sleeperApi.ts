@@ -62,12 +62,20 @@ export interface SleeperRoster {
     ties: number;
     fpts: number;
     fpts_against: number;
+    waiver_budget_used?: number;
     [key: string]: any;
   };
   metadata?: {
     record?: string;
     [key: string]: any;
   };
+  draft_picks?: Array<{
+    season: number;
+    round: number;
+    roster_id: number;
+    previous_owner_id?: number;
+    owner_id?: number;
+  }>;
 }
 
 export interface SleeperUser {

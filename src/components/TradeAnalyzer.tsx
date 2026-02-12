@@ -6,6 +6,7 @@ import {
   getPlayerImageUrl,
   fetchLeagueRosters,
   fetchLeagueUsers,
+  fetchTradedPicks,
   type SleeperPlayer,
   type SleeperRoster,
   type SleeperUser,
@@ -46,6 +47,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [showInactivePlayers, setShowInactivePlayers] = useState(false);
   const [rosters, setRosters] = useState<SleeperRoster[]>([]);
   const [users, setUsers] = useState<SleeperUser[]>([]);
+  const [tradedPicks, setTradedPicks] = useState<any[]>([]);
   const [teamAName, setTeamAName] = useState('Your Team');
   const [teamBName, setTeamBName] = useState('Their Team');
   const [selectedTeamA, setSelectedTeamA] = useState<string>('');
@@ -80,13 +82,15 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     if (!leagueId) return;
 
     try {
-      const [rostersData, usersData] = await Promise.all([
+      const [rostersData, usersData, tradedPicksData] = await Promise.all([
         fetchLeagueRosters(leagueId),
-        fetchLeagueUsers(leagueId)
+        fetchLeagueUsers(leagueId),
+        fetchTradedPicks(leagueId).catch(() => [])
       ]);
 
       setRosters(rostersData);
       setUsers(usersData);
+      setTradedPicks(tradedPicksData);
     } catch (error) {
       console.error('Failed to load league data:', error);
       showToast('Failed to load league data', 'error');
@@ -411,15 +415,47 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
   function getRosterPicks(rosterId: string): DraftPick[] {
     const roster = rosters.find(r => r.roster_id.toString() === rosterId);
-    if (!roster?.draft_picks) return [];
+    if (!roster) return [];
 
-    return roster.draft_picks.map((pick, index) => ({
-      id: `${pick.season}-${pick.round}-${roster.roster_id}-${index}`,
-      year: pick.season,
-      round: pick.round,
-      displayName: `${pick.season} Round ${pick.round} Pick`,
-      pickNumber: undefined,
-    }));
+    const picks: DraftPick[] = [];
+    const pickKeys = new Set<string>();
+
+    if (roster.draft_picks) {
+      roster.draft_picks.forEach((pick, index) => {
+        const key = `${pick.season}-${pick.round}`;
+        if (!pickKeys.has(key)) {
+          pickKeys.add(key);
+          picks.push({
+            id: `${pick.season}-${pick.round}-${roster.roster_id}-${index}`,
+            year: pick.season,
+            round: pick.round,
+            displayName: `${pick.season} Round ${pick.round} Pick`,
+            pickNumber: undefined,
+          });
+        }
+      });
+    }
+
+    tradedPicks.forEach((pick: any) => {
+      if (pick.owner_id === roster.roster_id || pick.roster_id === roster.roster_id) {
+        const key = `${pick.season}-${pick.round}`;
+        if (!pickKeys.has(key)) {
+          pickKeys.add(key);
+          picks.push({
+            id: `${pick.season}-${pick.round}-${roster.roster_id}-traded`,
+            year: pick.season,
+            round: pick.round,
+            displayName: `${pick.season} Round ${pick.round} Pick`,
+            pickNumber: undefined,
+          });
+        }
+      }
+    });
+
+    return picks.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.round - b.round;
+    });
   }
 
   function getRosterFAAB(rosterId: string): number {
