@@ -30,6 +30,10 @@ export interface SleeperPlayer {
   years_exp?: number;
 }
 
+export function getPlayerImageUrl(playerId: string): string {
+  return `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`;
+}
+
 export interface SleeperLeague {
   league_id: string;
   name: string;

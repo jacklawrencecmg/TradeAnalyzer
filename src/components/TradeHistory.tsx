@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { History, Trash2, TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
 import { supabase, type SavedTrade } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { fetchAllPlayers, type SleeperPlayer } from '../services/sleeperApi';
+import { fetchAllPlayers, getPlayerImageUrl, type SleeperPlayer } from '../services/sleeperApi';
 
 interface TradeHistoryProps {
   leagueId: string;
@@ -205,6 +205,16 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"
                         >
                           <div className="flex items-center gap-2">
+                            {item.type === 'player' && (
+                              <img
+                                src={getPlayerImageUrl(item.id)}
+                                alt={item.name}
+                                className="w-6 h-6 rounded-full object-cover bg-gray-700"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )}
                             {item.type === 'pick' && (
                               <Calendar className="w-3 h-3 text-[#00d4ff]" />
                             )}
@@ -229,6 +239,16 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"
                         >
                           <div className="flex items-center gap-2">
+                            {item.type === 'player' && (
+                              <img
+                                src={getPlayerImageUrl(item.id)}
+                                alt={item.name}
+                                className="w-6 h-6 rounded-full object-cover bg-gray-700"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )}
                             {item.type === 'pick' && (
                               <Calendar className="w-3 h-3 text-[#00d4ff]" />
                             )}
@@ -253,16 +273,32 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                       {trade.trade_data?.team_a_gives?.map((playerId: string) => (
                         <div
                           key={playerId}
-                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                         >
+                          <img
+                            src={getPlayerImageUrl(playerId)}
+                            alt={getPlayerName(playerId)}
+                            className="w-6 h-6 rounded-full object-cover bg-gray-700"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                           {getPlayerName(playerId)}
                         </div>
                       )) ||
                         trade.team_a_gives?.map((playerId: string) => (
                           <div
                             key={playerId}
-                            className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                            className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                           >
+                            <img
+                              src={getPlayerImageUrl(playerId)}
+                              alt={getPlayerName(playerId)}
+                              className="w-6 h-6 rounded-full object-cover bg-gray-700"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
                             {getPlayerName(playerId)}
                           </div>
                         ))}
@@ -283,16 +319,32 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                       {trade.trade_data?.team_a_gets?.map((playerId: string) => (
                         <div
                           key={playerId}
-                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                         >
+                          <img
+                            src={getPlayerImageUrl(playerId)}
+                            alt={getPlayerName(playerId)}
+                            className="w-6 h-6 rounded-full object-cover bg-gray-700"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
                           {getPlayerName(playerId)}
                         </div>
                       )) ||
                         trade.team_a_gets?.map((playerId: string) => (
                           <div
                             key={playerId}
-                            className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                            className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                           >
+                            <img
+                              src={getPlayerImageUrl(playerId)}
+                              alt={getPlayerName(playerId)}
+                              className="w-6 h-6 rounded-full object-cover bg-gray-700"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
                             {getPlayerName(playerId)}
                           </div>
                         ))}

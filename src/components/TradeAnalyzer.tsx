@@ -3,6 +3,7 @@ import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign,
 import {
   fetchAllPlayers,
   analyzeTrade,
+  getPlayerImageUrl,
   type SleeperPlayer,
   type TradeAnalysis,
   type DraftPick,
@@ -448,8 +449,16 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                       <button
                         key={result.player.player_id}
                         onClick={() => addPlayer(result.player!.player_id, 'A', 'gives')}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center gap-3 group"
                       >
+                        <img
+                          src={getPlayerImageUrl(result.player.player_id)}
+                          alt={result.player.full_name}
+                          className="w-12 h-12 rounded-full object-cover bg-gray-700"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-white font-medium">{result.player.full_name}</span>
@@ -487,10 +496,18 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   return (
                     <div
                       key={playerId}
-                      className={`flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border ${
+                      className={`flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border ${
                         inactive ? 'border-red-500 bg-red-950 bg-opacity-20' : 'border-gray-700'
                       }`}
                     >
+                      <img
+                        src={getPlayerImageUrl(playerId)}
+                        alt={player.full_name}
+                        className="w-12 h-12 rounded-full object-cover bg-gray-700"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-white font-medium">{player.full_name}</span>
@@ -574,8 +591,16 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                       <button
                         key={result.player.player_id}
                         onClick={() => addPlayer(result.player!.player_id, 'A', 'gets')}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
+                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center gap-3 group"
                       >
+                        <img
+                          src={getPlayerImageUrl(result.player.player_id)}
+                          alt={result.player.full_name}
+                          className="w-12 h-12 rounded-full object-cover bg-gray-700"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-white font-medium">{result.player.full_name}</span>
@@ -613,10 +638,18 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   return (
                     <div
                       key={playerId}
-                      className={`flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border ${
+                      className={`flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border ${
                         inactive ? 'border-red-500 bg-red-950 bg-opacity-20' : 'border-gray-700'
                       }`}
                     >
+                      <img
+                        src={getPlayerImageUrl(playerId)}
+                        alt={player.full_name}
+                        className="w-12 h-12 rounded-full object-cover bg-gray-700"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-white font-medium">{player.full_name}</span>
@@ -722,6 +755,16 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     className="flex items-center justify-between text-sm"
                   >
                     <div className="flex items-center gap-2">
+                      {item.type === 'player' && (
+                        <img
+                          src={getPlayerImageUrl(item.id)}
+                          alt={item.name}
+                          className="w-8 h-8 rounded-full object-cover bg-gray-700"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      )}
                       {item.type === 'pick' && (
                         <Calendar className="w-3 h-3 text-[#00d4ff]" />
                       )}
@@ -754,6 +797,16 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     className="flex items-center justify-between text-sm"
                   >
                     <div className="flex items-center gap-2">
+                      {item.type === 'player' && (
+                        <img
+                          src={getPlayerImageUrl(item.id)}
+                          alt={item.name}
+                          className="w-8 h-8 rounded-full object-cover bg-gray-700"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      )}
                       {item.type === 'pick' && (
                         <Calendar className="w-3 h-3 text-[#00d4ff]" />
                       )}
