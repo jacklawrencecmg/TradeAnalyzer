@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, AlertTriangle } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
@@ -34,6 +34,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     isSuperflex: false,
     isTEPremium: false,
   });
+  const [showInactiveWarning, setShowInactiveWarning] = useState(false);
 
   useEffect(() => {
     loadPlayers();
@@ -209,6 +210,50 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     const v = n % 100;
     return n + (s[(v - 20) % 10] || s[v] || s[0]);
   }
+
+  function getInjuryStatusBadge(player: SleeperPlayer) {
+    const status = player.injury_status || (player as any).status;
+
+    if (!status) return null;
+
+    const statusConfig: Record<string, { label: string; className: string }> = {
+      'Out': { label: 'OUT', className: 'bg-red-600 text-white' },
+      'Doubtful': { label: 'D', className: 'bg-red-500 text-white' },
+      'Questionable': { label: 'Q', className: 'bg-yellow-500 text-white' },
+      'IR': { label: 'IR', className: 'bg-red-700 text-white' },
+      'PUP': { label: 'PUP', className: 'bg-red-600 text-white' },
+      'COV': { label: 'COV', className: 'bg-red-600 text-white' },
+      'Inactive': { label: 'INACTIVE', className: 'bg-gray-600 text-white' },
+      'Retired': { label: 'RETIRED', className: 'bg-gray-700 text-white' },
+    };
+
+    const config = statusConfig[status];
+    if (!config) return null;
+
+    return (
+      <span className={`text-xs font-bold px-2 py-0.5 rounded ${config.className}`}>
+        {config.label}
+      </span>
+    );
+  }
+
+  function isPlayerInactive(player: SleeperPlayer): boolean {
+    const status = player.injury_status || (player as any).status;
+    return ['Inactive', 'Retired', 'IR', 'Out', 'PUP', 'COV'].includes(status || '');
+  }
+
+  function checkForInactivePlayers() {
+    const allPlayerIds = [...teamAGives, ...teamAGets];
+    const hasInactive = allPlayerIds.some(id => {
+      const player = players[id];
+      return player && isPlayerInactive(player);
+    });
+    setShowInactiveWarning(hasInactive);
+  }
+
+  useEffect(() => {
+    checkForInactivePlayers();
+  }, [teamAGives, teamAGets, players]);
 
   async function handleAnalyzeTrade() {
     if (
@@ -392,8 +437,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                         onClick={() => addPlayer(result.player!.player_id, 'A', 'gives')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
                       >
-                        <div>
-                          <div className="text-white font-medium">{result.player.full_name}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{result.player.full_name}</span>
+                            {getInjuryStatusBadge(result.player)}
+                          </div>
                           <div className="text-sm text-gray-400">
                             {result.player.position} - {result.player.team || 'FA'}
                           </div>
@@ -422,13 +470,19 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               <div className="mt-3 space-y-2">
                 {teamAGives.map((playerId) => {
                   const player = players[playerId];
+                  const inactive = isPlayerInactive(player);
                   return (
                     <div
                       key={playerId}
-                      className="flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border border-gray-700"
+                      className={`flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border ${
+                        inactive ? 'border-red-500 bg-red-950 bg-opacity-20' : 'border-gray-700'
+                      }`}
                     >
-                      <div>
-                        <div className="text-white font-medium">{player.full_name}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{player.full_name}</span>
+                          {getInjuryStatusBadge(player)}
+                        </div>
                         <div className="text-sm text-gray-400">
                           {player.position} - {player.team || 'FA'}
                         </div>
@@ -509,8 +563,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                         onClick={() => addPlayer(result.player!.player_id, 'A', 'gets')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
                       >
-                        <div>
-                          <div className="text-white font-medium">{result.player.full_name}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-white font-medium">{result.player.full_name}</span>
+                            {getInjuryStatusBadge(result.player)}
+                          </div>
                           <div className="text-sm text-gray-400">
                             {result.player.position} - {result.player.team || 'FA'}
                           </div>
@@ -539,13 +596,19 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               <div className="mt-3 space-y-2">
                 {teamAGets.map((playerId) => {
                   const player = players[playerId];
+                  const inactive = isPlayerInactive(player);
                   return (
                     <div
                       key={playerId}
-                      className="flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border border-gray-700"
+                      className={`flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border ${
+                        inactive ? 'border-red-500 bg-red-950 bg-opacity-20' : 'border-gray-700'
+                      }`}
                     >
-                      <div>
-                        <div className="text-white font-medium">{player.full_name}</div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{player.full_name}</span>
+                          {getInjuryStatusBadge(player)}
+                        </div>
                         <div className="text-sm text-gray-400">
                           {player.position} - {player.team || 'FA'}
                         </div>
@@ -602,6 +665,20 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             </div>
           </div>
         </div>
+
+        {showInactiveWarning && (
+          <div className="mt-4 bg-yellow-900 bg-opacity-30 border border-yellow-500 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-yellow-400 font-semibold mb-1">Inactive Players Detected</h4>
+                <p className="text-sm text-gray-300">
+                  This trade includes players who are injured, on IR, or inactive. Their values have been adjusted, but verify their status before accepting the trade.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6">
           <button
