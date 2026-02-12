@@ -612,6 +612,15 @@ export interface PlayoffOdds {
   projected_wins: number;
   playoff_odds: number;
   championship_odds: number;
+  seed_distribution: number[];
+  bye_odds: number;
+  projected_record_distribution: { wins: number; percentage: number }[];
+  strength_of_schedule: number;
+  points_for: number;
+  points_against: number;
+  current_seed: number;
+  clinch_scenario: string | null;
+  elimination_scenario: string | null;
 }
 
 export async function simulatePlayoffOdds(
@@ -626,6 +635,12 @@ export async function simulatePlayoffOdds(
 
   const playoffTeams = league.settings.playoff_teams || 6;
   const totalWeeks = 14;
+  const byeWeeks = league.settings.playoff_teams <= 4 ? 0 : league.settings.playoff_teams <= 6 ? 2 : 4;
+
+  const avgPointsFor =
+    rosters.reduce((sum, r) => sum + (r.settings.fpts || 0), 0) / rosters.length;
+  const avgPointsAgainst =
+    rosters.reduce((sum, r) => sum + (r.settings.fpts_against || 0), 0) / rosters.length;
 
   const teamStats = rosters.map((roster) => {
     const user = users.find((u) => u.user_id === roster.owner_id);
@@ -634,18 +649,38 @@ export async function simulatePlayoffOdds(
 
     const gamesPlayed = roster.settings.wins + roster.settings.losses + roster.settings.ties;
     const remainingGames = Math.max(0, totalWeeks - gamesPlayed);
-    const winPct = gamesPlayed > 0 ? roster.settings.wins / gamesPlayed : 0.5;
+
+    const pointsFor = roster.settings.fpts || 0;
+    const pointsAgainst = roster.settings.fpts_against || 0;
+
+    const teamStrength = pointsFor / (avgPointsFor || 1);
+    const oppStrength = pointsAgainst / (avgPointsAgainst || 1);
+
+    const adjustedWinPct = gamesPlayed > 0
+      ? Math.min(0.95, Math.max(0.05, (roster.settings.wins / gamesPlayed) * (teamStrength / Math.max(oppStrength, 0.5))))
+      : 0.5;
 
     return {
       roster_id: roster.roster_id,
       team_name: teamName,
       current_wins: roster.settings.wins,
       current_losses: roster.settings.losses,
+      current_ties: roster.settings.ties,
       remaining_games: remainingGames,
-      win_probability: winPct,
+      win_probability: adjustedWinPct,
+      points_for: pointsFor,
+      points_against: pointsAgainst,
       playoff_count: 0,
       championship_count: 0,
+      bye_count: 0,
+      seed_counts: new Array(rosters.length).fill(0),
+      win_distribution: {} as Record<number, number>,
     };
+  });
+
+  const currentStandings = [...teamStats].sort((a, b) => {
+    if (b.current_wins !== a.current_wins) return b.current_wins - a.current_wins;
+    return b.points_for - a.points_for;
   });
 
   for (let sim = 0; sim < simulations; sim++) {
@@ -657,18 +692,37 @@ export async function simulatePlayoffOdds(
         if (randomWin) simulatedWins++;
       }
 
+      const teamStat = teamStats.find((t) => t.roster_id === team.roster_id);
+      if (teamStat) {
+        teamStat.win_distribution[simulatedWins] =
+          (teamStat.win_distribution[simulatedWins] || 0) + 1;
+      }
+
       return {
         roster_id: team.roster_id,
         total_wins: simulatedWins,
+        points_for: team.points_for,
       };
     });
 
-    simResults.sort((a, b) => b.total_wins - a.total_wins);
+    simResults.sort((a, b) => {
+      if (b.total_wins !== a.total_wins) return b.total_wins - a.total_wins;
+      return b.points_for - a.points_for;
+    });
 
-    for (let i = 0; i < Math.min(playoffTeams, simResults.length); i++) {
+    for (let i = 0; i < simResults.length; i++) {
       const team = teamStats.find((t) => t.roster_id === simResults[i].roster_id);
       if (team) {
-        team.playoff_count++;
+        team.seed_counts[i]++;
+
+        if (i < playoffTeams) {
+          team.playoff_count++;
+        }
+
+        if (i < byeWeeks) {
+          team.bye_count++;
+        }
+
         if (i === 0) {
           team.championship_count++;
         }
@@ -676,12 +730,55 @@ export async function simulatePlayoffOdds(
     }
   }
 
-  return teamStats.map((team) => ({
-    roster_id: team.roster_id,
-    team_name: team.team_name,
-    current_record: `${team.current_wins}-${team.current_losses}`,
-    projected_wins: team.current_wins + team.remaining_games * team.win_probability,
-    playoff_odds: (team.playoff_count / simulations) * 100,
-    championship_odds: (team.championship_count / simulations) * 100,
-  }));
+  return teamStats.map((team) => {
+    const currentSeed = currentStandings.findIndex((t) => t.roster_id === team.roster_id) + 1;
+    const projectedWins = team.current_wins + team.remaining_games * team.win_probability;
+
+    const winDistribution = Object.entries(team.win_distribution)
+      .map(([wins, count]) => ({
+        wins: parseInt(wins),
+        percentage: (count / simulations) * 100,
+      }))
+      .sort((a, b) => b.wins - a.wins);
+
+    const playoffPct = (team.playoff_count / simulations) * 100;
+
+    let clinchScenario: string | null = null;
+    let eliminationScenario: string | null = null;
+
+    if (playoffPct >= 99.5) {
+      clinchScenario = 'Playoff spot clinched!';
+    } else if (playoffPct >= 90) {
+      const winsNeeded = Math.ceil(projectedWins) - team.current_wins;
+      if (winsNeeded > 0) {
+        clinchScenario = `${winsNeeded} more win${winsNeeded > 1 ? 's' : ''} clinches playoff spot`;
+      }
+    }
+
+    if (playoffPct <= 0.5) {
+      eliminationScenario = 'Eliminated from playoff contention';
+    } else if (playoffPct <= 10) {
+      eliminationScenario = 'Near elimination - needs help';
+    }
+
+    const strengthOfSchedule = team.points_against / (team.current_wins + team.current_losses || 1);
+
+    return {
+      roster_id: team.roster_id,
+      team_name: team.team_name,
+      current_record: `${team.current_wins}-${team.current_losses}${team.current_ties > 0 ? `-${team.current_ties}` : ''}`,
+      projected_wins: projectedWins,
+      playoff_odds: playoffPct,
+      championship_odds: (team.championship_count / simulations) * 100,
+      bye_odds: (team.bye_count / simulations) * 100,
+      seed_distribution: team.seed_counts.map((count) => (count / simulations) * 100),
+      projected_record_distribution: winDistribution,
+      strength_of_schedule: strengthOfSchedule,
+      points_for: team.points_for,
+      points_against: team.points_against,
+      current_seed: currentSeed,
+      clinch_scenario: clinchScenario,
+      elimination_scenario: eliminationScenario,
+    };
+  });
 }
