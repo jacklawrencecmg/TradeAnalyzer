@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Swords, TrendingUp } from 'lucide-react';
-import { getLeagueRosters } from '../services/sleeperApi';
+import { getLeagueRosters, fetchLeagueUsers } from '../services/sleeperApi';
 
 interface Rivalry {
   team1: string;
@@ -32,7 +32,17 @@ export default function RivalryTracker({ leagueId }: RivalryTrackerProps) {
   const loadRivalries = async () => {
     setLoading(true);
     try {
-      const rosters = await getLeagueRosters(leagueId);
+      const [rosters, users] = await Promise.all([
+        getLeagueRosters(leagueId),
+        fetchLeagueUsers(leagueId)
+      ]);
+
+      const userMap = new Map(
+        users.map(user => [
+          user.user_id,
+          user.metadata?.team_name || user.display_name || user.username || `Team ${user.user_id.slice(0, 4)}`
+        ])
+      );
 
       const rivalryData: Rivalry[] = [];
 
@@ -46,9 +56,9 @@ export default function RivalryTracker({ leagueId }: RivalryTrackerProps) {
           const team2Wins = totalMatchups - team1Wins;
 
           const rivalry: Rivalry = {
-            team1: `Team ${team1.roster_id}`,
+            team1: userMap.get(team1.owner_id) || `Team ${team1.roster_id}`,
             team1_id: team1.roster_id,
-            team2: `Team ${team2.roster_id}`,
+            team2: userMap.get(team2.owner_id) || `Team ${team2.roster_id}`,
             team2_id: team2.roster_id,
             total_matchups: totalMatchups,
             team1_wins: team1Wins,
