@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, TrendingUp } from 'lucide-react';
-import { getLeagueRosters, getPlayerValueById as getPlayerValue } from '../services/sleeperApi';
+import { Shield, TrendingUp, RefreshCw } from 'lucide-react';
+import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers } from '../services/sleeperApi';
 
 interface KeeperPlayer {
   player_id: string;
@@ -12,26 +12,74 @@ interface KeeperPlayer {
   recommendation: 'keep' | 'cut';
 }
 
+interface TeamInfo {
+  roster_id: number;
+  team_name: string;
+  owner_id: string;
+}
+
 interface KeeperCalculatorProps {
   leagueId: string;
-  rosterId: string;
+  rosterId?: string;
 }
 
 export default function KeeperCalculator({ leagueId, rosterId }: KeeperCalculatorProps) {
   const [loading, setLoading] = useState(false);
+  const [teams, setTeams] = useState<TeamInfo[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<string>('');
   const [players, setPlayers] = useState<KeeperPlayer[]>([]);
   const [keeperLimit, setKeeperLimit] = useState(3);
   const [defaultCost, setDefaultCost] = useState(1000);
 
   useEffect(() => {
-    loadRosterAndCalculate();
-  }, [leagueId, rosterId]);
+    loadTeams();
+  }, [leagueId]);
+
+  useEffect(() => {
+    if (selectedTeam) {
+      loadRosterAndCalculate();
+    }
+  }, [selectedTeam]);
+
+  const loadTeams = async () => {
+    try {
+      const [rosters, users] = await Promise.all([
+        getLeagueRosters(leagueId),
+        fetchLeagueUsers(leagueId)
+      ]);
+
+      const userMap = new Map(
+        users.map(user => [
+          user.user_id,
+          user.metadata?.team_name || user.display_name || user.username || `Team ${user.user_id.slice(0, 4)}`
+        ])
+      );
+
+      const teamList = rosters.map((roster: any) => ({
+        roster_id: roster.roster_id,
+        team_name: userMap.get(roster.owner_id) || `Team ${roster.roster_id}`,
+        owner_id: roster.owner_id
+      }));
+
+      setTeams(teamList);
+
+      if (rosterId) {
+        setSelectedTeam(rosterId);
+      } else if (teamList.length > 0) {
+        setSelectedTeam(teamList[0].roster_id.toString());
+      }
+    } catch (error) {
+      console.error('Error loading teams:', error);
+    }
+  };
 
   const loadRosterAndCalculate = async () => {
+    if (!selectedTeam) return;
+
     setLoading(true);
     try {
       const rosters = await getLeagueRosters(leagueId);
-      const userRoster = rosters.find((r: any) => r.roster_id.toString() === rosterId);
+      const userRoster = rosters.find((r: any) => r.roster_id.toString() === selectedTeam);
 
       if (!userRoster) {
         setLoading(false);
@@ -101,33 +149,63 @@ export default function KeeperCalculator({ leagueId, rosterId }: KeeperCalculato
         </div>
 
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Keeper Limit</label>
-              <input
-                type="number"
-                value={keeperLimit}
-                onChange={(e) => setKeeperLimit(parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
-              />
+              <label className="block text-sm font-medium text-gray-400 mb-2">
+                Select Team
+              </label>
+              <div className="flex gap-4">
+                <select
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="flex-1 px-4 py-2 bg-gray-700/50 border border-gray-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Select a team...</option>
+                  {teams.map(team => (
+                    <option key={team.roster_id} value={team.roster_id.toString()}>
+                      {team.team_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={loadRosterAndCalculate}
+                  disabled={loading || !selectedTeam}
+                  className="px-6 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg flex items-center gap-2"
+                >
+                  <RefreshCw className="w-5 h-5" />
+                  {loading ? 'Calculating...' : 'Calculate'}
+                </button>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Default Keeper Cost</label>
-              <input
-                type="number"
-                value={defaultCost}
-                onChange={(e) => {
-                  const newCost = parseInt(e.target.value) || 0;
-                  setDefaultCost(newCost);
-                  setPlayers(players.map(p => ({
-                    ...p,
-                    cost: newCost,
-                    surplus: p.value - newCost,
-                    recommendation: (p.value - newCost) > 500 ? 'keep' : 'cut'
-                  })));
-                }}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Keeper Limit</label>
+                <input
+                  type="number"
+                  value={keeperLimit}
+                  onChange={(e) => setKeeperLimit(parseInt(e.target.value) || 0)}
+                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Default Keeper Cost</label>
+                <input
+                  type="number"
+                  value={defaultCost}
+                  onChange={(e) => {
+                    const newCost = parseInt(e.target.value) || 0;
+                    setDefaultCost(newCost);
+                    setPlayers(players.map(p => ({
+                      ...p,
+                      cost: newCost,
+                      surplus: p.value - newCost,
+                      recommendation: (p.value - newCost) > 500 ? 'keep' : 'cut'
+                    })));
+                  }}
+                  className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -151,6 +229,16 @@ export default function KeeperCalculator({ leagueId, rosterId }: KeeperCalculato
           <div className="text-center py-12">
             <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-400">Calculating keeper values...</p>
+          </div>
+        ) : !selectedTeam ? (
+          <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
+            <Shield className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400 text-lg">Select a team to calculate keeper values</p>
+          </div>
+        ) : players.length === 0 ? (
+          <div className="text-center py-12 bg-gray-800/50 rounded-lg border border-gray-700">
+            <Shield className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <p className="text-gray-400 text-lg">No players found for this team</p>
           </div>
         ) : (
           <div className="space-y-4">
