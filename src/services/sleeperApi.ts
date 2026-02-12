@@ -237,18 +237,18 @@ export function getDraftPickValue(round: number, year: number): number {
   const yearDiff = year - currentYear;
 
   const baseValues: Record<number, number> = {
-    1: 8000,
-    2: 4500,
-    3: 2500,
-    4: 1200,
+    1: 5500,
+    2: 2800,
+    3: 1400,
+    4: 700,
   };
 
-  let value = baseValues[round] || 500;
+  let value = baseValues[round] || 400;
 
   if (yearDiff > 0) {
-    value *= Math.pow(0.85, yearDiff);
+    value *= Math.pow(0.80, yearDiff);
   } else if (yearDiff < 0) {
-    value *= 1.15;
+    value *= 1.2;
   }
 
   return Math.round(value);
@@ -278,6 +278,23 @@ export function getPlayerValue(
       value *= 1.4;
     }
 
+    if (player.injury_status) {
+      const injuryMultipliers: Record<string, number> = {
+        Out: 0.85,
+        Doubtful: 0.9,
+        Questionable: 0.97,
+        IR: 0.6,
+        PUP: 0.7,
+        COV: 0.5,
+      };
+      const multiplier = injuryMultipliers[player.injury_status] || 1;
+      value *= multiplier;
+    }
+
+    if (player.status === 'Inactive' || player.status === 'Retired') {
+      value *= 0.15;
+    }
+
     return Math.round(value);
   }
 
@@ -297,43 +314,51 @@ export function getPlayerValue(
 
   if (player.years_exp !== undefined) {
     if (player.years_exp === 0) {
-      baseValue *= 1.3;
-    } else if (player.years_exp <= 2) {
-      baseValue *= 1.2;
+      baseValue *= 0.85;
+    } else if (player.years_exp === 1) {
+      baseValue *= 0.95;
+    } else if (player.years_exp <= 3) {
+      baseValue *= 1.05;
+    } else if (player.years_exp <= 5) {
+      baseValue *= 1.15;
+    } else if (player.years_exp <= 7) {
+      baseValue *= 1.1;
     } else if (player.years_exp >= 10) {
-      baseValue *= 0.6;
+      baseValue *= 0.65;
     } else if (player.years_exp >= 8) {
-      baseValue *= 0.75;
+      baseValue *= 0.8;
     }
   }
 
   if (player.age) {
-    if (player.age < 23) {
-      baseValue *= 1.2;
-    } else if (player.age < 25) {
-      baseValue *= 1.1;
+    if (player.age < 22) {
+      baseValue *= 1.05;
+    } else if (player.age >= 23 && player.age <= 27) {
+      baseValue *= 1.15;
+    } else if (player.age >= 28 && player.age <= 29) {
+      baseValue *= 1.05;
     } else if (player.age > 32) {
-      baseValue *= 0.5;
+      baseValue *= 0.55;
     } else if (player.age > 29) {
-      baseValue *= 0.7;
+      baseValue *= 0.75;
     }
   }
 
   if (player.injury_status) {
     const injuryMultipliers: Record<string, number> = {
-      Out: 0.6,
-      Doubtful: 0.75,
+      Out: 0.7,
+      Doubtful: 0.8,
       Questionable: 0.95,
-      IR: 0.4,
-      PUP: 0.5,
-      COV: 0.3,
+      IR: 0.5,
+      PUP: 0.6,
+      COV: 0.4,
     };
     const multiplier = injuryMultipliers[player.injury_status] || 1;
     baseValue *= multiplier;
   }
 
   if (player.status === 'Inactive' || player.status === 'Retired') {
-    baseValue *= 0.1;
+    baseValue *= 0.15;
   }
 
   return Math.round(baseValue);
