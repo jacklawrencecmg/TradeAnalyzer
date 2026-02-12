@@ -4,7 +4,11 @@ import {
   fetchAllPlayers,
   analyzeTrade,
   getPlayerImageUrl,
+  fetchLeagueRosters,
+  fetchLeagueUsers,
   type SleeperPlayer,
+  type SleeperRoster,
+  type SleeperUser,
   type TradeAnalysis,
   type DraftPick,
   type LeagueSettings,
@@ -40,10 +44,22 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   });
   const [showInactiveWarning, setShowInactiveWarning] = useState(false);
   const [showInactivePlayers, setShowInactivePlayers] = useState(false);
+  const [rosters, setRosters] = useState<SleeperRoster[]>([]);
+  const [users, setUsers] = useState<SleeperUser[]>([]);
+  const [teamAName, setTeamAName] = useState('Your Team');
+  const [teamBName, setTeamBName] = useState('Their Team');
+  const [selectedTeamA, setSelectedTeamA] = useState<string>('');
+  const [selectedTeamB, setSelectedTeamB] = useState<string>('');
 
   useEffect(() => {
     loadPlayers();
   }, []);
+
+  useEffect(() => {
+    if (leagueId) {
+      loadLeagueData();
+    }
+  }, [leagueId]);
 
   async function loadPlayers() {
     try {
@@ -54,6 +70,33 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     } finally {
       setLoading(false);
     }
+  }
+
+  async function loadLeagueData() {
+    if (!leagueId) return;
+
+    try {
+      const [rostersData, usersData] = await Promise.all([
+        fetchLeagueRosters(leagueId),
+        fetchLeagueUsers(leagueId)
+      ]);
+
+      setRosters(rostersData);
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Failed to load league data:', error);
+      showToast('Failed to load league data', 'error');
+    }
+  }
+
+  function getTeamName(rosterId: string): string {
+    const roster = rosters.find(r => r.roster_id.toString() === rosterId);
+    if (!roster) return 'Unknown Team';
+
+    const user = users.find(u => u.user_id === roster.owner_id);
+    if (!user) return 'Unknown Team';
+
+    return user.metadata?.team_name || user.display_name || user.username;
   }
 
   type SearchResult = {
@@ -331,6 +374,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           fairness: result.fairness,
           team_a_items: result.teamAItems,
           team_b_items: result.teamBItems,
+          team_a_name: teamAName,
+          team_b_name: teamBName,
         },
       });
 
@@ -385,6 +430,82 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           )}
         </div>
 
+        {leagueId && rosters.length > 0 && (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Select Teams</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Team 1</label>
+                <select
+                  value={selectedTeamA}
+                  onChange={(e) => {
+                    setSelectedTeamA(e.target.value);
+                    if (e.target.value) {
+                      setTeamAName(getTeamName(e.target.value));
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
+                >
+                  <option value="">Select a team...</option>
+                  {rosters.map((roster) => (
+                    <option key={roster.roster_id} value={roster.roster_id.toString()}>
+                      {getTeamName(roster.roster_id.toString())}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Team 2</label>
+                <select
+                  value={selectedTeamB}
+                  onChange={(e) => {
+                    setSelectedTeamB(e.target.value);
+                    if (e.target.value) {
+                      setTeamBName(getTeamName(e.target.value));
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff] transition-colors"
+                >
+                  <option value="">Select a team...</option>
+                  {rosters.map((roster) => (
+                    <option key={roster.roster_id} value={roster.roster_id.toString()}>
+                      {getTeamName(roster.roster_id.toString())}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!leagueId && (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-semibold text-white mb-4">Team Names</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Team 1 Name</label>
+                <input
+                  type="text"
+                  value={teamAName}
+                  onChange={(e) => setTeamAName(e.target.value)}
+                  placeholder="Your Team"
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Team 2 Name</label>
+                <input
+                  type="text"
+                  value={teamBName}
+                  onChange={(e) => setTeamBName(e.target.value)}
+                  placeholder="Their Team"
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Settings className="w-5 h-5 text-[#00d4ff]" />
@@ -436,7 +557,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-300 mb-2">
-                Team A Gives
+                {teamAName} Gives
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
@@ -578,7 +699,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-semibold text-gray-300 mb-2">
-                Team A Gets
+                {teamAName} Gets
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
@@ -753,7 +874,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <h4 className="text-lg font-semibold text-white mb-3">Team A Gives</h4>
+              <h4 className="text-lg font-semibold text-white mb-3">{teamAName} Gives</h4>
               <div className="space-y-2">
                 {analysis.teamAItems.map((item) => (
                   <div
@@ -795,7 +916,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             </div>
 
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <h4 className="text-lg font-semibold text-white mb-3">Team A Gets</h4>
+              <h4 className="text-lg font-semibold text-white mb-3">{teamAName} Gets</h4>
               <div className="space-y-2">
                 {analysis.teamBItems.map((item) => (
                   <div
@@ -839,11 +960,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-sm text-gray-400 mb-1">Team A Value</div>
+              <div className="text-sm text-gray-400 mb-1">{teamAName} Value</div>
               <div className="text-2xl font-bold text-white">{analysis.teamAValue}</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-              <div className="text-sm text-gray-400 mb-1">Team B Value</div>
+              <div className="text-sm text-gray-400 mb-1">{teamBName} Value</div>
               <div className="text-2xl font-bold text-white">{analysis.teamBValue}</div>
             </div>
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">

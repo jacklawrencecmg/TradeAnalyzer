@@ -155,7 +155,11 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                     >
                       {(trade.trade_result?.winner || trade.winner) === 'Fair'
                         ? 'Fair Trade'
-                        : `Team ${trade.trade_result?.winner || trade.winner} Wins`}
+                        : `${
+                            (trade.trade_result?.winner || trade.winner) === 'A'
+                              ? trade.trade_result?.team_a_name || 'Team A'
+                              : trade.trade_result?.team_b_name || 'Team B'
+                          } Wins`}
                     </div>
                     <div className="text-sm text-gray-400">
                       {new Date(trade.created_at).toLocaleDateString('en-US', {
@@ -179,13 +183,17 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
 
               <div className="grid md:grid-cols-3 gap-4 mb-4">
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                  <div className="text-sm text-gray-400 mb-1">Team A Value</div>
+                  <div className="text-sm text-gray-400 mb-1">
+                    {trade.trade_result?.team_a_name || 'Team A'} Value
+                  </div>
                   <div className="text-2xl font-bold text-white">
                     {trade.trade_result?.team_a_value || trade.team_a_value}
                   </div>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
-                  <div className="text-sm text-gray-400 mb-1">Team B Value</div>
+                  <div className="text-sm text-gray-400 mb-1">
+                    {trade.trade_result?.team_b_name || 'Team B'} Value
+                  </div>
                   <div className="text-2xl font-bold text-white">
                     {trade.trade_result?.team_b_value || trade.team_b_value}
                   </div>
@@ -201,7 +209,9 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
               {trade.trade_result?.team_a_items ? (
                 <div className="grid md:grid-cols-2 gap-4 mb-4">
                   <div>
-                    <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gives</div>
+                    <div className="text-sm font-semibold text-gray-400 mb-2">
+                      {trade.trade_result?.team_a_name || 'Team A'} Gives
+                    </div>
                     <div className="space-y-1">
                       {trade.trade_result.team_a_items.map((item) => (
                         <div
@@ -235,7 +245,9 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gets</div>
+                    <div className="text-sm font-semibold text-gray-400 mb-2">
+                      {trade.trade_result?.team_a_name || 'Team A'} Gets
+                    </div>
                     <div className="space-y-1">
                       {trade.trade_result.team_b_items.map((item) => (
                         <div
