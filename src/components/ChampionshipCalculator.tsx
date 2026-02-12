@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, TrendingUp, Calendar } from 'lucide-react';
-import { getLeagueRosters, getPlayerValueById as getPlayerValue } from '../services/sleeperApi';
+import { Trophy, TrendingUp, Calendar, PieChart } from 'lucide-react';
+import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers, fetchAllPlayers } from '../services/sleeperApi';
+import { TeamStrengthsModal } from './TeamStrengthsModal';
 
 interface TeamOdds {
   roster_id: number;
@@ -11,6 +12,12 @@ interface TeamOdds {
   playoff_odds: number;
   championship_odds: number;
   strength_of_schedule: number;
+  positional_strengths?: {
+    QB: number;
+    RB: number;
+    WR: number;
+    TE: number;
+  };
 }
 
 interface ChampionshipCalculatorProps {
@@ -20,6 +27,8 @@ interface ChampionshipCalculatorProps {
 export default function ChampionshipCalculator({ leagueId }: ChampionshipCalculatorProps) {
   const [loading, setLoading] = useState(false);
   const [teamOdds, setTeamOdds] = useState<TeamOdds[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<TeamOdds | null>(null);
+  const [showStrengthsModal, setShowStrengthsModal] = useState(false);
 
   useEffect(() => {
     calculateOdds();
@@ -29,7 +38,10 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
     setLoading(true);
     try {
       const rosters = await getLeagueRosters(leagueId);
-      const allPlayers = await fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json());
+      const users = await fetchLeagueUsers(leagueId);
+      const allPlayers = await fetchAllPlayers();
+
+      const userMap = new Map(users.map(user => [user.user_id, user]));
 
       const teamValues = await Promise.all(
         rosters.map(async (roster: any) => {
@@ -39,14 +51,26 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
           );
           const totalValue = values.reduce((sum: number, val: number) => sum + val, 0);
 
+          const positionalStrengths = { QB: 0, RB: 0, WR: 0, TE: 0 };
+          playerIds.forEach((playerId: string, index: number) => {
+            const player = allPlayers[playerId];
+            if (player && ['QB', 'RB', 'WR', 'TE'].includes(player.position)) {
+              positionalStrengths[player.position as keyof typeof positionalStrengths] += values[index] || 0;
+            }
+          });
+
+          const owner = userMap.get(roster.owner_id);
+          const teamName = owner?.metadata?.team_name || owner?.display_name || owner?.username || `Team ${roster.roster_id}`;
+
           return {
             roster_id: roster.roster_id,
-            team_name: `Team ${roster.roster_id}`,
-            owner_name: roster.owner_id,
+            team_name: teamName,
+            owner_name: owner?.display_name || owner?.username || 'Unknown',
             total_value: totalValue,
             wins: roster.settings?.wins || 0,
             losses: roster.settings?.losses || 0,
-            points_for: roster.settings?.fpts || 0
+            points_for: roster.settings?.fpts || 0,
+            positional_strengths: positionalStrengths
           };
         })
       );
@@ -123,7 +147,7 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-4">
                   <div>
                     <p className="text-sm text-gray-400 mb-1">Playoff Odds</p>
                     <p className={`text-2xl font-bold ${getOddsColor(team.playoff_odds)}`}>
@@ -163,6 +187,17 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
                     </div>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setSelectedTeam(team);
+                    setShowStrengthsModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  <PieChart className="w-4 h-4" />
+                  View Team Strengths
+                </button>
               </div>
             ))}
           </div>
@@ -187,6 +222,20 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
           </div>
         </div>
       </div>
+
+      {selectedTeam && selectedTeam.positional_strengths && (
+        <TeamStrengthsModal
+          isOpen={showStrengthsModal}
+          onClose={() => setShowStrengthsModal(false)}
+          teamName={selectedTeam.team_name}
+          strengths={[
+            { category: 'QB', value: selectedTeam.positional_strengths.QB, color: '#3b82f6' },
+            { category: 'RB', value: selectedTeam.positional_strengths.RB, color: '#10b981' },
+            { category: 'WR', value: selectedTeam.positional_strengths.WR, color: '#f59e0b' },
+            { category: 'TE', value: selectedTeam.positional_strengths.TE, color: '#8b5cf6' },
+          ]}
+        />
+      )}
     </div>
   );
 }
