@@ -66,7 +66,11 @@ export function AuthForm() {
             <img
               src="/FDP2.png"
               alt="Fantasy Draft Pros Logo"
-              className="h-32 w-auto"
+              className="h-32 w-auto object-contain drop-shadow-lg"
+              onError={(e) => {
+                console.error('Logo failed to load');
+                e.currentTarget.style.display = 'none';
+              }}
             />
           </div>
           <h1 className="text-4xl font-bold text-fdp-text-1 mb-2">Fantasy Draft Pros</h1>

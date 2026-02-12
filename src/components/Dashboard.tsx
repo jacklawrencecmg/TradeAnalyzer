@@ -110,7 +110,11 @@ export function Dashboard() {
               <img
                 src="/FDP2.png"
                 alt="Fantasy Draft Pros"
-                className="h-12 w-auto"
+                className="h-14 w-auto object-contain"
+                onError={(e) => {
+                  console.error('Logo failed to load');
+                  e.currentTarget.style.display = 'none';
+                }}
               />
               <div>
                 <h1 className="text-2xl font-bold text-fdp-text-1">Fantasy Draft Pros</h1>
