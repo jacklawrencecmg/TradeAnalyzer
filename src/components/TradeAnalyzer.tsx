@@ -50,11 +50,20 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     }
   }
 
-  function getFilteredPlayers(searchTerm: string): SleeperPlayer[] {
+  type SearchResult = {
+    type: 'player' | 'pick';
+    player?: SleeperPlayer;
+    pick?: { year: number; round: number; displayName: string };
+  };
+
+  function getFilteredResults(searchTerm: string): SearchResult[] {
     if (!searchTerm || searchTerm.length < 2) return [];
 
     const term = searchTerm.toLowerCase();
-    return Object.values(players)
+    const results: SearchResult[] = [];
+
+    // Add players
+    const filteredPlayers = Object.values(players)
       .filter(
         (player) =>
           player.full_name?.toLowerCase().includes(term) &&
@@ -70,7 +79,31 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         if (!aStartsWith && bStartsWith) return 1;
         return aName.localeCompare(bName);
       })
-      .slice(0, 10);
+      .slice(0, 8);
+
+    results.push(...filteredPlayers.map(player => ({ type: 'player' as const, player })));
+
+    // Add draft picks if search matches
+    const currentYear = new Date().getFullYear();
+    const pickKeywords = ['pick', '1st', '2nd', '3rd', '4th', 'first', 'second', 'third', 'fourth', 'round'];
+
+    if (pickKeywords.some(keyword => term.includes(keyword))) {
+      for (let year = currentYear; year <= currentYear + 4; year++) {
+        for (let round = 1; round <= 4; round++) {
+          const displayName = `${year} ${getOrdinal(round)} Round`;
+          const searchableText = `${year} ${getOrdinal(round)} round pick`.toLowerCase();
+
+          if (searchableText.includes(term) || term.includes(year.toString())) {
+            results.push({
+              type: 'pick',
+              pick: { year, round, displayName }
+            });
+          }
+        }
+      }
+    }
+
+    return results.slice(0, 12);
   }
 
   function addPlayer(playerId: string, team: 'A' | 'B', type: 'gives' | 'gets') {
@@ -83,6 +116,24 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         setTeamAGets([...teamAGets, playerId]);
       }
     }
+    setSearchTermA('');
+    setSearchTermB('');
+  }
+
+  function addPickFromSearch(year: number, round: number, team: 'A' | 'B', type: 'gives' | 'gets') {
+    const pick: DraftPick = {
+      id: `${year}-${round}-${Date.now()}`,
+      year,
+      round,
+      displayName: `${year} ${getOrdinal(round)} Round`,
+    };
+
+    if (team === 'A' && type === 'gives') {
+      setTeamAGivesPicks([...teamAGivesPicks, pick]);
+    } else if (team === 'A' && type === 'gets') {
+      setTeamAGetsPicks([...teamAGetsPicks, pick]);
+    }
+
     setSearchTermA('');
     setSearchTermB('');
   }
@@ -248,26 +299,43 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   type="text"
                   value={searchTermA}
                   onChange={(e) => setSearchTermA(e.target.value)}
-                  placeholder="Search players..."
+                  placeholder="Search players or draft picks..."
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
                 />
               </div>
               {searchTermA.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
-                  {getFilteredPlayers(searchTermA).map((player) => (
-                    <button
-                      key={player.player_id}
-                      onClick={() => addPlayer(player.player_id, 'A', 'gives')}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
-                    >
-                      <div>
-                        <div className="text-white font-medium">{player.full_name}</div>
-                        <div className="text-sm text-gray-400">
-                          {player.position} - {player.team || 'FA'}
+                  {getFilteredResults(searchTermA).map((result, idx) => (
+                    result.type === 'player' && result.player ? (
+                      <button
+                        key={result.player.player_id}
+                        onClick={() => addPlayer(result.player!.player_id, 'A', 'gives')}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
+                      >
+                        <div>
+                          <div className="text-white font-medium">{result.player.full_name}</div>
+                          <div className="text-sm text-gray-400">
+                            {result.player.position} - {result.player.team || 'FA'}
+                          </div>
                         </div>
-                      </div>
-                      <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
-                    </button>
+                        <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
+                      </button>
+                    ) : result.type === 'pick' && result.pick ? (
+                      <button
+                        key={`pick-${result.pick.year}-${result.pick.round}-${idx}`}
+                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, 'A', 'gives')}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-[#00d4ff]" />
+                          <div>
+                            <div className="text-white font-medium">{result.pick.displayName}</div>
+                            <div className="text-sm text-gray-400">Draft Pick</div>
+                          </div>
+                        </div>
+                        <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
+                      </button>
+                    ) : null
                   ))}
                 </div>
               )}
@@ -335,26 +403,43 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   type="text"
                   value={searchTermB}
                   onChange={(e) => setSearchTermB(e.target.value)}
-                  placeholder="Search players..."
+                  placeholder="Search players or draft picks..."
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
                 />
               </div>
               {searchTermB.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
-                  {getFilteredPlayers(searchTermB).map((player) => (
-                    <button
-                      key={player.player_id}
-                      onClick={() => addPlayer(player.player_id, 'A', 'gets')}
-                      className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
-                    >
-                      <div>
-                        <div className="text-white font-medium">{player.full_name}</div>
-                        <div className="text-sm text-gray-400">
-                          {player.position} - {player.team || 'FA'}
+                  {getFilteredResults(searchTermB).map((result, idx) => (
+                    result.type === 'player' && result.player ? (
+                      <button
+                        key={result.player.player_id}
+                        onClick={() => addPlayer(result.player!.player_id, 'A', 'gets')}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
+                      >
+                        <div>
+                          <div className="text-white font-medium">{result.player.full_name}</div>
+                          <div className="text-sm text-gray-400">
+                            {result.player.position} - {result.player.team || 'FA'}
+                          </div>
                         </div>
-                      </div>
-                      <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
-                    </button>
+                        <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
+                      </button>
+                    ) : result.type === 'pick' && result.pick ? (
+                      <button
+                        key={`pick-${result.pick.year}-${result.pick.round}-${idx}`}
+                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, 'A', 'gets')}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-[#00d4ff]" />
+                          <div>
+                            <div className="text-white font-medium">{result.pick.displayName}</div>
+                            <div className="text-sm text-gray-400">Draft Pick</div>
+                          </div>
+                        </div>
+                        <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
+                      </button>
+                    ) : null
                   ))}
                 </div>
               )}
