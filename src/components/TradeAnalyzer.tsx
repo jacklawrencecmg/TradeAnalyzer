@@ -464,7 +464,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   </div>
                   {teamAGivesFAAB > 0 && (
                     <div className="mt-2 text-sm text-gray-400">
-                      Value: {(teamAGivesFAAB * 10).toLocaleString()} points
+                      Value: {(teamAGivesFAAB * 5).toLocaleString()} points
                     </div>
                   )}
                 </div>
@@ -590,7 +590,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   </div>
                   {teamAGetsFAAB > 0 && (
                     <div className="mt-2 text-sm text-gray-400">
-                      Value: {(teamAGetsFAAB * 10).toLocaleString()} points
+                      Value: {(teamAGetsFAAB * 5).toLocaleString()} points
                     </div>
                   )}
                 </div>

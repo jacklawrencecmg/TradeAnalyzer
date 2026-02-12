@@ -240,7 +240,7 @@ export function getDraftPickValue(round: number, year: number): number {
 }
 
 export function getFAABValue(amount: number): number {
-  return amount * 10;
+  return amount * 5;
 }
 
 export function getPlayerValue(
