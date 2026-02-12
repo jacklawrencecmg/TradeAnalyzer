@@ -306,7 +306,7 @@ export function getPlayerValue(
 }
 
 export async function analyzeTrade(
-  leagueId: string,
+  leagueId: string | undefined,
   teamAGives: string[],
   teamAGets: string[],
   teamAGivesPicks: DraftPick[] = [],
@@ -316,10 +316,13 @@ export async function analyzeTrade(
 ): Promise<TradeAnalysis> {
   await fetchPlayerValues();
 
-  const league = await fetchLeagueDetails(leagueId);
   const players = await fetchAllPlayers();
 
-  const isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
+  let isSuperflex = false;
+  if (leagueId) {
+    const league = await fetchLeagueDetails(leagueId);
+    isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
+  }
 
   const teamAItems: TradeItem[] = [];
   let teamAValue = 0;

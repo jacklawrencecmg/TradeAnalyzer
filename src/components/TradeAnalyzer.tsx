@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 
 interface TradeAnalyzerProps {
-  leagueId: string;
+  leagueId?: string;
   onTradeSaved?: () => void;
 }
 
@@ -29,13 +29,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
-  const [showPickModal, setShowPickModal] = useState<{
-    show: boolean;
-    team: 'A' | 'B';
-    type: 'gives' | 'gets';
-  }>({ show: false, team: 'A', type: 'gives' });
-  const [pickYear, setPickYear] = useState(new Date().getFullYear());
-  const [pickRound, setPickRound] = useState(1);
 
   useEffect(() => {
     loadPlayers();
@@ -192,23 +185,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     } else if (team === 'A' && type === 'gets') {
       setTeamAGets(teamAGets.filter((id) => id !== playerId));
     }
-  }
-
-  function addDraftPick() {
-    const pick: DraftPick = {
-      id: `${pickYear}-${pickRound}-${Date.now()}`,
-      year: pickYear,
-      round: pickRound,
-      displayName: `${pickYear} ${getOrdinal(pickRound)} Round`,
-    };
-
-    if (showPickModal.team === 'A' && showPickModal.type === 'gives') {
-      setTeamAGivesPicks([...teamAGivesPicks, pick]);
-    } else if (showPickModal.team === 'A' && showPickModal.type === 'gets') {
-      setTeamAGetsPicks([...teamAGetsPicks, pick]);
-    }
-
-    setShowPickModal({ show: false, team: 'A', type: 'gives' });
   }
 
   function removeDraftPick(pickId: string, team: 'A' | 'B', type: 'gives' | 'gets') {
@@ -437,15 +413,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     </button>
                   </div>
                 ))}
-                <button
-                  onClick={() =>
-                    setShowPickModal({ show: true, team: 'A', type: 'gives' })
-                  }
-                  className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Add Draft Pick
-                </button>
                 <div className="pt-2">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
                     FAAB Money
@@ -563,15 +530,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     </button>
                   </div>
                 ))}
-                <button
-                  onClick={() =>
-                    setShowPickModal({ show: true, team: 'A', type: 'gets' })
-                  }
-                  className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors flex items-center justify-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Add Draft Pick
-                </button>
                 <div className="pt-2">
                   <label className="block text-sm font-semibold text-gray-300 mb-2">
                     FAAB Money
@@ -731,70 +689,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               This trade has been saved to your history
             </div>
           )}
-        </div>
-      )}
-
-      {showPickModal.show && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
-            <h3 className="text-xl font-bold text-white mb-4">Add Draft Pick</h3>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Year
-                </label>
-                <select
-                  value={pickYear}
-                  onChange={(e) => setPickYear(Number(e.target.value))}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff]"
-                >
-                  {Array.from({ length: 5 }, (_, i) => {
-                    const year = new Date().getFullYear() + i;
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-2">
-                  Round
-                </label>
-                <select
-                  value={pickRound}
-                  onChange={(e) => setPickRound(Number(e.target.value))}
-                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff]"
-                >
-                  {[1, 2, 3, 4].map((round) => (
-                    <option key={round} value={round}>
-                      {getOrdinal(round)} Round
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() =>
-                  setShowPickModal({ show: false, team: 'A', type: 'gives' })
-                }
-                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={addDraftPick}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-[#00d4ff] to-[#0099cc] text-white rounded-lg hover:opacity-90 transition-opacity"
-              >
-                Add Pick
-              </button>
-            </div>
-          </div>
         </div>
       )}
     </div>
