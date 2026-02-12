@@ -44,12 +44,40 @@ export interface KTCPlayer {
   trend: string;
 }
 
+export interface SportsDataPlayer {
+  PlayerID: number;
+  Name: string;
+  Team: string;
+  Position: string;
+  FantasyPoints: number;
+  AverageDraftPosition: number;
+  LastGameFantasyPoints: number;
+  ProjectedFantasyPoints: number;
+}
+
 class PlayerValuesApi {
-  private readonly KTC_API_BASE = 'https://keeptradecut.com/dynasty-rankings';
+  private readonly SPORTS_DATA_API_KEY = '15f968f1d055437186750d24b8ced580';
+  private readonly SPORTS_DATA_BASE = 'https://api.sportsdata.io/v3/nfl';
+
+  async fetchSportsDataPlayers(): Promise<SportsDataPlayer[]> {
+    try {
+      const response = await fetch(
+        `${this.SPORTS_DATA_BASE}/projections/json/FantasyPlayers?key=${this.SPORTS_DATA_API_KEY}`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch SportsData.io player data');
+      }
+      const data = await response.json();
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching SportsData.io values:', error);
+      return [];
+    }
+  }
 
   async fetchKTCValues(): Promise<KTCPlayer[]> {
     try {
-      const response = await fetch(`${this.KTC_API_BASE}?format=json`);
+      const response = await fetch('https://keeptradecut.com/dynasty-rankings?format=json');
       if (!response.ok) {
         throw new Error('Failed to fetch KTC values');
       }
@@ -58,6 +86,89 @@ class PlayerValuesApi {
     } catch (error) {
       console.error('Error fetching KTC values:', error);
       return [];
+    }
+  }
+
+  convertSportsDataToPlayerValue(player: SportsDataPlayer, ktcValue: number = 0): Partial<PlayerValue> {
+    const baseValue = player.FantasyPoints || player.ProjectedFantasyPoints || 0;
+    const normalizedValue = Math.round(baseValue * 100);
+
+    let trend: 'up' | 'down' | 'stable' = 'stable';
+    if (player.LastGameFantasyPoints > player.FantasyPoints) {
+      trend = 'up';
+    } else if (player.LastGameFantasyPoints < player.FantasyPoints) {
+      trend = 'down';
+    }
+
+    return {
+      player_id: player.PlayerID.toString(),
+      player_name: player.Name,
+      position: player.Position,
+      team: player.Team,
+      ktc_value: ktcValue || normalizedValue,
+      fdp_value: normalizedValue,
+      trend,
+      last_updated: new Date().toISOString(),
+      metadata: {
+        fantasy_points: player.FantasyPoints,
+        projected_points: player.ProjectedFantasyPoints,
+        adp: player.AverageDraftPosition,
+        last_game_points: player.LastGameFantasyPoints,
+      },
+    };
+  }
+
+  async syncPlayerValuesFromSportsData(isSuperflex: boolean = false): Promise<number> {
+    try {
+      const sportsDataPlayers = await this.fetchSportsDataPlayers();
+      const ktcPlayers = await this.fetchKTCValues();
+
+      const ktcMap = new Map(ktcPlayers.map(p => [p.playerName.toLowerCase(), p.value]));
+
+      const playerValues: any[] = [];
+
+      for (const player of sportsDataPlayers) {
+        if (!player.Position || !['QB', 'RB', 'WR', 'TE'].includes(player.Position)) continue;
+
+        const ktcValue = ktcMap.get(player.Name.toLowerCase()) || 0;
+        const converted = this.convertSportsDataToPlayerValue(player, ktcValue);
+
+        const factors: Partial<ValueAdjustmentFactors> = {
+          superflex_boost: isSuperflex && player.Position === 'QB' ? 0.3 : 0,
+          recent_performance: 0,
+          playoff_schedule: 0,
+          injury_risk: 0,
+          age_factor: 0,
+          team_situation: 0,
+        };
+
+        const fdpValue = this.calculateFDPValue(converted.ktc_value || 0, factors, isSuperflex);
+
+        playerValues.push({
+          player_id: converted.player_id,
+          player_name: converted.player_name,
+          position: converted.position,
+          team: converted.team,
+          ktc_value: converted.ktc_value,
+          fdp_value: fdpValue,
+          trend: converted.trend,
+          last_updated: converted.last_updated,
+          metadata: converted.metadata,
+        });
+      }
+
+      if (playerValues.length > 0) {
+        const { error } = await supabase
+          .from('player_values')
+          .upsert(playerValues, { onConflict: 'player_id' });
+
+        if (error) throw error;
+      }
+
+      return playerValues.length;
+    } catch (error) {
+      console.error('Error syncing player values:', error);
+      return 0;
     }
   }
 

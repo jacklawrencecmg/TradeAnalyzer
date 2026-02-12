@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw } from 'lucide-react';
 import { playerValuesApi, PlayerValue } from '../services/playerValuesApi';
 import { useAuth } from '../hooks/useAuth';
 import { ListSkeleton } from './LoadingSkeleton';
+import { useToast } from './Toast';
 
 interface PlayerValuesProps {
   leagueId: string;
@@ -11,9 +12,11 @@ interface PlayerValuesProps {
 
 export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [players, setPlayers] = useState<PlayerValue[]>([]);
   const [filteredPlayers, setFilteredPlayers] = useState<PlayerValue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
   const [trendFilter, setTrendFilter] = useState<string>('ALL');
@@ -36,6 +39,25 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
       console.error('Error loading player values:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const syncPlayerValues = async () => {
+    if (!user) {
+      showToast('Please sign in to sync player values', 'error');
+      return;
+    }
+
+    setSyncing(true);
+    try {
+      const count = await playerValuesApi.syncPlayerValuesFromSportsData(isSuperflex);
+      showToast(`Successfully synced ${count} players from SportsData.io`, 'success');
+      await loadPlayerValues();
+    } catch (error) {
+      console.error('Error syncing player values:', error);
+      showToast('Failed to sync player values', 'error');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -114,12 +136,23 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
               Player Values
             </h2>
             <p className="text-fdp-text-3 text-sm mt-1">
-              KTC values with FDP custom adjustments
+              Powered by SportsData.io with FDP custom adjustments
             </p>
           </div>
-          <span title="FDP Values apply custom adjustments for playoff schedules, recent performance, team situations, and league settings to give you a competitive edge.">
-            <Info className="w-5 h-5 text-fdp-text-3 cursor-help" />
-          </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={syncPlayerValues}
+              disabled={syncing || !user}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              title={!user ? 'Sign in to sync player values' : 'Sync player values from SportsData.io'}
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Data'}
+            </button>
+            <span title="FDP Values apply custom adjustments for playoff schedules, recent performance, team situations, and league settings to give you a competitive edge.">
+              <Info className="w-5 h-5 text-fdp-text-3 cursor-help" />
+            </span>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -291,6 +324,9 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
           <Info className="w-4 h-4" />
           About FDP Value Adjustments
         </h3>
+        <p className="text-sm text-fdp-text-3 mb-3">
+          <span className="text-fdp-accent-2 font-medium">Data Source:</span> Player data from SportsData.io API combined with Keep Trade Cut dynasty rankings
+        </p>
         <ul className="text-sm text-fdp-text-3 space-y-1">
           <li>• <span className="text-fdp-accent-2 font-medium">Playoff Schedule:</span> Adjusts for strength of schedule in weeks 15-17</li>
           <li>• <span className="text-fdp-accent-2 font-medium">Recent Performance:</span> Weights last 4 weeks more heavily</li>
