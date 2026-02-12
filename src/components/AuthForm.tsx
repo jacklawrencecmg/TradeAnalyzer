@@ -62,6 +62,13 @@ export function AuthForm() {
     <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <img
+              src="/FDP2.png"
+              alt="Fantasy Draft Pros Logo"
+              className="h-32 w-auto"
+            />
+          </div>
           <h1 className="text-4xl font-bold text-fdp-text-1 mb-2">Fantasy Draft Pros</h1>
           <p className="text-fdp-text-3">Sign in to manage leagues and analyze trades</p>
         </div>

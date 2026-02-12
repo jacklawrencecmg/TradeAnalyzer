@@ -106,9 +106,16 @@ export function Dashboard() {
       <div className="bg-gradient-to-r from-fdp-surface-1 to-fdp-bg-1 border-b border-fdp-border-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-fdp-text-1">Fantasy Draft Pros</h1>
-              <p className="text-fdp-text-3 text-sm">{user?.email}</p>
+            <div className="flex items-center gap-4">
+              <img
+                src="/FDP2.png"
+                alt="Fantasy Draft Pros"
+                className="h-12 w-auto"
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-fdp-text-1">Fantasy Draft Pros</h1>
+                <p className="text-fdp-text-3 text-sm">{user?.email}</p>
+              </div>
             </div>
             <button
               onClick={signOut}
