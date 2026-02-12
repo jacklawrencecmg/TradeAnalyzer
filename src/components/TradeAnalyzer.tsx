@@ -55,54 +55,100 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   type SearchResult = {
     type: 'player' | 'pick';
     player?: SleeperPlayer;
-    pick?: { year: number; round: number; displayName: string };
+    pick?: { year: number; round: number; pickNumber?: number; displayName: string };
   };
 
   function getFilteredResults(searchTerm: string): SearchResult[] {
     if (!searchTerm || searchTerm.length < 2) return [];
 
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase().trim();
     const results: SearchResult[] = [];
 
-    // Add players
-    const filteredPlayers = Object.values(players)
-      .filter(
-        (player) =>
-          player.full_name?.toLowerCase().includes(term) &&
-          player.position &&
-          ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position)
-      )
-      .sort((a, b) => {
-        const aName = a.full_name?.toLowerCase() || '';
-        const bName = b.full_name?.toLowerCase() || '';
-        const aStartsWith = aName.startsWith(term);
-        const bStartsWith = bName.startsWith(term);
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
-        return aName.localeCompare(bName);
-      })
-      .slice(0, 8);
+    // Check if searching for specific pick number (e.g., "2026 1.01", "2026 1", "1.05")
+    const yearPickPattern = /(\d{4})?\s*(\d)[.\s]?(\d{1,2})?/;
+    const match = term.match(yearPickPattern);
 
-    results.push(...filteredPlayers.map(player => ({ type: 'player' as const, player })));
-
-    // Add draft picks if search matches
     const currentYear = new Date().getFullYear();
     const pickKeywords = ['pick', '1st', '2nd', '3rd', '4th', 'first', 'second', 'third', 'fourth', 'round'];
+    const isPickSearch = pickKeywords.some(keyword => term.includes(keyword)) || match;
 
-    if (pickKeywords.some(keyword => term.includes(keyword))) {
-      for (let year = currentYear; year <= currentYear + 4; year++) {
-        for (let round = 1; round <= 4; round++) {
-          const displayName = `${year} ${getOrdinal(round)} Round`;
-          const searchableText = `${year} ${getOrdinal(round)} round pick`.toLowerCase();
+    // Add draft picks if searching for picks
+    if (isPickSearch && match) {
+      const searchYear = match[1] ? parseInt(match[1]) : null;
+      const searchRound = match[2] ? parseInt(match[2]) : null;
+      const searchPick = match[3] ? parseInt(match[3]) : null;
 
-          if (searchableText.includes(term) || term.includes(year.toString())) {
+      const yearsToSearch = searchYear ? [searchYear] : [currentYear, currentYear + 1, currentYear + 2, currentYear + 3, currentYear + 4];
+      const roundsToSearch = searchRound ? [searchRound] : [1, 2, 3, 4];
+
+      for (const year of yearsToSearch) {
+        for (const round of roundsToSearch) {
+          if (round < 1 || round > 4) continue;
+
+          // If specific pick number is provided, show only that pick
+          if (searchPick !== null && searchPick >= 1 && searchPick <= 12) {
+            const pickNum = searchPick;
+            const displayName = `${year} Pick ${round}.${pickNum.toString().padStart(2, '0')}`;
             results.push({
               type: 'pick',
-              pick: { year, round, displayName }
+              pick: { year, round, pickNumber: pickNum, displayName }
             });
+          } else {
+            // Show all picks for that round
+            for (let pickNum = 1; pickNum <= 12; pickNum++) {
+              const displayName = `${year} Pick ${round}.${pickNum.toString().padStart(2, '0')}`;
+              const searchableText = `${year} ${round}.${pickNum.toString().padStart(2, '0')} pick`.toLowerCase();
+
+              if (searchableText.includes(term) || term.includes(`${year} ${round}`) || term === `${round}`) {
+                results.push({
+                  type: 'pick',
+                  pick: { year, round, pickNumber: pickNum, displayName }
+                });
+              }
+            }
           }
         }
       }
+    } else if (isPickSearch) {
+      // General pick search without specific numbers
+      for (let year = currentYear; year <= currentYear + 4; year++) {
+        for (let round = 1; round <= 4; round++) {
+          for (let pickNum = 1; pickNum <= 12; pickNum++) {
+            const displayName = `${year} Pick ${round}.${pickNum.toString().padStart(2, '0')}`;
+            const searchableText = `${year} ${getOrdinal(round)} round pick ${round}.${pickNum.toString().padStart(2, '0')}`.toLowerCase();
+
+            if (searchableText.includes(term)) {
+              results.push({
+                type: 'pick',
+                pick: { year, round, pickNumber: pickNum, displayName }
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // Add players (only if not a clear pick search)
+    if (!match || results.length < 5) {
+      const filteredPlayers = Object.values(players)
+        .filter(
+          (player) =>
+            player.full_name?.toLowerCase().includes(term) &&
+            player.position &&
+            ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position)
+        )
+        .sort((a, b) => {
+          const aName = a.full_name?.toLowerCase() || '';
+          const bName = b.full_name?.toLowerCase() || '';
+          const aStartsWith = aName.startsWith(term);
+          const bStartsWith = bName.startsWith(term);
+          if (aStartsWith && !bStartsWith) return -1;
+          if (!aStartsWith && bStartsWith) return 1;
+          return aName.localeCompare(bName);
+        })
+        .slice(0, 8);
+
+      results.push(...filteredPlayers.map(player => ({ type: 'player' as const, player })));
     }
 
     return results.slice(0, 12);
@@ -122,12 +168,12 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     setSearchTermB('');
   }
 
-  function addPickFromSearch(year: number, round: number, team: 'A' | 'B', type: 'gives' | 'gets') {
+  function addPickFromSearch(year: number, round: number, pickNumber: number | undefined, displayName: string, team: 'A' | 'B', type: 'gives' | 'gets') {
     const pick: DraftPick = {
-      id: `${year}-${round}-${Date.now()}`,
+      id: `${year}-${round}-${pickNumber || 0}-${Date.now()}`,
       year,
       round,
-      displayName: `${year} ${getOrdinal(round)} Round`,
+      displayName,
     };
 
     if (team === 'A' && type === 'gives') {
@@ -334,8 +380,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                       </button>
                     ) : result.type === 'pick' && result.pick ? (
                       <button
-                        key={`pick-${result.pick.year}-${result.pick.round}-${idx}`}
-                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, 'A', 'gives')}
+                        key={`pick-${result.pick.year}-${result.pick.round}-${result.pick.pickNumber}-${idx}`}
+                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, result.pick!.pickNumber, result.pick!.displayName, 'A', 'gives')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
                       >
                         <div className="flex items-center gap-2">
@@ -460,8 +506,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                       </button>
                     ) : result.type === 'pick' && result.pick ? (
                       <button
-                        key={`pick-${result.pick.year}-${result.pick.round}-${idx}`}
-                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, 'A', 'gets')}
+                        key={`pick-${result.pick.year}-${result.pick.round}-${result.pick.pickNumber}-${idx}`}
+                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, result.pick!.pickNumber, result.pick!.displayName, 'A', 'gets')}
                         className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
                       >
                         <div className="flex items-center gap-2">
