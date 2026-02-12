@@ -105,85 +105,67 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
               key={team.roster_id}
               className={`bg-gray-800 rounded-lg border ${
                 team.rank <= 3 ? 'border-[#00d4ff]' : 'border-gray-700'
-              } p-5 hover:border-[#00d4ff] transition-all duration-300 ${
+              } overflow-hidden hover:border-[#00d4ff] transition-all duration-300 ${
                 team.rank <= 3 ? 'shadow-lg shadow-[#00d4ff]/20' : ''
               }`}
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  {getRankBadge(team.rank)}
-                  <div>
-                    <h3
-                      className="text-xl font-bold text-white hover:text-[#00d4ff] cursor-pointer transition-colors"
-                      onClick={() => setSelectedTeam(team)}
-                    >
-                      {team.team_name}
-                    </h3>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-                      <span className="flex items-center gap-1">
-                        <Users className="w-4 h-4" />
-                        {team.record}
-                      </span>
-                      <span>{team.points_for.toFixed(1)} pts</span>
+              <div className="p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-4 flex-1">
+                    {getRankBadge(team.rank)}
+                    <div className="flex-1">
+                      <h3
+                        className="text-xl font-bold text-white hover:text-[#00d4ff] cursor-pointer transition-colors"
+                        onClick={() => setSelectedTeam(team)}
+                      >
+                        {team.team_name}
+                      </h3>
+                      <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
+                        <span className="flex items-center gap-1">
+                          <Users className="w-4 h-4" />
+                          {team.record}
+                        </span>
+                        <span>{team.points_for.toFixed(1)} pts</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right ml-4">
+                    <div className="text-sm text-gray-400 mb-1">Total Value</div>
+                    <div className="text-2xl font-bold text-[#00d4ff]">
+                      {team.total_value.toLocaleString()}
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-gray-400 mb-1">Total Value</div>
-                  <div className="text-2xl font-bold text-[#00d4ff]">
-                    {team.total_value.toLocaleString()}
-                  </div>
-                </div>
-              </div>
 
-              <div className="border-t border-gray-700 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-sm font-semibold text-gray-400">
-                    All Players ({team.all_players.length})
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+                  <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                    <div className="text-xs text-gray-400 mb-1">Players</div>
+                    <div className="text-lg font-bold text-white">{team.all_players.length}</div>
                   </div>
-                  <button
-                    onClick={() => setSelectedTeam(team)}
-                    className="text-xs text-[#00d4ff] hover:text-[#00a8cc] transition-colors"
-                  >
-                    View Full Team
-                  </button>
-                </div>
-                <div className="relative">
-                  <div className="overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
-                    <div className="flex gap-3 min-w-max">
-                      {team.all_players.slice(0, 15).map((player, idx) => (
-                        <div
-                          key={player.player_id}
-                          className="bg-gray-900 rounded-lg p-3 border border-gray-700 min-w-[160px]"
-                        >
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-[#00d4ff]">#{idx + 1}</span>
-                            <span className="text-xs px-2 py-1 bg-gray-800 rounded text-gray-300 font-medium">
-                              {player.position}
-                            </span>
-                          </div>
-                          <div className="text-sm font-medium text-white mb-1 truncate">
-                            {player.name}
-                          </div>
-                          {player.team && (
-                            <div className="text-xs text-gray-500 mb-1">{player.team}</div>
-                          )}
-                          <div className="text-xs text-gray-400">Value: {player.value}</div>
-                        </div>
-                      ))}
-                      {team.all_players.length > 15 && (
-                        <div className="bg-gray-900 rounded-lg p-3 border border-gray-700 min-w-[160px] flex items-center justify-center">
-                          <button
-                            onClick={() => setSelectedTeam(team)}
-                            className="text-[#00d4ff] hover:text-[#00a8cc] transition-colors text-sm"
-                          >
-                            +{team.all_players.length - 15} more
-                          </button>
-                        </div>
-                      )}
+                  <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                    <div className="text-xs text-gray-400 mb-1">Draft Picks</div>
+                    <div className="text-lg font-bold text-white">{team.draft_picks.length}</div>
+                  </div>
+                  <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                    <div className="text-xs text-gray-400 mb-1">FAAB</div>
+                    <div className="text-lg font-bold text-white">${team.faab_remaining}</div>
+                  </div>
+                  <div className="bg-gray-900 rounded-lg p-3 border border-gray-700">
+                    <div className="text-xs text-gray-400 mb-1">Avg Player</div>
+                    <div className="text-lg font-bold text-white">
+                      {team.all_players.length > 0
+                        ? Math.round(team.total_value / team.all_players.length).toLocaleString()
+                        : '0'}
                     </div>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => setSelectedTeam(team)}
+                  className="w-full py-2 bg-gray-900 hover:bg-gray-700 text-[#00d4ff] rounded-lg transition-colors border border-gray-700 text-sm font-semibold"
+                >
+                  View Full Roster
+                </button>
               </div>
             </div>
           ))}
@@ -191,100 +173,130 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
       </div>
 
       {selectedTeam && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-lg border border-gray-700 max-w-5xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-gray-900 rounded-xl border border-gray-700 max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-700 bg-gray-800">
               <div className="flex items-center gap-4">
                 {getRankBadge(selectedTeam.rank)}
                 <div>
                   <h2 className="text-2xl font-bold text-white">{selectedTeam.team_name}</h2>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-400">
-                    <span className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center gap-4 mt-2 text-sm">
+                    <span className="flex items-center gap-1 text-gray-400">
                       <Users className="w-4 h-4" />
                       {selectedTeam.record}
                     </span>
-                    <span>{selectedTeam.points_for.toFixed(1)} pts</span>
+                    <span className="text-gray-400">{selectedTeam.points_for.toFixed(1)} pts</span>
                     <span className="text-[#00d4ff] font-semibold">
-                      Total Value: {selectedTeam.total_value.toLocaleString()}
+                      Value: {selectedTeam.total_value.toLocaleString()}
                     </span>
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedTeam(null)}
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-gray-700 rounded-lg"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
-            <div className="overflow-y-auto max-h-[calc(90vh-100px)] p-6">
-              <div className="space-y-6">
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="p-6 space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-5 h-5 text-[#00d4ff]" />
+                      <div className="text-sm text-gray-400">Total Players</div>
+                    </div>
+                    <div className="text-3xl font-bold text-white">{selectedTeam.all_players.length}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Calendar className="w-5 h-5 text-[#00d4ff]" />
+                      <div className="text-sm text-gray-400">Draft Picks</div>
+                    </div>
+                    <div className="text-3xl font-bold text-white">{selectedTeam.draft_picks.length}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="w-5 h-5 text-[#00d4ff]" />
+                      <div className="text-sm text-gray-400">FAAB Left</div>
+                    </div>
+                    <div className="text-3xl font-bold text-white">${selectedTeam.faab_remaining}</div>
+                  </div>
+                </div>
+
                 <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-[#00d4ff]" />
-                    Full Roster ({selectedTeam.all_players.length} Players)
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                      <Users className="w-6 h-6 text-[#00d4ff]" />
+                      Roster
+                    </h3>
+                    <div className="text-sm text-gray-400">
+                      {selectedTeam.all_players.length} players
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {selectedTeam.all_players.map((player, idx) => (
                       <div
                         key={player.player_id}
-                        className="bg-gray-800 rounded-lg p-3 border border-gray-700 hover:border-[#00d4ff] transition-colors"
+                        className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-[#00d4ff] transition-all duration-200 hover:shadow-lg hover:shadow-[#00d4ff]/10"
                       >
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-[#00d4ff]">#{idx + 1}</span>
-                          <span className="text-xs px-2 py-1 bg-gray-900 rounded text-gray-300 font-medium">
+                          <span className="text-xs font-bold text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded">
+                            #{idx + 1}
+                          </span>
+                          <span className="text-xs px-2 py-1 bg-gray-900 rounded text-gray-300 font-semibold">
                             {player.position}
                           </span>
                         </div>
-                        <div className="text-sm font-medium text-white mb-1">
+                        <div className="text-sm font-semibold text-white mb-1 truncate" title={player.name}>
                           {player.name}
                         </div>
                         {player.team && (
-                          <div className="text-xs text-gray-500 mb-1">{player.team}</div>
+                          <div className="text-xs text-gray-500 mb-2">{player.team}</div>
                         )}
-                        <div className="text-xs text-gray-400">Value: {player.value.toLocaleString()}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-[#00d4ff]" />
-                    Draft Picks ({selectedTeam.draft_picks.length})
-                  </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {selectedTeam.draft_picks.map((pick, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-gray-800 rounded-lg p-3 border border-gray-700"
-                      >
-                        <div className="text-sm font-bold text-white mb-1">
-                          {pick.season} Round {pick.round}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {pick.original_owner_id === selectedTeam.roster_id.toString()
-                            ? 'Own Pick'
-                            : `Roster ${pick.original_owner_id}`}
+                        <div className="text-xs font-medium text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded inline-block">
+                          {player.value.toLocaleString()}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-[#00d4ff]" />
-                    FAAB Remaining
-                  </h3>
-                  <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
-                    <div className="text-3xl font-bold text-[#00d4ff]">
-                      ${selectedTeam.faab_remaining}
+                {selectedTeam.draft_picks.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Calendar className="w-6 h-6 text-[#00d4ff]" />
+                        Draft Picks
+                      </h3>
+                      <div className="text-sm text-gray-400">
+                        {selectedTeam.draft_picks.length} picks
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-400 mt-1">Available for waivers</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                      {selectedTeam.draft_picks.map((pick, idx) => (
+                        <div
+                          key={idx}
+                          className="bg-gray-800 rounded-lg p-3 border border-gray-700 text-center hover:border-[#00d4ff] transition-colors"
+                        >
+                          <div className="text-sm font-bold text-white mb-1">
+                            {pick.season}
+                          </div>
+                          <div className="text-xs text-[#00d4ff] font-semibold mb-1">
+                            Round {pick.round}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {pick.original_owner_id === selectedTeam.roster_id.toString()
+                              ? 'Own'
+                              : `R${pick.original_owner_id}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           </div>
