@@ -198,19 +198,26 @@ const POSITION_BASE_VALUES: Record<string, number> = {
 };
 
 let ktcValues: Record<string, number> = {};
+let ktcSuperflexValues: Record<string, number> = {};
 
-export async function fetchPlayerValues(): Promise<void> {
+export async function fetchPlayerValues(isSuperflex: boolean = false): Promise<void> {
   const currentYear = new Date().getFullYear();
   const targetYear = currentYear >= 2025 ? currentYear : 2025;
-  const cacheKey = `ktc_values_${targetYear}`;
+  const format = isSuperflex ? 2 : 1;
+  const cacheKey = `ktc_values_${targetYear}_${format}`;
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
+
   if (cached) {
-    ktcValues = cached;
+    if (isSuperflex) {
+      ktcSuperflexValues = cached;
+    } else {
+      ktcValues = cached;
+    }
     return;
   }
 
   try {
-    const response = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?season=${targetYear}`, {
+    const response = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?season=${targetYear}&format=${format}`, {
       headers: {
         'Accept': 'application/json',
       },
@@ -229,12 +236,16 @@ export async function fetchPlayerValues(): Promise<void> {
       }
 
       if (Object.keys(values).length > 0) {
-        ktcValues = values;
+        if (isSuperflex) {
+          ktcSuperflexValues = values;
+        } else {
+          ktcValues = values;
+        }
         setCachedData(cacheKey, values);
-        console.log(`Loaded ${Object.keys(values).length} player values from KTC (${targetYear} season)`);
+        console.log(`Loaded ${Object.keys(values).length} ${isSuperflex ? 'Superflex' : '1QB'} player values from KTC (${targetYear} season)`);
       }
     } else {
-      const fallbackResponse = await fetch('https://api.keeptradecut.com/bff/dynasty/players', {
+      const fallbackResponse = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?format=${format}`, {
         headers: {
           'Accept': 'application/json',
         },
@@ -253,14 +264,18 @@ export async function fetchPlayerValues(): Promise<void> {
         }
 
         if (Object.keys(values).length > 0) {
-          ktcValues = values;
+          if (isSuperflex) {
+            ktcSuperflexValues = values;
+          } else {
+            ktcValues = values;
+          }
           setCachedData(cacheKey, values);
-          console.log(`Loaded ${Object.keys(values).length} player values from KTC (current season)`);
+          console.log(`Loaded ${Object.keys(values).length} ${isSuperflex ? 'Superflex' : '1QB'} player values from KTC (current season)`);
         }
       }
     }
   } catch (error) {
-    console.warn('Failed to fetch KTC values, using fallback values:', error);
+    console.warn(`Failed to fetch KTC ${isSuperflex ? 'Superflex' : '1QB'} values, using fallback values:`, error);
   }
 }
 
@@ -369,15 +384,14 @@ export function getPlayerValue(
   };
 
   const finalSettings = { ...defaultSettings, ...settings };
-  if (ktcValues[player.player_id]) {
-    let value = ktcValues[player.player_id];
 
-    if (player.position === 'QB' && finalSettings.isSuperflex) {
-      value *= 1.3;
-    }
+  const ktcValueSource = finalSettings.isSuperflex ? ktcSuperflexValues : ktcValues;
+
+  if (ktcValueSource[player.player_id]) {
+    let value = ktcValueSource[player.player_id];
 
     if (player.position === 'TE' && finalSettings.isTEPremium) {
-      value *= 1.4;
+      value *= 1.15;
     }
 
     if (player.injury_status) {
@@ -517,10 +531,6 @@ export async function analyzeTrade(
   teamAGetsFAAB: number = 0,
   leagueSettings?: Partial<LeagueSettings>
 ): Promise<TradeAnalysis> {
-  await fetchPlayerValues();
-
-  const players = await fetchAllPlayers();
-
   let settings: LeagueSettings | Partial<LeagueSettings>;
 
   if (leagueSettings) {
@@ -541,6 +551,10 @@ export async function analyzeTrade(
       bestBall: false,
     };
   }
+
+  await fetchPlayerValues(settings.isSuperflex);
+
+  const players = await fetchAllPlayers();
 
   const teamAItems: TradeItem[] = [];
   let teamAValue = 0;
@@ -697,6 +711,7 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
   ]);
 
   const settings = getLeagueSettings(league);
+  await fetchPlayerValues(settings.isSuperflex);
 
   const rankings: TeamRanking[] = rosters.map((roster) => {
     const user = users.find((u) => u.user_id === roster.owner_id);
@@ -807,12 +822,20 @@ export async function getLeagueRosters(leagueId: string): Promise<SleeperRoster[
   return fetchLeagueRosters(leagueId);
 }
 
-export async function getPlayerValueById(playerId: string): Promise<number> {
-  await fetchPlayerValues();
+export async function getPlayerValueById(
+  playerId: string,
+  leagueSettings?: Partial<LeagueSettings>
+): Promise<number> {
+  const isSuperflex = leagueSettings?.isSuperflex || false;
+  await Promise.all([
+    fetchPlayerValues(false),
+    fetchPlayerValues(true)
+  ]);
+
   const players = await fetchAllPlayers();
   const player = players[playerId];
   if (!player) return 0;
-  return getPlayerValue(player);
+  return getPlayerValue(player, leagueSettings);
 }
 
 export interface TradeBlockPlayer {
@@ -826,13 +849,15 @@ export interface TradeBlockPlayer {
 }
 
 export async function fetchTradeBlockPlayers(leagueId: string): Promise<TradeBlockPlayer[]> {
-  const [rosters, users, players] = await Promise.all([
+  const [league, rosters, users, players] = await Promise.all([
+    fetchLeagueDetails(leagueId),
     fetchLeagueRosters(leagueId),
     fetchLeagueUsers(leagueId),
     fetchAllPlayers(),
   ]);
 
-  await fetchPlayerValues();
+  const settings = getLeagueSettings(league);
+  await fetchPlayerValues(settings.isSuperflex);
 
   const tradeBlockPlayers: TradeBlockPlayer[] = [];
 
@@ -849,7 +874,7 @@ export async function fetchTradeBlockPlayers(leagueId: string): Promise<TradeBlo
             player_name: player.full_name,
             position: player.position,
             team: player.team,
-            value: getPlayerValue(player),
+            value: getPlayerValue(player, settings),
             owner_id: roster.owner_id,
             roster_id: roster.roster_id,
           });

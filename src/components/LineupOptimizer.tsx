@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Users, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
-import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers, fetchAllPlayers } from '../services/sleeperApi';
+import {
+  getLeagueRosters,
+  getPlayerValueById as getPlayerValue,
+  fetchLeagueUsers,
+  fetchAllPlayers,
+  fetchLeagueDetails,
+  getLeagueSettings,
+  type LeagueSettings
+} from '../services/sleeperApi';
 
 interface Player {
   player_id: string;
@@ -38,10 +46,22 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
   const [players, setPlayers] = useState<Player[]>([]);
   const [lineup, setLineup] = useState<LineupSlot[]>([]);
   const [optimalLineup, setOptimalLineup] = useState<LineupSlot[]>([]);
+  const [leagueSettings, setLeagueSettings] = useState<Partial<LeagueSettings>>({});
 
   useEffect(() => {
+    loadLeagueSettings();
     loadTeams();
   }, [leagueId]);
+
+  const loadLeagueSettings = async () => {
+    try {
+      const league = await fetchLeagueDetails(leagueId);
+      const settings = getLeagueSettings(league);
+      setLeagueSettings(settings);
+    } catch (error) {
+      console.error('Error loading league settings:', error);
+    }
+  };
 
   useEffect(() => {
     if (selectedTeam) {
@@ -105,7 +125,7 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
           const playerData = allPlayers[playerId];
           if (!playerData) return null;
 
-          const value = await getPlayerValue(playerId);
+          const value = await getPlayerValue(playerId, leagueSettings);
           return {
             player_id: playerId,
             name: playerData.full_name,
@@ -275,9 +295,16 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
   return (
     <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 text-fdp-text-1 p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex items-center gap-3 mb-8">
-          <Users className="w-8 h-8 text-fdp-accent-1" />
-          <h1 className="text-3xl font-bold">Lineup Optimizer</h1>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <Users className="w-8 h-8 text-fdp-accent-1" />
+            <h1 className="text-3xl font-bold">Lineup Optimizer</h1>
+          </div>
+          {leagueSettings.isSuperflex && (
+            <span className="px-4 py-2 bg-fdp-accent-1/20 text-fdp-accent-1 rounded-lg text-sm font-semibold border border-fdp-accent-1/50">
+              Superflex League • QB Premium Values
+            </span>
+          )}
         </div>
 
         <div className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-6 mb-6">
