@@ -11,6 +11,48 @@ export interface PlayerValue {
   trend: 'up' | 'down' | 'stable';
   last_updated: string;
   metadata: Record<string, any>;
+  age?: number | null;
+  years_experience?: number | null;
+  injury_status?: string | null;
+  bye_week?: number | null;
+  college?: string | null;
+  draft_year?: number | null;
+  draft_round?: number | null;
+  draft_pick?: number | null;
+  contract_years_remaining?: number | null;
+  tier?: string | null;
+  volatility_score?: number | null;
+}
+
+export interface PlayerValueHistory {
+  id: string;
+  player_id: string;
+  value: number;
+  source: 'ktc' | 'fdp';
+  snapshot_date: string;
+  created_at: string;
+}
+
+export interface PlayerValueChange {
+  player_id: string;
+  change_7d: number;
+  change_30d: number;
+  change_season: number;
+  percent_7d: number;
+  percent_30d: number;
+  percent_season: number;
+  last_calculated: string;
+}
+
+export interface DynastyDraftPick {
+  id: string;
+  pick_id: string;
+  year: number;
+  round: number;
+  pick_number: number;
+  value: number;
+  display_name: string;
+  last_updated: string;
 }
 
 export interface ValueAdjustmentFactors {
@@ -432,6 +474,195 @@ class PlayerValuesApi {
     const direction = difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
     return { difference, percentage, direction };
+  }
+
+  async getPlayerValueHistory(playerId: string, days: number = 30): Promise<PlayerValueHistory[]> {
+    try {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const { data, error } = await supabase
+        .from('player_value_history')
+        .select('*')
+        .eq('player_id', playerId)
+        .gte('snapshot_date', startDate.toISOString().split('T')[0])
+        .order('snapshot_date', { ascending: true });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching player value history:', error);
+      return [];
+    }
+  }
+
+  async getPlayerValueChanges(playerIds?: string[]): Promise<PlayerValueChange[]> {
+    try {
+      let query = supabase
+        .from('player_value_changes')
+        .select('*');
+
+      if (playerIds && playerIds.length > 0) {
+        query = query.in('player_id', playerIds);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching player value changes:', error);
+      return [];
+    }
+  }
+
+  async getBiggestMovers(period: '7d' | '30d' | 'season' = '7d', limit: number = 10): Promise<{risers: PlayerValue[], fallers: PlayerValue[]}> {
+    try {
+      const changeColumn = period === '7d' ? 'change_7d' : period === '30d' ? 'change_30d' : 'change_season';
+
+      const { data: changes, error: changesError } = await supabase
+        .from('player_value_changes')
+        .select('player_id, ' + changeColumn)
+        .order(changeColumn, { ascending: false })
+        .limit(limit * 2);
+
+      if (changesError) throw changesError;
+
+      const playerIds = changes?.map(c => c.player_id) || [];
+      if (playerIds.length === 0) return { risers: [], fallers: [] };
+
+      const { data: players, error: playersError } = await supabase
+        .from('player_values')
+        .select('*')
+        .in('player_id', playerIds);
+
+      if (playersError) throw playersError;
+
+      const playerMap = new Map(players?.map(p => [p.player_id, p]) || []);
+
+      const risers = changes
+        ?.filter(c => (c as any)[changeColumn] > 0)
+        .slice(0, limit)
+        .map(c => playerMap.get(c.player_id))
+        .filter(p => p !== undefined) as PlayerValue[] || [];
+
+      const fallers = changes
+        ?.filter(c => (c as any)[changeColumn] < 0)
+        .slice(-limit)
+        .reverse()
+        .map(c => playerMap.get(c.player_id))
+        .filter(p => p !== undefined) as PlayerValue[] || [];
+
+      return { risers, fallers };
+    } catch (error) {
+      console.error('Error fetching biggest movers:', error);
+      return { risers: [], fallers: [] };
+    }
+  }
+
+  async getDynastyDraftPicks(year?: number): Promise<DynastyDraftPick[]> {
+    try {
+      let query = supabase
+        .from('dynasty_draft_picks')
+        .select('*')
+        .order('year', { ascending: true })
+        .order('round', { ascending: true })
+        .order('pick_number', { ascending: true });
+
+      if (year) {
+        query = query.eq('year', year);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching dynasty draft picks:', error);
+      return [];
+    }
+  }
+
+  async getRookies(year?: number): Promise<PlayerValue[]> {
+    try {
+      const currentYear = year || new Date().getFullYear();
+
+      const { data, error } = await supabase
+        .from('player_values')
+        .select('*')
+        .eq('draft_year', currentYear)
+        .order('fdp_value', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching rookies:', error);
+      return [];
+    }
+  }
+
+  async saveValueSnapshot(): Promise<boolean> {
+    try {
+      const { data: players, error: playersError } = await supabase
+        .from('player_values')
+        .select('player_id, fdp_value');
+
+      if (playersError) throw playersError;
+
+      const today = new Date().toISOString().split('T')[0];
+      const snapshots = players?.map(p => ({
+        player_id: p.player_id,
+        value: p.fdp_value,
+        source: 'fdp',
+        snapshot_date: today,
+      })) || [];
+
+      if (snapshots.length > 0) {
+        const { error } = await supabase
+          .from('player_value_history')
+          .upsert(snapshots, { onConflict: 'player_id,source,snapshot_date', ignoreDuplicates: true });
+
+        if (error) throw error;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error saving value snapshot:', error);
+      return false;
+    }
+  }
+
+  getInjuryBadgeColor(status: string | null | undefined): string {
+    switch (status) {
+      case 'out':
+      case 'ir':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      case 'doubtful':
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'questionable':
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+      default:
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
+    }
+  }
+
+  getTierBadgeColor(tier: string | null | undefined): string {
+    switch (tier) {
+      case 'elite':
+        return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+      case 'tier1':
+        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      case 'tier2':
+        return 'bg-teal-500/20 text-teal-300 border-teal-500/30';
+      case 'tier3':
+        return 'bg-green-500/20 text-green-300 border-green-500/30';
+      case 'flex':
+        return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+      case 'depth':
+        return 'bg-slate-500/20 text-slate-400 border-slate-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+    }
   }
 }
 

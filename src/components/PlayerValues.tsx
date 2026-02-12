@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw } from 'lucide-react';
-import { playerValuesApi, PlayerValue } from '../services/playerValuesApi';
+import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw, Calendar, AlertCircle, Award, BarChart3, Star } from 'lucide-react';
+import { playerValuesApi, PlayerValue, PlayerValueChange, DynastyDraftPick } from '../services/playerValuesApi';
 import { useAuth } from '../hooks/useAuth';
 import { ListSkeleton } from './LoadingSkeleton';
 import { useToast } from './Toast';
@@ -10,32 +10,50 @@ interface PlayerValuesProps {
   isSuperflex: boolean;
 }
 
+type ViewMode = 'players' | 'picks' | 'movers' | 'rookies';
+
 export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [players, setPlayers] = useState<PlayerValue[]>([]);
   const [filteredPlayers, setFilteredPlayers] = useState<PlayerValue[]>([]);
+  const [valueChanges, setValueChanges] = useState<Map<string, PlayerValueChange>>(new Map());
+  const [draftPicks, setDraftPicks] = useState<DynastyDraftPick[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
   const [trendFilter, setTrendFilter] = useState<string>('ALL');
+  const [tierFilter, setTierFilter] = useState<string>('ALL');
+  const [injuryFilter, setInjuryFilter] = useState<string>('ALL');
   const [showOnlyDifferences, setShowOnlyDifferences] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<PlayerValue[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>('players');
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [movers, setMovers] = useState<{risers: PlayerValue[], fallers: PlayerValue[]}>({risers: [], fallers: []});
+  const [moversPeriod, setMoversPeriod] = useState<'7d' | '30d' | 'season'>('7d');
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadPlayerValues();
+    loadDraftPicks();
   }, []);
 
   useEffect(() => {
     filterPlayers();
-  }, [players, searchTerm, positionFilter, trendFilter, showOnlyDifferences]);
+  }, [players, searchTerm, positionFilter, trendFilter, tierFilter, injuryFilter, showOnlyDifferences]);
 
   useEffect(() => {
-    // Cleanup timeout on unmount
+    if (viewMode === 'movers') {
+      loadMovers();
+    } else if (viewMode === 'picks') {
+      loadDraftPicks();
+    }
+  }, [viewMode, moversPeriod, selectedYear]);
+
+  useEffect(() => {
     return () => {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
@@ -48,10 +66,33 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     try {
       const data = await playerValuesApi.getPlayerValues(undefined, 500);
       setPlayers(data);
+
+      const playerIds = data.map(p => p.player_id);
+      const changes = await playerValuesApi.getPlayerValueChanges(playerIds);
+      const changesMap = new Map(changes.map(c => [c.player_id, c]));
+      setValueChanges(changesMap);
     } catch (error) {
       console.error('Error loading player values:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDraftPicks = async () => {
+    try {
+      const picks = await playerValuesApi.getDynastyDraftPicks(selectedYear);
+      setDraftPicks(picks);
+    } catch (error) {
+      console.error('Error loading draft picks:', error);
+    }
+  };
+
+  const loadMovers = async () => {
+    try {
+      const data = await playerValuesApi.getBiggestMovers(moversPeriod, 10);
+      setMovers(data);
+    } catch (error) {
+      console.error('Error loading movers:', error);
     }
   };
 
@@ -128,8 +169,21 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
       filtered = filtered.filter(p => p.trend === trendFilter);
     }
 
+    if (tierFilter !== 'ALL') {
+      filtered = filtered.filter(p => p.tier === tierFilter);
+    }
+
+    if (injuryFilter !== 'ALL') {
+      filtered = filtered.filter(p => p.injury_status === injuryFilter);
+    }
+
     if (showOnlyDifferences) {
       filtered = filtered.filter(p => Math.abs(p.ktc_value - p.fdp_value) > 100);
+    }
+
+    if (viewMode === 'rookies') {
+      const currentYear = new Date().getFullYear();
+      filtered = filtered.filter(p => p.draft_year === currentYear);
     }
 
     setFilteredPlayers(filtered);
@@ -161,8 +215,27 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     }
   };
 
+  const getValueChangeDisplay = (playerId: string, period: '7d' | '30d' | 'season') => {
+    const change = valueChanges.get(playerId);
+    if (!change) return null;
+
+    const value = period === '7d' ? change.change_7d : period === '30d' ? change.change_30d : change.change_season;
+    const percent = period === '7d' ? change.percent_7d : period === '30d' ? change.percent_30d : change.percent_season;
+
+    if (value === 0) return <span className="text-fdp-text-3 text-xs">-</span>;
+
+    const color = value > 0 ? 'text-fdp-pos' : 'text-fdp-neg';
+    return (
+      <span className={`text-xs font-medium ${color}`}>
+        {value > 0 ? '+' : ''}{playerValuesApi.formatValue(value)} ({percent > 0 ? '+' : ''}{percent.toFixed(1)}%)
+      </span>
+    );
+  };
+
   const positions = ['ALL', 'QB', 'RB', 'WR', 'TE'];
   const trends = ['ALL', 'up', 'down', 'stable'];
+  const tiers = ['ALL', 'elite', 'tier1', 'tier2', 'tier3', 'flex', 'depth'];
+  const injuryStatuses = ['ALL', 'healthy', 'questionable', 'doubtful', 'out', 'ir'];
 
   if (loading) {
     return (
@@ -185,7 +258,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
               Player Values
             </h2>
             <p className="text-fdp-text-3 text-sm mt-1">
-              Powered by SportsData.io with FDP custom adjustments
+              Dynasty rankings powered by Keep Trade Cut with FDP enhancements
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -193,15 +266,62 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
               onClick={syncPlayerValues}
               disabled={syncing || !user}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!user ? 'Sign in to sync player values' : 'Sync player values from SportsData.io'}
+              title={!user ? 'Sign in to sync player values' : 'Sync player values from Keep Trade Cut'}
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Data'}
+              {syncing ? 'Syncing...' : 'Sync KTC Data'}
             </button>
             <span title="FDP Values apply custom adjustments for playoff schedules, recent performance, team situations, and league settings to give you a competitive edge.">
               <Info className="w-5 h-5 text-fdp-text-3 cursor-help" />
             </span>
           </div>
+        </div>
+
+        <div className="flex items-center gap-2 mb-6 border-b border-fdp-border-1">
+          <button
+            onClick={() => setViewMode('players')}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
+              viewMode === 'players'
+                ? 'border-fdp-accent-2 text-fdp-accent-2'
+                : 'border-transparent text-fdp-text-3 hover:text-fdp-text-1'
+            }`}
+          >
+            <Star className="w-4 h-4" />
+            All Players
+          </button>
+          <button
+            onClick={() => setViewMode('movers')}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
+              viewMode === 'movers'
+                ? 'border-fdp-accent-2 text-fdp-accent-2'
+                : 'border-transparent text-fdp-text-3 hover:text-fdp-text-1'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Biggest Movers
+          </button>
+          <button
+            onClick={() => setViewMode('picks')}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
+              viewMode === 'picks'
+                ? 'border-fdp-accent-2 text-fdp-accent-2'
+                : 'border-transparent text-fdp-text-3 hover:text-fdp-text-1'
+            }`}
+          >
+            <Award className="w-4 h-4" />
+            Draft Picks
+          </button>
+          <button
+            onClick={() => setViewMode('rookies')}
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-all ${
+              viewMode === 'rookies'
+                ? 'border-fdp-accent-2 text-fdp-accent-2'
+                : 'border-transparent text-fdp-text-3 hover:text-fdp-text-1'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            Rookies
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -300,6 +420,32 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
             ))}
           </select>
 
+          <select
+            value={tierFilter}
+            onChange={(e) => setTierFilter(e.target.value)}
+            className="px-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+          >
+            {tiers.map(tier => (
+              <option key={tier} value={tier}>
+                {tier === 'ALL' ? 'All Tiers' : tier.charAt(0).toUpperCase() + tier.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <select
+            value={injuryFilter}
+            onChange={(e) => setInjuryFilter(e.target.value)}
+            className="px-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+          >
+            {injuryStatuses.map(status => (
+              <option key={status} value={status}>
+                {status === 'ALL' ? 'All Injury Status' : status.charAt(0).toUpperCase() + status.slice(1)}
+              </option>
+            ))}
+          </select>
+
           <button
             onClick={() => setShowOnlyDifferences(!showOnlyDifferences)}
             className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg transition-all ${
@@ -322,87 +468,168 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
           </div>
         )}
 
-        <div className="bg-fdp-surface-2 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-fdp-surface-1 border-b border-fdp-border-1">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    Rank
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    Player
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    Pos
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    Team
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    Trend
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    KTC Value
-                  </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    <span className="text-fdp-accent-2">FDP Value</span>
-                  </th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">
-                    Diff
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-fdp-border-1">
-                {filteredPlayers.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-fdp-text-3">
-                      No players found matching your filters
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPlayers.map((player, index) => (
-                    <tr
-                      key={player.id}
-                      className="hover:bg-fdp-surface-1 transition-colors"
-                    >
-                      <td className="px-4 py-3 text-fdp-text-3 text-sm">
-                        {index + 1}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-fdp-text-1">
-                          {player.player_name}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-semibold rounded-full bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
-                          {player.position}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-fdp-text-2 text-sm">
-                        {player.team || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        {getTrendIcon(player.trend)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-fdp-text-1 font-medium">
-                        {playerValuesApi.formatValue(player.ktc_value)}
-                      </td>
-                      <td className="px-4 py-3 text-right text-fdp-accent-2 font-bold">
-                        {playerValuesApi.formatValue(player.fdp_value)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`text-sm font-medium ${getValueDifferenceColor(player.ktc_value, player.fdp_value)}`}>
-                          {getValueDifferenceText(player.ktc_value, player.fdp_value)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+{viewMode === 'picks' ? (
+          <div className="bg-fdp-surface-2 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-bold text-fdp-text-1">Dynasty Draft Pick Values</h3>
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                className="px-4 py-2 bg-fdp-surface-1 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1"
+              >
+                <option value={2024}>2024</option>
+                <option value={2025}>2025</option>
+                <option value={2026}>2026</option>
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map(round => (
+                <div key={round} className="space-y-3">
+                  <h4 className="font-semibold text-fdp-text-1 border-b border-fdp-border-1 pb-2">Round {round}</h4>
+                  {draftPicks.filter(p => p.round === round).map((pick) => (
+                    <div key={pick.id} className="flex items-center justify-between p-3 bg-fdp-surface-1 rounded-lg border border-fdp-border-1 hover:border-fdp-accent-1 transition-colors">
+                      <span className="text-fdp-text-2 font-medium">{pick.display_name}</span>
+                      <span className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(pick.value)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : viewMode === 'movers' ? (
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="text-fdp-text-3 text-sm">Period:</span>
+              {(['7d', '30d', 'season'] as const).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setMoversPeriod(period)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    moversPeriod === period
+                      ? 'bg-fdp-accent-2 text-fdp-bg-0'
+                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
+                  }`}
+                >
+                  {period === '7d' ? '7 Days' : period === '30d' ? '30 Days' : 'Season'}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-fdp-surface-2 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-fdp-pos mb-4 flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Biggest Risers
+                </h3>
+                <div className="space-y-3">
+                  {movers.risers.length === 0 ? (
+                    <p className="text-fdp-text-3 text-sm text-center py-4">No data available yet</p>
+                  ) : (
+                    movers.risers.map((player, index) => (
+                      <div key={player.id} className="flex items-center justify-between p-3 bg-fdp-surface-1 rounded-lg border border-fdp-border-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-fdp-text-3 font-bold">#{index + 1}</span>
+                          <div>
+                            <div className="text-fdp-text-1 font-medium">{player.player_name}</div>
+                            <div className="text-fdp-text-3 text-xs">{player.position} - {player.team}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(player.fdp_value)}</div>
+                          {getValueChangeDisplay(player.player_id, moversPeriod)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <div className="bg-fdp-surface-2 rounded-lg p-6">
+                <h3 className="text-lg font-bold text-fdp-neg mb-4 flex items-center gap-2">
+                  <TrendingDown className="w-5 h-5" />
+                  Biggest Fallers
+                </h3>
+                <div className="space-y-3">
+                  {movers.fallers.length === 0 ? (
+                    <p className="text-fdp-text-3 text-sm text-center py-4">No data available yet</p>
+                  ) : (
+                    movers.fallers.map((player, index) => (
+                      <div key={player.id} className="flex items-center justify-between p-3 bg-fdp-surface-1 rounded-lg border border-fdp-border-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-fdp-text-3 font-bold">#{index + 1}</span>
+                          <div>
+                            <div className="text-fdp-text-1 font-medium">{player.player_name}</div>
+                            <div className="text-fdp-text-3 text-xs">{player.position} - {player.team}</div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(player.fdp_value)}</div>
+                          {getValueChangeDisplay(player.player_id, moversPeriod)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-fdp-surface-2 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-fdp-surface-1 border-b border-fdp-border-1">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Rank</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Player</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Details</th>
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">7d Change</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">KTC</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider"><span className="text-fdp-accent-2">FDP</span></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-fdp-border-1">
+                  {filteredPlayers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-fdp-text-3">No players found</td>
+                    </tr>
+                  ) : (
+                    filteredPlayers.map((player, index) => (
+                      <tr key={player.id} className="hover:bg-fdp-surface-1 transition-colors">
+                        <td className="px-4 py-3 text-fdp-text-3 text-sm">{index + 1}</td>
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-fdp-text-1">{player.player_name}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
+                              {player.position}
+                            </span>
+                            <span className="text-fdp-text-3 text-xs">{player.team || 'FA'}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col items-center gap-1">
+                            {player.age && <span className="text-fdp-text-3 text-xs">Age: {player.age}</span>}
+                            {player.injury_status && player.injury_status !== 'healthy' && (
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded border ${playerValuesApi.getInjuryBadgeColor(player.injury_status)}`}>
+                                <AlertCircle className="w-3 h-3" />
+                                {player.injury_status.toUpperCase()}
+                              </span>
+                            )}
+                            {player.tier && (
+                              <span className={`inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded border ${playerValuesApi.getTierBadgeColor(player.tier)}`}>
+                                {player.tier.charAt(0).toUpperCase() + player.tier.slice(1)}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-center">{getValueChangeDisplay(player.player_id, '7d')}</td>
+                        <td className="px-4 py-3 text-right text-fdp-text-1 font-medium">{playerValuesApi.formatValue(player.ktc_value)}</td>
+                        <td className="px-4 py-3 text-right text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(player.fdp_value)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-fdp-surface-2 border border-fdp-border-1 rounded-lg p-4">
