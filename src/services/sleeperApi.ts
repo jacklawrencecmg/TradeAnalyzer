@@ -162,19 +162,19 @@ export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> 
 }
 
 const POSITION_BASE_VALUES: Record<string, number> = {
-  QB: 100,
-  RB: 120,
-  WR: 110,
-  TE: 90,
-  K: 20,
-  DEF: 30,
-  DL: 45,
-  LB: 50,
-  DB: 45,
-  DE: 48,
-  DT: 42,
-  CB: 46,
-  S: 44,
+  QB: 2500,
+  RB: 2800,
+  WR: 2600,
+  TE: 2000,
+  K: 400,
+  DEF: 800,
+  DL: 1000,
+  LB: 1100,
+  DB: 1000,
+  DE: 1050,
+  DT: 950,
+  CB: 1000,
+  S: 950,
 };
 
 let ktcValues: Record<string, number> = {};
@@ -188,7 +188,7 @@ export async function fetchPlayerValues(): Promise<void> {
   }
 
   try {
-    const response = await fetch('https://api.keeptradecut.com/dynasty-rankings', {
+    const response = await fetch('https://api.keeptradecut.com/bff/dynasty/players', {
       headers: {
         'Accept': 'application/json',
       },
@@ -200,14 +200,17 @@ export async function fetchPlayerValues(): Promise<void> {
 
       if (Array.isArray(data)) {
         data.forEach((item: any) => {
-          if (item.playerID && item.value) {
-            values[item.playerID] = parseInt(item.value, 10);
+          if (item.sleeperId && item.value) {
+            values[item.sleeperId] = parseInt(item.value, 10);
           }
         });
       }
 
-      ktcValues = values;
-      setCachedData(cacheKey, values);
+      if (Object.keys(values).length > 0) {
+        ktcValues = values;
+        setCachedData(cacheKey, values);
+        console.log(`Loaded ${Object.keys(values).length} player values from KTC`);
+      }
     }
   } catch (error) {
     console.warn('Failed to fetch KTC values, using fallback values:', error);
@@ -251,25 +254,48 @@ export function getPlayerValue(
   let baseValue = POSITION_BASE_VALUES[player.position];
 
   if (player.position === 'QB' && isSuperflex) {
-    baseValue *= 1.5;
+    baseValue *= 1.8;
   }
 
-  if (player.age && player.age < 25) {
-    baseValue *= 1.1;
-  } else if (player.age && player.age > 30) {
-    baseValue *= 0.85;
+  if (player.years_exp !== undefined) {
+    if (player.years_exp === 0) {
+      baseValue *= 1.3;
+    } else if (player.years_exp <= 2) {
+      baseValue *= 1.2;
+    } else if (player.years_exp >= 10) {
+      baseValue *= 0.6;
+    } else if (player.years_exp >= 8) {
+      baseValue *= 0.75;
+    }
+  }
+
+  if (player.age) {
+    if (player.age < 23) {
+      baseValue *= 1.2;
+    } else if (player.age < 25) {
+      baseValue *= 1.1;
+    } else if (player.age > 32) {
+      baseValue *= 0.5;
+    } else if (player.age > 29) {
+      baseValue *= 0.7;
+    }
   }
 
   if (player.injury_status) {
     const injuryMultipliers: Record<string, number> = {
-      Out: 0.5,
-      Doubtful: 0.7,
-      Questionable: 0.9,
-      IR: 0.3,
-      PUP: 0.4,
+      Out: 0.6,
+      Doubtful: 0.75,
+      Questionable: 0.95,
+      IR: 0.4,
+      PUP: 0.5,
+      COV: 0.3,
     };
     const multiplier = injuryMultipliers[player.injury_status] || 1;
     baseValue *= multiplier;
+  }
+
+  if (player.status === 'Inactive' || player.status === 'Retired') {
+    baseValue *= 0.1;
   }
 
   return Math.round(baseValue);
