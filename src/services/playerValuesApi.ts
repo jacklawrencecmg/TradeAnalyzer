@@ -75,18 +75,58 @@ class PlayerValuesApi {
     }
   }
 
-  async fetchKTCValues(): Promise<KTCPlayer[]> {
+  async fetchKTCValues(isSuperflex: boolean = false): Promise<Map<string, { value: number; playerName: string; position: string; team: string }>> {
     try {
-      const response = await fetch('https://keeptradecut.com/dynasty-rankings?format=json');
+      const currentYear = new Date().getFullYear();
+      const targetYear = currentYear >= 2025 ? currentYear : 2025;
+      const format = isSuperflex ? 2 : 1;
+
+      const response = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?season=${targetYear}&format=${format}`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
       if (!response.ok) {
-        throw new Error('Failed to fetch KTC values');
+        const fallbackResponse = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?format=${format}`, {
+          headers: {
+            'Accept': 'application/json',
+          },
+        });
+
+        if (!fallbackResponse.ok) {
+          throw new Error('Failed to fetch KTC values');
+        }
+
+        const data = await fallbackResponse.json();
+        return this.parseKTCData(data);
       }
+
       const data = await response.json();
-      return data || [];
+      return this.parseKTCData(data);
     } catch (error) {
       console.error('Error fetching KTC values:', error);
-      return [];
+      return new Map();
     }
+  }
+
+  private parseKTCData(data: any): Map<string, { value: number; playerName: string; position: string; team: string }> {
+    const valueMap = new Map<string, { value: number; playerName: string; position: string; team: string }>();
+
+    if (Array.isArray(data)) {
+      data.forEach((item: any) => {
+        if (item.sleeperId && item.value) {
+          valueMap.set(item.sleeperId, {
+            value: parseInt(item.value, 10),
+            playerName: item.playerName || '',
+            position: item.position || '',
+            team: item.team || ''
+          });
+        }
+      });
+    }
+
+    return valueMap;
   }
 
   convertSportsDataToPlayerValue(player: SportsDataPlayer, ktcValue: number = 0): Partial<PlayerValue> {
@@ -120,21 +160,19 @@ class PlayerValuesApi {
 
   async syncPlayerValuesFromSportsData(isSuperflex: boolean = false): Promise<number> {
     try {
-      const sportsDataPlayers = await this.fetchSportsDataPlayers();
-      const ktcPlayers = await this.fetchKTCValues();
+      const ktcValueMap = await this.fetchKTCValues(isSuperflex);
 
-      const ktcMap = new Map(ktcPlayers.map(p => [p.playerName.toLowerCase(), p.value]));
+      if (ktcValueMap.size === 0) {
+        throw new Error('No KTC values fetched');
+      }
 
       const playerValues: any[] = [];
 
-      for (const player of sportsDataPlayers) {
-        if (!player.Position || !['QB', 'RB', 'WR', 'TE'].includes(player.Position)) continue;
-
-        const ktcValue = ktcMap.get(player.Name.toLowerCase()) || 0;
-        const converted = this.convertSportsDataToPlayerValue(player, ktcValue);
+      ktcValueMap.forEach((ktcData, sleeperId) => {
+        if (!ktcData.position || !['QB', 'RB', 'WR', 'TE', 'PICK'].includes(ktcData.position)) return;
 
         const factors: Partial<ValueAdjustmentFactors> = {
-          superflex_boost: isSuperflex && player.Position === 'QB' ? 0.3 : 0,
+          superflex_boost: isSuperflex && ktcData.position === 'QB' ? 0.05 : 0,
           recent_performance: 0,
           playoff_schedule: 0,
           injury_risk: 0,
@@ -142,20 +180,25 @@ class PlayerValuesApi {
           team_situation: 0,
         };
 
-        const fdpValue = this.calculateFDPValue(converted.ktc_value || 0, factors, isSuperflex);
+        const fdpValue = this.calculateFDPValue(ktcData.value, factors, isSuperflex);
+
+        let trend: 'up' | 'down' | 'stable' = 'stable';
 
         playerValues.push({
-          player_id: converted.player_id,
-          player_name: converted.player_name,
-          position: converted.position,
-          team: converted.team,
-          ktc_value: converted.ktc_value,
+          player_id: sleeperId,
+          player_name: ktcData.playerName,
+          position: ktcData.position,
+          team: ktcData.team || null,
+          ktc_value: ktcData.value,
           fdp_value: fdpValue,
-          trend: converted.trend,
-          last_updated: converted.last_updated,
-          metadata: converted.metadata,
+          trend: trend,
+          last_updated: new Date().toISOString(),
+          metadata: {
+            is_superflex: isSuperflex,
+            source: 'ktc'
+          },
         });
-      }
+      });
 
       if (playerValues.length > 0) {
         const { error } = await supabase
@@ -163,6 +206,7 @@ class PlayerValuesApi {
           .upsert(playerValues, { onConflict: 'player_id' });
 
         if (error) throw error;
+        console.log(`Synced ${playerValues.length} player values from KTC`);
       }
 
       return playerValues.length;

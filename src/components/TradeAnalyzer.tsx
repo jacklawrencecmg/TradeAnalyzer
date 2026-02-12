@@ -226,6 +226,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       year,
       round,
       displayName,
+      pickNumber: pickNumber,
     };
 
     if (team === 'A' && type === 'gives') {

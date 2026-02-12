@@ -86,6 +86,7 @@ export interface DraftPick {
   year: number;
   round: number;
   displayName: string;
+  pickNumber?: number;
 }
 
 export interface TradeItem {
@@ -282,15 +283,30 @@ export async function fetchPlayerValues(isSuperflex: boolean = false): Promise<v
 export function getDraftPickValue(
   round: number,
   year: number,
-  settings?: { totalRounds?: number; isSuperflex?: boolean; hasIDP?: boolean }
+  settings?: { totalRounds?: number; isSuperflex?: boolean; hasIDP?: boolean },
+  pickNumber?: number
 ): number {
+  const ktcValueSource = settings?.isSuperflex ? ktcSuperflexValues : ktcValues;
+
+  if (pickNumber) {
+    const pickKey = `${year}_${round}_${pickNumber.toString().padStart(2, '0')}`;
+    if (ktcValueSource[pickKey]) {
+      return ktcValueSource[pickKey];
+    }
+  }
+
+  const earlyPickKey = `${year}_${round}_01`;
+  if (ktcValueSource[earlyPickKey]) {
+    return ktcValueSource[earlyPickKey];
+  }
+
   const currentYear = new Date().getFullYear();
   const yearDiff = year - currentYear;
   const totalRounds = settings?.totalRounds || 4;
 
   const baseValues: Record<number, number> = {
-    1: 7000,
-    2: 3500,
+    1: 6800,
+    2: 3400,
     3: 1500,
     4: 600,
     5: 350,
@@ -303,7 +319,7 @@ export function getDraftPickValue(
   }
 
   if (settings?.isSuperflex && round <= 2) {
-    value *= 1.15;
+    value *= 1.12;
   }
 
   if (settings?.hasIDP && round >= 3) {
@@ -311,7 +327,7 @@ export function getDraftPickValue(
   }
 
   if (yearDiff > 0) {
-    value *= Math.pow(0.85, yearDiff);
+    value *= Math.pow(0.87, yearDiff);
   } else if (yearDiff < 0) {
     value *= 1.15;
   }
@@ -579,7 +595,7 @@ export async function analyzeTrade(
       totalRounds: settings.draftRounds,
       isSuperflex: settings.isSuperflex,
       hasIDP: settings.hasIDP,
-    });
+    }, pick.pickNumber);
     teamAValue += value;
     teamAItems.push({
       type: 'pick',
@@ -623,7 +639,7 @@ export async function analyzeTrade(
       totalRounds: settings.draftRounds,
       isSuperflex: settings.isSuperflex,
       hasIDP: settings.hasIDP,
-    });
+    }, pick.pickNumber);
     teamBValue += value;
     teamBItems.push({
       type: 'pick',
