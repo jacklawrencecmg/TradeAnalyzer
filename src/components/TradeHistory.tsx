@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { History, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { History, Trash2, TrendingUp, TrendingDown, Minus, Calendar } from 'lucide-react';
 import { supabase, type SavedTrade } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { fetchAllPlayers, type SleeperPlayer } from '../services/sleeperApi';
@@ -142,10 +142,16 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  {getWinnerIcon(trade.winner)}
+                  {getWinnerIcon(trade.trade_result?.winner || trade.winner)}
                   <div>
-                    <div className={`font-bold text-lg ${getWinnerColor(trade.winner)}`}>
-                      {trade.winner === 'Fair' ? 'Fair Trade' : `Team ${trade.winner} Wins`}
+                    <div
+                      className={`font-bold text-lg ${getWinnerColor(
+                        trade.trade_result?.winner || trade.winner || 'Fair'
+                      )}`}
+                    >
+                      {(trade.trade_result?.winner || trade.winner) === 'Fair'
+                        ? 'Fair Trade'
+                        : `Team ${trade.trade_result?.winner || trade.winner} Wins`}
                     </div>
                     <div className="text-sm text-gray-400">
                       {new Date(trade.created_at).toLocaleDateString('en-US', {
@@ -170,50 +176,143 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
               <div className="grid md:grid-cols-3 gap-4 mb-4">
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <div className="text-sm text-gray-400 mb-1">Team A Value</div>
-                  <div className="text-2xl font-bold text-white">{trade.team_a_value}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {trade.trade_result?.team_a_value || trade.team_a_value}
+                  </div>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <div className="text-sm text-gray-400 mb-1">Team B Value</div>
-                  <div className="text-2xl font-bold text-white">{trade.team_b_value}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {trade.trade_result?.team_b_value || trade.team_b_value}
+                  </div>
                 </div>
                 <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                   <div className="text-sm text-gray-400 mb-1">Difference</div>
-                  <div className="text-2xl font-bold text-[#00d4ff]">{trade.difference}</div>
+                  <div className="text-2xl font-bold text-[#00d4ff]">
+                    {trade.trade_result?.difference || trade.difference}
+                  </div>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gives</div>
-                  <div className="space-y-1">
-                    {trade.team_a_gives.map((playerId: string) => (
-                      <div
-                        key={playerId}
-                        className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
-                      >
-                        {getPlayerName(playerId)}
-                      </div>
-                    ))}
+              {trade.trade_result?.team_a_items ? (
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gives</div>
+                    <div className="space-y-1">
+                      {trade.trade_result.team_a_items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2">
+                            {item.type === 'pick' && (
+                              <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                            )}
+                            <span>
+                              {item.name}
+                              {item.position && (
+                                <span className="text-gray-500 ml-1">({item.position})</span>
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-gray-400">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gets</div>
+                    <div className="space-y-1">
+                      {trade.trade_result.team_b_items.map((item) => (
+                        <div
+                          key={item.id}
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-2">
+                            {item.type === 'pick' && (
+                              <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                            )}
+                            <span>
+                              {item.name}
+                              {item.position && (
+                                <span className="text-gray-500 ml-1">({item.position})</span>
+                              )}
+                            </span>
+                          </div>
+                          <span className="text-gray-400">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gets</div>
-                  <div className="space-y-1">
-                    {trade.team_a_gets.map((playerId: string) => (
-                      <div
-                        key={playerId}
-                        className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
-                      >
-                        {getPlayerName(playerId)}
-                      </div>
-                    ))}
+              ) : (
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gives</div>
+                    <div className="space-y-1">
+                      {trade.trade_data?.team_a_gives?.map((playerId: string) => (
+                        <div
+                          key={playerId}
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                        >
+                          {getPlayerName(playerId)}
+                        </div>
+                      )) ||
+                        trade.team_a_gives?.map((playerId: string) => (
+                          <div
+                            key={playerId}
+                            className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                          >
+                            {getPlayerName(playerId)}
+                          </div>
+                        ))}
+                      {trade.trade_data?.team_a_gives_picks?.map((pick) => (
+                        <div
+                          key={pick.id}
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
+                        >
+                          <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                          {pick.displayName}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-400 mb-2">Team A Gets</div>
+                    <div className="space-y-1">
+                      {trade.trade_data?.team_a_gets?.map((playerId: string) => (
+                        <div
+                          key={playerId}
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                        >
+                          {getPlayerName(playerId)}
+                        </div>
+                      )) ||
+                        trade.team_a_gets?.map((playerId: string) => (
+                          <div
+                            key={playerId}
+                            className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white"
+                          >
+                            {getPlayerName(playerId)}
+                          </div>
+                        ))}
+                      {trade.trade_data?.team_a_gets_picks?.map((pick) => (
+                        <div
+                          key={pick.id}
+                          className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
+                        >
+                          <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                          {pick.displayName}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <div className="bg-gray-900 rounded-lg p-4 border border-gray-700">
                 <div className="text-sm text-gray-400 mb-2">Analysis</div>
-                <p className="text-white">{trade.fairness}</p>
+                <p className="text-white">{trade.trade_result?.fairness || trade.fairness}</p>
               </div>
 
               {trade.notes && (

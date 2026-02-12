@@ -76,12 +76,29 @@ export interface SleeperUser {
   };
 }
 
+export interface DraftPick {
+  id: string;
+  year: number;
+  round: number;
+  displayName: string;
+}
+
+export interface TradeItem {
+  type: 'player' | 'pick';
+  id: string;
+  name: string;
+  position?: string;
+  value: number;
+}
+
 export interface TradeAnalysis {
   teamAValue: number;
   teamBValue: number;
   difference: number;
   winner: 'A' | 'B' | 'Fair';
   fairness: string;
+  teamAItems: TradeItem[];
+  teamBItems: TradeItem[];
 }
 
 export async function fetchLeagueDetails(leagueId: string): Promise<SleeperLeague> {
@@ -160,10 +177,73 @@ const POSITION_BASE_VALUES: Record<string, number> = {
   S: 44,
 };
 
+let ktcValues: Record<string, number> = {};
+
+export async function fetchPlayerValues(): Promise<void> {
+  const cacheKey = 'ktc_values';
+  const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
+  if (cached) {
+    ktcValues = cached;
+    return;
+  }
+
+  try {
+    const response = await fetch('https://api.keeptradecut.com/dynasty-rankings', {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const values: Record<string, number> = {};
+
+      if (Array.isArray(data)) {
+        data.forEach((item: any) => {
+          if (item.playerID && item.value) {
+            values[item.playerID] = parseInt(item.value, 10);
+          }
+        });
+      }
+
+      ktcValues = values;
+      setCachedData(cacheKey, values);
+    }
+  } catch (error) {
+    console.warn('Failed to fetch KTC values, using fallback values:', error);
+  }
+}
+
+export function getDraftPickValue(round: number, year: number): number {
+  const currentYear = new Date().getFullYear();
+  const yearDiff = year - currentYear;
+
+  const baseValues: Record<number, number> = {
+    1: 8000,
+    2: 4500,
+    3: 2500,
+    4: 1200,
+  };
+
+  let value = baseValues[round] || 500;
+
+  if (yearDiff > 0) {
+    value *= Math.pow(0.85, yearDiff);
+  } else if (yearDiff < 0) {
+    value *= 1.15;
+  }
+
+  return Math.round(value);
+}
+
 export function getPlayerValue(
   player: SleeperPlayer,
   isSuperflex: boolean = false
 ): number {
+  if (ktcValues[player.player_id]) {
+    return ktcValues[player.player_id];
+  }
+
   if (!player.position || !POSITION_BASE_VALUES[player.position]) {
     return 0;
   }
@@ -198,27 +278,73 @@ export function getPlayerValue(
 export async function analyzeTrade(
   leagueId: string,
   teamAGives: string[],
-  teamAGets: string[]
+  teamAGets: string[],
+  teamAGivesPicks: DraftPick[] = [],
+  teamAGetsPicks: DraftPick[] = []
 ): Promise<TradeAnalysis> {
+  await fetchPlayerValues();
+
   const league = await fetchLeagueDetails(leagueId);
   const players = await fetchAllPlayers();
 
   const isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
 
+  const teamAItems: TradeItem[] = [];
   let teamAValue = 0;
+
   for (const playerId of teamAGives) {
     const player = players[playerId];
     if (player) {
-      teamAValue += getPlayerValue(player, isSuperflex);
+      const value = getPlayerValue(player, isSuperflex);
+      teamAValue += value;
+      teamAItems.push({
+        type: 'player',
+        id: playerId,
+        name: player.full_name,
+        position: player.position,
+        value,
+      });
     }
   }
 
+  for (const pick of teamAGivesPicks) {
+    const value = getDraftPickValue(pick.round, pick.year);
+    teamAValue += value;
+    teamAItems.push({
+      type: 'pick',
+      id: pick.id,
+      name: pick.displayName,
+      value,
+    });
+  }
+
+  const teamBItems: TradeItem[] = [];
   let teamBValue = 0;
+
   for (const playerId of teamAGets) {
     const player = players[playerId];
     if (player) {
-      teamBValue += getPlayerValue(player, isSuperflex);
+      const value = getPlayerValue(player, isSuperflex);
+      teamBValue += value;
+      teamBItems.push({
+        type: 'player',
+        id: playerId,
+        name: player.full_name,
+        position: player.position,
+        value,
+      });
     }
+  }
+
+  for (const pick of teamAGetsPicks) {
+    const value = getDraftPickValue(pick.round, pick.year);
+    teamBValue += value;
+    teamBItems.push({
+      type: 'pick',
+      id: pick.id,
+      name: pick.displayName,
+      value,
+    });
   }
 
   const difference = Math.abs(teamAValue - teamBValue);
@@ -244,6 +370,8 @@ export async function analyzeTrade(
     difference,
     winner,
     fairness,
+    teamAItems,
+    teamBItems,
   };
 }
 

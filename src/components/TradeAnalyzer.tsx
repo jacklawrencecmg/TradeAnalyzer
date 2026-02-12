@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
   type SleeperPlayer,
   type TradeAnalysis,
+  type DraftPick,
 } from '../services/sleeperApi';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -21,9 +22,18 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [searchTermB, setSearchTermB] = useState('');
   const [teamAGives, setTeamAGives] = useState<string[]>([]);
   const [teamAGets, setTeamAGets] = useState<string[]>([]);
+  const [teamAGivesPicks, setTeamAGivesPicks] = useState<DraftPick[]>([]);
+  const [teamAGetsPicks, setTeamAGetsPicks] = useState<DraftPick[]>([]);
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [showPickModal, setShowPickModal] = useState<{
+    show: boolean;
+    team: 'A' | 'B';
+    type: 'gives' | 'gets';
+  }>({ show: false, team: 'A', type: 'gives' });
+  const [pickYear, setPickYear] = useState(new Date().getFullYear());
+  const [pickRound, setPickRound] = useState(1);
 
   useEffect(() => {
     loadPlayers();
@@ -85,15 +95,65 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     }
   }
 
+  function addDraftPick() {
+    const pick: DraftPick = {
+      id: `${pickYear}-${pickRound}-${Date.now()}`,
+      year: pickYear,
+      round: pickRound,
+      displayName: `${pickYear} ${getOrdinal(pickRound)} Round`,
+    };
+
+    if (showPickModal.team === 'A' && showPickModal.type === 'gives') {
+      setTeamAGivesPicks([...teamAGivesPicks, pick]);
+    } else if (showPickModal.team === 'A' && showPickModal.type === 'gets') {
+      setTeamAGetsPicks([...teamAGetsPicks, pick]);
+    }
+
+    setShowPickModal({ show: false, team: 'A', type: 'gives' });
+  }
+
+  function removeDraftPick(pickId: string, team: 'A' | 'B', type: 'gives' | 'gets') {
+    if (team === 'A' && type === 'gives') {
+      setTeamAGivesPicks(teamAGivesPicks.filter((p) => p.id !== pickId));
+    } else if (team === 'A' && type === 'gets') {
+      setTeamAGetsPicks(teamAGetsPicks.filter((p) => p.id !== pickId));
+    }
+  }
+
+  function getOrdinal(n: number): string {
+    const s = ['th', 'st', 'nd', 'rd'];
+    const v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  }
+
   async function handleAnalyzeTrade() {
-    if (teamAGives.length === 0 || teamAGets.length === 0) {
-      alert('Please add players to both sides of the trade');
+    if (
+      teamAGives.length === 0 &&
+      teamAGivesPicks.length === 0 &&
+      teamAGets.length === 0 &&
+      teamAGetsPicks.length === 0
+    ) {
+      alert('Please add players or picks to both sides of the trade');
+      return;
+    }
+
+    if (
+      (teamAGives.length === 0 && teamAGivesPicks.length === 0) ||
+      (teamAGets.length === 0 && teamAGetsPicks.length === 0)
+    ) {
+      alert('Please add items to both sides of the trade');
       return;
     }
 
     setAnalyzing(true);
     try {
-      const result = await analyzeTrade(leagueId, teamAGives, teamAGets);
+      const result = await analyzeTrade(
+        leagueId,
+        teamAGives,
+        teamAGets,
+        teamAGivesPicks,
+        teamAGetsPicks
+      );
       setAnalysis(result);
 
       if (user) {
@@ -114,13 +174,21 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       const { error } = await supabase.from('saved_trades').insert({
         user_id: user.id,
         league_id: leagueId,
-        team_a_gives: teamAGives,
-        team_a_gets: teamAGets,
-        team_a_value: result.teamAValue,
-        team_b_value: result.teamBValue,
-        difference: result.difference,
-        winner: result.winner,
-        fairness: result.fairness,
+        trade_data: {
+          team_a_gives: teamAGives,
+          team_a_gets: teamAGets,
+          team_a_gives_picks: teamAGivesPicks,
+          team_a_gets_picks: teamAGetsPicks,
+        },
+        trade_result: {
+          team_a_value: result.teamAValue,
+          team_b_value: result.teamBValue,
+          difference: result.difference,
+          winner: result.winner,
+          fairness: result.fairness,
+          team_a_items: result.teamAItems,
+          team_b_items: result.teamBItems,
+        },
       });
 
       if (error) throw error;
@@ -134,6 +202,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   function clearTrade() {
     setTeamAGives([]);
     setTeamAGets([]);
+    setTeamAGivesPicks([]);
+    setTeamAGetsPicks([]);
     setAnalysis(null);
   }
 
@@ -153,7 +223,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             <TrendingUp className="w-7 h-7 text-[#00d4ff]" />
             Trade Analyzer
           </h2>
-          {(teamAGives.length > 0 || teamAGets.length > 0) && (
+          {(teamAGives.length > 0 ||
+            teamAGets.length > 0 ||
+            teamAGivesPicks.length > 0 ||
+            teamAGetsPicks.length > 0) && (
             <button
               onClick={clearTrade}
               className="text-sm text-gray-400 hover:text-white transition-colors"
@@ -221,6 +294,32 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     </div>
                   );
                 })}
+                {teamAGivesPicks.map((pick) => (
+                  <div
+                    key={pick.id}
+                    className="flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border border-[#00d4ff]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-[#00d4ff]" />
+                      <div className="text-white font-medium">{pick.displayName}</div>
+                    </div>
+                    <button
+                      onClick={() => removeDraftPick(pick.id, 'A', 'gives')}
+                      className="text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() =>
+                    setShowPickModal({ show: true, team: 'A', type: 'gives' })
+                  }
+                  className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Add Draft Pick
+                </button>
               </div>
             </div>
           </div>
@@ -282,6 +381,32 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     </div>
                   );
                 })}
+                {teamAGetsPicks.map((pick) => (
+                  <div
+                    key={pick.id}
+                    className="flex items-center justify-between bg-gray-800 px-4 py-3 rounded-lg border border-[#00d4ff]"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-[#00d4ff]" />
+                      <div className="text-white font-medium">{pick.displayName}</div>
+                    </div>
+                    <button
+                      onClick={() => removeDraftPick(pick.id, 'A', 'gets')}
+                      className="text-gray-400 hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  onClick={() =>
+                    setShowPickModal({ show: true, team: 'A', type: 'gets' })
+                  }
+                  className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Add Draft Pick
+                </button>
               </div>
             </div>
           </div>
@@ -290,7 +415,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         <div className="mt-6">
           <button
             onClick={handleAnalyzeTrade}
-            disabled={analyzing || teamAGives.length === 0 || teamAGets.length === 0}
+            disabled={
+              analyzing ||
+              (teamAGives.length === 0 && teamAGivesPicks.length === 0) ||
+              (teamAGets.length === 0 && teamAGetsPicks.length === 0)
+            }
             className="w-full bg-gradient-to-r from-[#00d4ff] to-[#0099cc] text-white font-semibold py-3 px-6 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {analyzing ? 'Analyzing...' : 'Analyze Trade'}
@@ -301,6 +430,66 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       {analysis && (
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border border-gray-700 p-6 shadow-xl animate-in fade-in duration-300">
           <h3 className="text-xl font-bold text-white mb-4">Trade Analysis Results</h3>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-6">
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <h4 className="text-lg font-semibold text-white mb-3">Team A Gives</h4>
+              <div className="space-y-2">
+                {analysis.teamAItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      {item.type === 'pick' && (
+                        <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                      )}
+                      <span className="text-gray-300">
+                        {item.name}
+                        {item.position && (
+                          <span className="text-gray-500 ml-1">({item.position})</span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="text-white font-medium">{item.value}</span>
+                  </div>
+                ))}
+                <div className="pt-2 mt-2 border-t border-gray-600 flex justify-between font-bold">
+                  <span className="text-white">Total</span>
+                  <span className="text-[#00d4ff]">{analysis.teamAValue}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
+              <h4 className="text-lg font-semibold text-white mb-3">Team A Gets</h4>
+              <div className="space-y-2">
+                {analysis.teamBItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between text-sm"
+                  >
+                    <div className="flex items-center gap-2">
+                      {item.type === 'pick' && (
+                        <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                      )}
+                      <span className="text-gray-300">
+                        {item.name}
+                        {item.position && (
+                          <span className="text-gray-500 ml-1">({item.position})</span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="text-white font-medium">{item.value}</span>
+                  </div>
+                ))}
+                <div className="pt-2 mt-2 border-t border-gray-600 flex justify-between font-bold">
+                  <span className="text-white">Total</span>
+                  <span className="text-[#00d4ff]">{analysis.teamBValue}</span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div className="grid md:grid-cols-3 gap-4 mb-6">
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -349,6 +538,70 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               This trade has been saved to your history
             </div>
           )}
+        </div>
+      )}
+
+      {showPickModal.show && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full mx-4 border border-gray-700">
+            <h3 className="text-xl font-bold text-white mb-4">Add Draft Pick</h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Year
+                </label>
+                <select
+                  value={pickYear}
+                  onChange={(e) => setPickYear(Number(e.target.value))}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff]"
+                >
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const year = new Date().getFullYear() + i;
+                    return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-300 mb-2">
+                  Round
+                </label>
+                <select
+                  value={pickRound}
+                  onChange={(e) => setPickRound(Number(e.target.value))}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00d4ff]"
+                >
+                  {[1, 2, 3, 4].map((round) => (
+                    <option key={round} value={round}>
+                      {getOrdinal(round)} Round
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() =>
+                  setShowPickModal({ show: false, team: 'A', type: 'gives' })
+                }
+                className="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={addDraftPick}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-[#00d4ff] to-[#0099cc] text-white rounded-lg hover:opacity-90 transition-opacity"
+              >
+                Add Pick
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
