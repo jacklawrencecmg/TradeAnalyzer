@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ArrowLeftRight, TrendingUp } from 'lucide-react';
-import { getLeagueRosters, getPlayerValueById as getPlayerValue } from '../services/sleeperApi';
+import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers } from '../services/sleeperApi';
 
 interface TradeProposal {
   target_team: string;
@@ -29,7 +29,18 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
   const findTrades = async () => {
     setLoading(true);
     try {
-      const rosters = await getLeagueRosters(leagueId);
+      const [rosters, users] = await Promise.all([
+        getLeagueRosters(leagueId),
+        fetchLeagueUsers(leagueId)
+      ]);
+
+      const userMap = new Map(
+        users.map(user => [
+          user.user_id,
+          user.metadata?.team_name || user.display_name || user.username || `Team ${user.user_id.slice(0, 4)}`
+        ])
+      );
+
       const userRoster = rosters.find((r: any) => r.roster_id.toString() === rosterId);
 
       if (!userRoster) {
@@ -87,7 +98,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
 
             if (fairness >= 70) {
               tradeSuggestions.push({
-                target_team: `Team ${roster.roster_id}`,
+                target_team: userMap.get(roster.owner_id) || `Team ${roster.roster_id}`,
                 roster_id: roster.roster_id,
                 give_players: [myPlayer],
                 receive_players: [theirPlayer],

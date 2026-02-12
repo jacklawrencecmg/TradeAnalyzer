@@ -21,13 +21,27 @@ interface RivalryTrackerProps {
   leagueId: string;
 }
 
+interface TeamOption {
+  roster_id: number;
+  owner_id: string;
+  name: string;
+}
+
 export default function RivalryTracker({ leagueId }: RivalryTrackerProps) {
   const [loading, setLoading] = useState(false);
   const [rivalries, setRivalries] = useState<Rivalry[]>([]);
+  const [allRivalries, setAllRivalries] = useState<Rivalry[]>([]);
+  const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [selectedTeam1, setSelectedTeam1] = useState<string>('ALL');
+  const [selectedTeam2, setSelectedTeam2] = useState<string>('ALL');
 
   useEffect(() => {
     loadRivalries();
   }, [leagueId]);
+
+  useEffect(() => {
+    filterRivalries();
+  }, [selectedTeam1, selectedTeam2, allRivalries]);
 
   const loadRivalries = async () => {
     setLoading(true);
@@ -43,6 +57,13 @@ export default function RivalryTracker({ leagueId }: RivalryTrackerProps) {
           user.metadata?.team_name || user.display_name || user.username || `Team ${user.user_id.slice(0, 4)}`
         ])
       );
+
+      const teamOptions: TeamOption[] = rosters.map((roster: any) => ({
+        roster_id: roster.roster_id,
+        owner_id: roster.owner_id,
+        name: userMap.get(roster.owner_id) || `Team ${roster.roster_id}`
+      }));
+      setTeams(teamOptions);
 
       const rivalryData: Rivalry[] = [];
 
@@ -75,11 +96,38 @@ export default function RivalryTracker({ leagueId }: RivalryTrackerProps) {
       }
 
       rivalryData.sort((a, b) => b.total_matchups - a.total_matchups);
+      setAllRivalries(rivalryData);
       setRivalries(rivalryData);
     } catch (error) {
       console.error('Error loading rivalries:', error);
     }
     setLoading(false);
+  };
+
+  const filterRivalries = () => {
+    if (selectedTeam1 === 'ALL' && selectedTeam2 === 'ALL') {
+      setRivalries(allRivalries);
+      return;
+    }
+
+    const filtered = allRivalries.filter(rivalry => {
+      const matchesTeam1 = selectedTeam1 === 'ALL' ||
+        rivalry.team1_id.toString() === selectedTeam1 ||
+        rivalry.team2_id.toString() === selectedTeam1;
+
+      const matchesTeam2 = selectedTeam2 === 'ALL' ||
+        rivalry.team1_id.toString() === selectedTeam2 ||
+        rivalry.team2_id.toString() === selectedTeam2;
+
+      if (selectedTeam1 !== 'ALL' && selectedTeam2 !== 'ALL') {
+        return (rivalry.team1_id.toString() === selectedTeam1 && rivalry.team2_id.toString() === selectedTeam2) ||
+               (rivalry.team1_id.toString() === selectedTeam2 && rivalry.team2_id.toString() === selectedTeam1);
+      }
+
+      return matchesTeam1 && matchesTeam2;
+    });
+
+    setRivalries(filtered);
   };
 
   const getWinPercentage = (wins: number, total: number) => {
@@ -92,6 +140,42 @@ export default function RivalryTracker({ leagueId }: RivalryTrackerProps) {
         <div className="flex items-center gap-3 mb-8">
           <Swords className="w-8 h-8 text-red-400" />
           <h1 className="text-3xl font-bold">Rivalry Tracker</h1>
+        </div>
+
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-6 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Filter Rivalries</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Team 1</label>
+              <select
+                value={selectedTeam1}
+                onChange={(e) => setSelectedTeam1(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+              >
+                <option value="ALL">All Teams</option>
+                {teams.map(team => (
+                  <option key={team.roster_id} value={team.roster_id.toString()}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Team 2</label>
+              <select
+                value={selectedTeam2}
+                onChange={(e) => setSelectedTeam2(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+              >
+                <option value="ALL">All Teams</option>
+                {teams.map(team => (
+                  <option key={team.roster_id} value={team.roster_id.toString()}>
+                    {team.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         {loading ? (
