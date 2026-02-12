@@ -151,6 +151,13 @@ const POSITION_BASE_VALUES: Record<string, number> = {
   TE: 90,
   K: 20,
   DEF: 30,
+  DL: 45,
+  LB: 50,
+  DB: 45,
+  DE: 48,
+  DT: 42,
+  CB: 46,
+  S: 44,
 };
 
 export function getPlayerValue(

@@ -49,7 +49,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         (player) =>
           player.full_name?.toLowerCase().includes(term) &&
           player.position &&
-          ['QB', 'RB', 'WR', 'TE', 'K', 'DEF'].includes(player.position)
+          ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position)
       )
       .sort((a, b) => {
         const aName = a.full_name?.toLowerCase() || '';
