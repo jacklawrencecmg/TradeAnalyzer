@@ -70,22 +70,22 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
   if (leagues.length === 0) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+        <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-w-2xl w-full p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-xl font-bold text-gray-800">Manage Leagues</h3>
+            <h3 className="text-xl font-bold text-fdp-text-1">Manage Leagues</h3>
             <button
               onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 transition-colors"
+              className="text-fdp-text-3 hover:text-fdp-text-1 transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
 
-          <p className="text-gray-600 text-center py-8">No leagues to manage.</p>
+          <p className="text-fdp-text-3 text-center py-8">No leagues to manage.</p>
 
           <button
             onClick={onClose}
-            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-all"
+            className="w-full bg-fdp-surface-2 hover:bg-fdp-border-1 text-fdp-text-1 font-semibold py-2 px-4 rounded-lg transition-all"
           >
             Close
           </button>
@@ -96,12 +96,12 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
+      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-800">Manage Your Leagues</h3>
+          <h3 className="text-xl font-bold text-fdp-text-1">Manage Your Leagues</h3>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 transition-colors"
+            className="text-fdp-text-3 hover:text-fdp-text-1 transition-colors"
           >
             <X className="w-6 h-6" />
           </button>
@@ -111,7 +111,7 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
           {leagues.map((league) => (
             <div
               key={league.id}
-              className="border border-gray-200 rounded-lg p-4 hover:border-[#3CBEDC] transition-colors"
+              className="border border-fdp-border-1 rounded-lg p-4 hover:border-fdp-accent-1 transition-colors"
             >
               {editingId === league.id ? (
                 <div className="space-y-3">
@@ -119,14 +119,14 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
                     type="text"
                     value={editForm.league_name}
                     onChange={(e) => setEditForm({ ...editForm, league_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3CBEDC] focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
                     placeholder="League Name"
                   />
                   <input
                     type="text"
                     value={editForm.team_name}
                     onChange={(e) => setEditForm({ ...editForm, team_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3CBEDC] focus:border-transparent outline-none"
+                    className="w-full px-3 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
                     placeholder="Team Name"
                   />
                   <div className="flex items-center gap-2">
@@ -135,22 +135,22 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
                       id={`edit-superflex-${league.id}`}
                       checked={editForm.is_superflex}
                       onChange={(e) => setEditForm({ ...editForm, is_superflex: e.target.checked })}
-                      className="w-4 h-4 text-[#3CBEDC] border-gray-300 rounded focus:ring-[#3CBEDC]"
+                      className="w-4 h-4 text-fdp-accent-1 border-fdp-border-1 rounded focus:ring-fdp-accent-1"
                     />
-                    <label htmlFor={`edit-superflex-${league.id}`} className="text-sm font-medium text-gray-700">
+                    <label htmlFor={`edit-superflex-${league.id}`} className="text-sm font-medium text-fdp-text-2">
                       Superflex League
                     </label>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleUpdate(league.id)}
-                      className="flex-1 bg-gradient-to-r from-[#3CBEDC] to-[#0694B5] text-white font-semibold py-2 px-4 rounded-lg hover:shadow-lg transition-all"
+                      className="flex-1 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-semibold py-2 px-4 rounded-lg hover:shadow-lg transition-all"
                     >
                       Save
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-all"
+                      className="flex-1 bg-fdp-surface-2 hover:bg-fdp-border-1 text-fdp-text-1 font-semibold py-2 px-4 rounded-lg transition-all"
                     >
                       Cancel
                     </button>
@@ -160,18 +160,18 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
                 <div>
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h4 className="font-bold text-gray-800">{league.league_name}</h4>
-                      <p className="text-sm text-gray-600">League ID: {league.league_id}</p>
+                      <h4 className="font-bold text-fdp-text-1">{league.league_name}</h4>
+                      <p className="text-sm text-fdp-text-3">League ID: {league.league_id}</p>
                       {league.team_name && (
-                        <p className="text-sm text-gray-600">Team: {league.team_name}</p>
+                        <p className="text-sm text-fdp-text-3">Team: {league.team_name}</p>
                       )}
                       <div className="flex gap-2 mt-1">
                         {league.is_superflex && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-semibold">
-                            ⚡ Superflex
+                          <span className="px-2 py-1 bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2 rounded-full text-xs font-semibold">
+                            Superflex
                           </span>
                         )}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-fdp-text-3">
                           Added: {new Date(league.created_at).toLocaleDateString()}
                         </span>
                       </div>
@@ -179,14 +179,14 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleEdit(league)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-2 text-fdp-accent-1 hover:bg-fdp-surface-2 rounded-lg transition-colors"
                         title="Edit"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(league.id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-fdp-neg hover:bg-fdp-surface-2 rounded-lg transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -201,7 +201,7 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
 
         <button
           onClick={onClose}
-          className="w-full mt-6 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition-all"
+          className="w-full mt-6 bg-fdp-surface-2 hover:bg-fdp-border-1 text-fdp-text-1 font-semibold py-2 px-4 rounded-lg transition-all"
         >
           Close
         </button>
