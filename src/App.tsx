@@ -4,7 +4,7 @@ import { AuthForm } from './components/AuthForm';
 import { Dashboard } from './components/Dashboard';
 import TradeAnalyzer from './components/TradeAnalyzer';
 import { ToastProvider } from './components/Toast';
-import { LogIn, TrendingUp } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -42,12 +42,21 @@ function AppContent() {
       <div className="bg-gradient-to-r from-fdp-surface-1 to-fdp-bg-1 border-b border-fdp-border-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-fdp-text-1 flex items-center gap-2">
-                <TrendingUp className="w-7 h-7 text-fdp-accent-1" />
-                Fantasy Draft Pros
-              </h1>
-              <p className="text-fdp-text-3 text-sm">Free Trade Analyzer</p>
+            <div className="flex items-center gap-3">
+              <img
+                src="/FDP2.png"
+                alt="Fantasy Draft Pros Logo"
+                className="h-12 w-auto object-contain drop-shadow-lg"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              <div>
+                <h1 className="text-2xl font-bold text-fdp-text-1">
+                  Fantasy Draft Pros
+                </h1>
+                <p className="text-fdp-text-3 text-sm">Free Trade Analyzer</p>
+              </div>
             </div>
             <button
               onClick={() => setShowAuth(true)}
