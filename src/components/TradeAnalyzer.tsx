@@ -478,34 +478,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           </div>
         )}
 
-        {!leagueId && (
-          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-semibold text-white mb-4">Team Names</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Team 1 Name</label>
-                <input
-                  type="text"
-                  value={teamAName}
-                  onChange={(e) => setTeamAName(e.target.value)}
-                  placeholder="Your Team"
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Team 2 Name</label>
-                <input
-                  type="text"
-                  value={teamBName}
-                  onChange={(e) => setTeamBName(e.target.value)}
-                  placeholder="Their Team"
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
         <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
           <div className="flex items-center gap-2 mb-3">
             <Settings className="w-5 h-5 text-[#00d4ff]" />
