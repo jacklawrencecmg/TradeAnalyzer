@@ -24,8 +24,13 @@ export interface SavedTrade {
   id: string;
   user_id: string;
   league_id: string;
-  trade_data: any;
-  trade_result: any;
+  team_a_gives: string[];
+  team_a_gets: string[];
+  team_a_value: number;
+  team_b_value: number;
+  difference: number;
+  winner: string;
+  fairness: string;
   notes?: string;
   created_at: string;
 }

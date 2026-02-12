@@ -1,8 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
+import TradeAnalyzer from './TradeAnalyzer';
+import PowerRankings from './PowerRankings';
+import PlayoffSimulator from './PlayoffSimulator';
+import TradeHistory from './TradeHistory';
+
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history';
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
@@ -11,6 +17,7 @@ export function Dashboard() {
   const [showAddLeague, setShowAddLeague] = useState(false);
   const [showManageLeagues, setShowManageLeagues] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('trade');
 
   useEffect(() => {
     if (user) {
@@ -170,19 +177,72 @@ export function Dashboard() {
 
         {/* Main Content */}
         {currentLeague && (
-          <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-6">
-            <h2 className="text-2xl font-bold text-fdp-text-1 mb-6 flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-fdp-accent-1" />
-              Trade Analysis
-            </h2>
+          <div className="space-y-6">
+            {/* Tab Navigation */}
+            <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-2">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button
+                  onClick={() => setActiveTab('trade')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+                    activeTab === 'trade'
+                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
+                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
+                  }`}
+                >
+                  <TrendingUp className="w-5 h-5" />
+                  <span className="hidden sm:inline">Trade Analyzer</span>
+                  <span className="sm:hidden">Trade</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('rankings')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+                    activeTab === 'rankings'
+                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
+                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
+                  }`}
+                >
+                  <Trophy className="w-5 h-5" />
+                  <span className="hidden sm:inline">Power Rankings</span>
+                  <span className="sm:hidden">Rankings</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('playoffs')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+                    activeTab === 'playoffs'
+                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
+                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
+                  }`}
+                >
+                  <Activity className="w-5 h-5" />
+                  <span className="hidden sm:inline">Playoff Odds</span>
+                  <span className="sm:hidden">Playoffs</span>
+                </button>
+                <button
+                  onClick={() => setActiveTab('history')}
+                  className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-semibold transition-all ${
+                    activeTab === 'history'
+                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 shadow-lg'
+                      : 'bg-fdp-surface-2 text-fdp-text-2 hover:bg-fdp-border-1'
+                  }`}
+                >
+                  <History className="w-5 h-5" />
+                  <span className="hidden sm:inline">Trade History</span>
+                  <span className="sm:hidden">History</span>
+                </button>
+              </div>
+            </div>
 
-            <div className="text-center py-12">
-              <p className="text-fdp-text-2 text-lg mb-4">
-                Trade analysis features coming soon!
-              </p>
-              <p className="text-fdp-text-3">
-                Connect to Sleeper API to analyze trades for {currentLeague.league_name}
-              </p>
+            {/* Tab Content */}
+            <div>
+              {activeTab === 'trade' && (
+                <TradeAnalyzer
+                  leagueId={currentLeague.league_id}
+                  onTradeSaved={() => setActiveTab('history')}
+                />
+              )}
+              {activeTab === 'rankings' && <PowerRankings leagueId={currentLeague.league_id} />}
+              {activeTab === 'playoffs' && <PlayoffSimulator leagueId={currentLeague.league_id} />}
+              {activeTab === 'history' && <TradeHistory leagueId={currentLeague.league_id} />}
             </div>
           </div>
         )}
