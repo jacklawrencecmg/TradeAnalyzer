@@ -84,7 +84,7 @@ export interface DraftPick {
 }
 
 export interface TradeItem {
-  type: 'player' | 'pick';
+  type: 'player' | 'pick' | 'faab';
   id: string;
   name: string;
   position?: string;
@@ -239,6 +239,10 @@ export function getDraftPickValue(round: number, year: number): number {
   return Math.round(value);
 }
 
+export function getFAABValue(amount: number): number {
+  return amount * 10;
+}
+
 export function getPlayerValue(
   player: SleeperPlayer,
   isSuperflex: boolean = false
@@ -306,7 +310,9 @@ export async function analyzeTrade(
   teamAGives: string[],
   teamAGets: string[],
   teamAGivesPicks: DraftPick[] = [],
-  teamAGetsPicks: DraftPick[] = []
+  teamAGetsPicks: DraftPick[] = [],
+  teamAGivesFAAB: number = 0,
+  teamAGetsFAAB: number = 0
 ): Promise<TradeAnalysis> {
   await fetchPlayerValues();
 
@@ -344,6 +350,17 @@ export async function analyzeTrade(
     });
   }
 
+  if (teamAGivesFAAB > 0) {
+    const value = getFAABValue(teamAGivesFAAB);
+    teamAValue += value;
+    teamAItems.push({
+      type: 'faab',
+      id: 'faab-gives',
+      name: `$${teamAGivesFAAB} FAAB`,
+      value,
+    });
+  }
+
   const teamBItems: TradeItem[] = [];
   let teamBValue = 0;
 
@@ -369,6 +386,17 @@ export async function analyzeTrade(
       type: 'pick',
       id: pick.id,
       name: pick.displayName,
+      value,
+    });
+  }
+
+  if (teamAGetsFAAB > 0) {
+    const value = getFAABValue(teamAGetsFAAB);
+    teamBValue += value;
+    teamBItems.push({
+      type: 'faab',
+      id: 'faab-gets',
+      name: `$${teamAGetsFAAB} FAAB`,
       value,
     });
   }

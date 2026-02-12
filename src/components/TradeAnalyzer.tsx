@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
@@ -24,6 +24,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [teamAGets, setTeamAGets] = useState<string[]>([]);
   const [teamAGivesPicks, setTeamAGivesPicks] = useState<DraftPick[]>([]);
   const [teamAGetsPicks, setTeamAGetsPicks] = useState<DraftPick[]>([]);
+  const [teamAGivesFAAB, setTeamAGivesFAAB] = useState<number>(0);
+  const [teamAGetsFAAB, setTeamAGetsFAAB] = useState<number>(0);
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
@@ -181,16 +183,18 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     if (
       teamAGives.length === 0 &&
       teamAGivesPicks.length === 0 &&
+      teamAGivesFAAB === 0 &&
       teamAGets.length === 0 &&
-      teamAGetsPicks.length === 0
+      teamAGetsPicks.length === 0 &&
+      teamAGetsFAAB === 0
     ) {
-      alert('Please add players or picks to both sides of the trade');
+      alert('Please add players, picks, or FAAB to both sides of the trade');
       return;
     }
 
     if (
-      (teamAGives.length === 0 && teamAGivesPicks.length === 0) ||
-      (teamAGets.length === 0 && teamAGetsPicks.length === 0)
+      (teamAGives.length === 0 && teamAGivesPicks.length === 0 && teamAGivesFAAB === 0) ||
+      (teamAGets.length === 0 && teamAGetsPicks.length === 0 && teamAGetsFAAB === 0)
     ) {
       alert('Please add items to both sides of the trade');
       return;
@@ -203,7 +207,9 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         teamAGives,
         teamAGets,
         teamAGivesPicks,
-        teamAGetsPicks
+        teamAGetsPicks,
+        teamAGivesFAAB,
+        teamAGetsFAAB
       );
       setAnalysis(result);
 
@@ -230,6 +236,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           team_a_gets: teamAGets,
           team_a_gives_picks: teamAGivesPicks,
           team_a_gets_picks: teamAGetsPicks,
+          team_a_gives_faab: teamAGivesFAAB,
+          team_a_gets_faab: teamAGetsFAAB,
         },
         trade_result: {
           team_a_value: result.teamAValue,
@@ -255,6 +263,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     setTeamAGets([]);
     setTeamAGivesPicks([]);
     setTeamAGetsPicks([]);
+    setTeamAGivesFAAB(0);
+    setTeamAGetsFAAB(0);
     setAnalysis(null);
   }
 
@@ -277,7 +287,9 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           {(teamAGives.length > 0 ||
             teamAGets.length > 0 ||
             teamAGivesPicks.length > 0 ||
-            teamAGetsPicks.length > 0) && (
+            teamAGetsPicks.length > 0 ||
+            teamAGivesFAAB > 0 ||
+            teamAGetsFAAB > 0) && (
             <button
               onClick={clearTrade}
               className="text-sm text-gray-400 hover:text-white transition-colors"
@@ -388,6 +400,28 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   <Calendar className="w-4 h-4" />
                   Add Draft Pick
                 </button>
+                <div className="pt-2">
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">
+                    FAAB Money
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      value={teamAGivesFAAB || ''}
+                      onChange={(e) => setTeamAGivesFAAB(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
+                    />
+                  </div>
+                  {teamAGivesFAAB > 0 && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Value: {(teamAGivesFAAB * 10).toLocaleString()} points
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -492,6 +526,28 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                   <Calendar className="w-4 h-4" />
                   Add Draft Pick
                 </button>
+                <div className="pt-2">
+                  <label className="block text-sm font-semibold text-gray-300 mb-2">
+                    FAAB Money
+                  </label>
+                  <div className="relative">
+                    <DollarSign className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                    <input
+                      type="number"
+                      min="0"
+                      max="1000"
+                      value={teamAGetsFAAB || ''}
+                      onChange={(e) => setTeamAGetsFAAB(Number(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full pl-9 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
+                    />
+                  </div>
+                  {teamAGetsFAAB > 0 && (
+                    <div className="mt-2 text-sm text-gray-400">
+                      Value: {(teamAGetsFAAB * 10).toLocaleString()} points
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -502,8 +558,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             onClick={handleAnalyzeTrade}
             disabled={
               analyzing ||
-              (teamAGives.length === 0 && teamAGivesPicks.length === 0) ||
-              (teamAGets.length === 0 && teamAGetsPicks.length === 0)
+              (teamAGives.length === 0 && teamAGivesPicks.length === 0 && teamAGivesFAAB === 0) ||
+              (teamAGets.length === 0 && teamAGetsPicks.length === 0 && teamAGetsFAAB === 0)
             }
             className="w-full bg-gradient-to-r from-[#00d4ff] to-[#0099cc] text-white font-semibold py-3 px-6 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -528,6 +584,9 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     <div className="flex items-center gap-2">
                       {item.type === 'pick' && (
                         <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                      )}
+                      {item.type === 'faab' && (
+                        <DollarSign className="w-3 h-3 text-green-400" />
                       )}
                       <span className="text-gray-300">
                         {item.name}
@@ -557,6 +616,9 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                     <div className="flex items-center gap-2">
                       {item.type === 'pick' && (
                         <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                      )}
+                      {item.type === 'faab' && (
+                        <DollarSign className="w-3 h-3 text-green-400" />
                       )}
                       <span className="text-gray-300">
                         {item.name}
