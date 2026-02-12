@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
   type SleeperPlayer,
   type TradeAnalysis,
   type DraftPick,
+  type LeagueSettings,
 } from '../services/sleeperApi';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
@@ -29,6 +30,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [leagueSettings, setLeagueSettings] = useState<LeagueSettings>({
+    isSuperflex: false,
+    isTEPremium: false,
+  });
 
   useEffect(() => {
     loadPlayers();
@@ -231,7 +236,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         teamAGivesPicks,
         teamAGetsPicks,
         teamAGivesFAAB,
-        teamAGetsFAAB
+        teamAGetsFAAB,
+        !leagueId ? leagueSettings : undefined
       );
       setAnalysis(result);
 
@@ -320,6 +326,42 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             </button>
           )}
         </div>
+
+        {!leagueId && (
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Settings className="w-5 h-5 text-[#00d4ff]" />
+              <h3 className="text-lg font-semibold text-white">League Settings</h3>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={leagueSettings.isSuperflex}
+                  onChange={(e) =>
+                    setLeagueSettings({ ...leagueSettings, isSuperflex: e.target.checked })
+                  }
+                  className="w-4 h-4 text-[#00d4ff] bg-gray-700 border-gray-600 rounded focus:ring-[#00d4ff] focus:ring-2"
+                />
+                <span className="text-gray-300">Superflex League</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={leagueSettings.isTEPremium}
+                  onChange={(e) =>
+                    setLeagueSettings({ ...leagueSettings, isTEPremium: e.target.checked })
+                  }
+                  className="w-4 h-4 text-[#00d4ff] bg-gray-700 border-gray-600 rounded focus:ring-[#00d4ff] focus:ring-2"
+                />
+                <span className="text-gray-300">TE Premium</span>
+              </label>
+            </div>
+            <p className="text-sm text-gray-400 mt-3">
+              These settings adjust player values to match your league format. Superflex increases QB values, TE Premium increases TE values.
+            </p>
+          </div>
+        )}
 
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">

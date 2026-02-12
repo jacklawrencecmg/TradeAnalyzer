@@ -243,12 +243,27 @@ export function getFAABValue(amount: number): number {
   return amount * 5;
 }
 
+export interface LeagueSettings {
+  isSuperflex: boolean;
+  isTEPremium: boolean;
+}
+
 export function getPlayerValue(
   player: SleeperPlayer,
-  isSuperflex: boolean = false
+  settings: LeagueSettings = { isSuperflex: false, isTEPremium: false }
 ): number {
   if (ktcValues[player.player_id]) {
-    return ktcValues[player.player_id];
+    let value = ktcValues[player.player_id];
+
+    if (player.position === 'QB' && settings.isSuperflex) {
+      value *= 1.3;
+    }
+
+    if (player.position === 'TE' && settings.isTEPremium) {
+      value *= 1.4;
+    }
+
+    return Math.round(value);
   }
 
   if (!player.position || !POSITION_BASE_VALUES[player.position]) {
@@ -257,8 +272,12 @@ export function getPlayerValue(
 
   let baseValue = POSITION_BASE_VALUES[player.position];
 
-  if (player.position === 'QB' && isSuperflex) {
+  if (player.position === 'QB' && settings.isSuperflex) {
     baseValue *= 1.8;
+  }
+
+  if (player.position === 'TE' && settings.isTEPremium) {
+    baseValue *= 1.5;
   }
 
   if (player.years_exp !== undefined) {
@@ -312,16 +331,22 @@ export async function analyzeTrade(
   teamAGivesPicks: DraftPick[] = [],
   teamAGetsPicks: DraftPick[] = [],
   teamAGivesFAAB: number = 0,
-  teamAGetsFAAB: number = 0
+  teamAGetsFAAB: number = 0,
+  leagueSettings?: LeagueSettings
 ): Promise<TradeAnalysis> {
   await fetchPlayerValues();
 
   const players = await fetchAllPlayers();
 
-  let isSuperflex = false;
-  if (leagueId) {
+  let settings: LeagueSettings = leagueSettings || { isSuperflex: false, isTEPremium: false };
+
+  if (leagueId && !leagueSettings) {
     const league = await fetchLeagueDetails(leagueId);
-    isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
+    settings.isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
+
+    const tePremiumPoints = league.scoring_settings?.rec_te || 0;
+    const standardRecPoints = league.scoring_settings?.rec || 0;
+    settings.isTEPremium = tePremiumPoints > standardRecPoints;
   }
 
   const teamAItems: TradeItem[] = [];
@@ -330,7 +355,7 @@ export async function analyzeTrade(
   for (const playerId of teamAGives) {
     const player = players[playerId];
     if (player) {
-      const value = getPlayerValue(player, isSuperflex);
+      const value = getPlayerValue(player, settings);
       teamAValue += value;
       teamAItems.push({
         type: 'player',
@@ -370,7 +395,7 @@ export async function analyzeTrade(
   for (const playerId of teamAGets) {
     const player = players[playerId];
     if (player) {
-      const value = getPlayerValue(player, isSuperflex);
+      const value = getPlayerValue(player, settings);
       teamBValue += value;
       teamBItems.push({
         type: 'player',
@@ -456,7 +481,10 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
     fetchAllPlayers(),
   ]);
 
-  const isSuperflex = league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0;
+  const settings: LeagueSettings = {
+    isSuperflex: league.roster_positions.filter((pos) => pos === 'SUPER_FLEX').length > 0,
+    isTEPremium: (league.scoring_settings?.rec_te || 0) > (league.scoring_settings?.rec || 0),
+  };
 
   const rankings: TeamRanking[] = rosters.map((roster) => {
     const user = users.find((u) => u.user_id === roster.owner_id);
@@ -472,7 +500,7 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
           player_id: playerId,
           name: player.full_name || 'Unknown Player',
           position: player.position || 'N/A',
-          value: getPlayerValue(player, isSuperflex),
+          value: getPlayerValue(player, settings),
         };
       })
       .filter((p): p is NonNullable<typeof p> => p !== null)
