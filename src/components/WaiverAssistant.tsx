@@ -50,14 +50,23 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
           full_name: player.full_name || `${player.first_name} ${player.last_name}`,
           position: player.position,
           team: player.team || 'FA',
+          status: player.status,
+          injury_status: player.injury_status,
           value: 0,
           recommendation_score: 0,
           reasoning: ''
         }))
-        .filter(p => ['QB', 'RB', 'WR', 'TE'].includes(p.position));
+        .filter(p => {
+          if (!['QB', 'RB', 'WR', 'TE'].includes(p.position)) return false;
+          if (!p.team || p.team === 'FA') return false;
+          if (p.status === 'Inactive' || p.status === 'Retired') return false;
+          return true;
+        });
+
+      const playersToAnalyze = availablePlayers.slice(0, 200);
 
       const withValues = await Promise.all(
-        availablePlayers.slice(0, 100).map(async (player) => {
+        playersToAnalyze.map(async (player) => {
           const value = await getPlayerValue(player.player_id);
           const score = calculateRecommendationScore(player, userRoster, value);
           const reasoning = generateReasoning(player, userRoster, value);
@@ -66,9 +75,9 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
       );
 
       const topRecommendations = withValues
-        .filter(p => p.value > 100)
+        .filter(p => p.value > 50)
         .sort((a, b) => b.recommendation_score - a.recommendation_score)
-        .slice(0, 20);
+        .slice(0, 30);
 
       setRecommendations(topRecommendations);
     } catch (error) {
@@ -96,8 +105,10 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
   const generateReasoning = (player: any, roster: any, value: number) => {
     const reasons = [];
 
-    if (value > 2000) reasons.push('High dynasty value');
-    if (value > 5000) reasons.push('Elite player');
+    if (value > 5000) reasons.push('Elite fantasy asset');
+    else if (value > 3000) reasons.push('High-end starter');
+    else if (value > 1500) reasons.push('Strong bench/flex option');
+    else if (value > 500) reasons.push('Potential breakout candidate');
 
     const positionCounts = (roster.players || []).reduce((acc: any, pid: string) => {
       const pos = roster.players_positions?.[pid] || 'UNKNOWN';
@@ -109,7 +120,11 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
       reasons.push(`Fills position need at ${player.position}`);
     }
 
-    return reasons.join('. ') || 'Available player with value';
+    if (player.injury_status) {
+      reasons.push(`Currently: ${player.injury_status}`);
+    }
+
+    return reasons.join(' • ') || 'Available waiver wire player';
   };
 
   const saveRecommendation = async (player: Player) => {
@@ -144,7 +159,12 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
         </div>
 
         <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-6 mb-6">
-          <div className="flex gap-4 mb-4">
+          <div className="mb-4">
+            <p className="text-sm text-gray-400">
+              Showing available players from your league's waiver wire, ranked by value and positional need
+            </p>
+          </div>
+          <div className="flex gap-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               <input
@@ -180,6 +200,16 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
           <div className="text-center py-12">
             <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
             <p className="text-gray-400">Analyzing waiver wire...</p>
+          </div>
+        ) : filteredRecommendations.length === 0 ? (
+          <div className="text-center py-12 bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700">
+            <TrendingUp className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+            <h3 className="text-xl font-bold mb-2">No Players Found</h3>
+            <p className="text-gray-400">
+              {searchTerm || positionFilter !== 'ALL'
+                ? 'Try adjusting your filters to see more recommendations'
+                : 'All valuable players appear to be rostered in your league'}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
