@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw, Calendar, AlertCircle, Award, BarChart3, Star } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw, Calendar, AlertCircle, Award, BarChart3, Star, Settings } from 'lucide-react';
 import { playerValuesApi, PlayerValue, PlayerValueChange, DynastyDraftPick } from '../services/playerValuesApi';
 import { useAuth } from '../hooks/useAuth';
 import { ListSkeleton } from './LoadingSkeleton';
@@ -12,6 +12,8 @@ interface PlayerValuesProps {
 }
 
 type ViewMode = 'players' | 'picks' | 'movers' | 'rookies';
+type LeagueFormat = 'dynasty' | 'redraft';
+type ScoringFormat = 'ppr' | 'half-ppr';
 
 export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const { user } = useAuth();
@@ -35,16 +37,46 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [movers, setMovers] = useState<{risers: PlayerValue[], fallers: PlayerValue[]}>({risers: [], fallers: []});
   const [moversPeriod, setMoversPeriod] = useState<'7d' | '30d' | 'season'>('7d');
+  const [showSettings, setShowSettings] = useState(false);
+  const [leagueFormat, setLeagueFormat] = useState<LeagueFormat>('dynasty');
+  const [scoringFormat, setScoringFormat] = useState<ScoringFormat>('ppr');
+  const [searchMinChars, setSearchMinChars] = useState(2);
+  const [searchMaxResults, setSearchMaxResults] = useState(10);
+  const [searchDebounceMs, setSearchDebounceMs] = useState(300);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    loadPlayerValues(true); // Auto-sync on first load if empty
+    const savedSettings = localStorage.getItem('playerValuesSettings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setLeagueFormat(settings.leagueFormat || 'dynasty');
+        setScoringFormat(settings.scoringFormat || 'ppr');
+        setSearchMinChars(settings.searchMinChars || 2);
+        setSearchMaxResults(settings.searchMaxResults || 10);
+        setSearchDebounceMs(settings.searchDebounceMs || 300);
+      } catch (e) {
+        console.error('Error loading settings:', e);
+      }
+    }
+    loadPlayerValues(true);
     loadDraftPicks();
   }, []);
 
   useEffect(() => {
+    const settings = {
+      leagueFormat,
+      scoringFormat,
+      searchMinChars,
+      searchMaxResults,
+      searchDebounceMs,
+    };
+    localStorage.setItem('playerValuesSettings', JSON.stringify(settings));
+  }, [leagueFormat, scoringFormat, searchMinChars, searchMaxResults, searchDebounceMs]);
+
+  useEffect(() => {
     filterPlayers();
-  }, [players, searchTerm, positionFilter, trendFilter, tierFilter, injuryFilter, showOnlyDifferences]);
+  }, [players, searchTerm, positionFilter, trendFilter, tierFilter, injuryFilter, showOnlyDifferences, leagueFormat, scoringFormat]);
 
   useEffect(() => {
     if (viewMode === 'movers') {
@@ -126,19 +158,17 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const handleSearchChange = async (value: string) => {
     setSearchTerm(value);
 
-    // Clear existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    if (value.trim().length >= 2) {
+    if (value.trim().length >= searchMinChars) {
       setSearchLoading(true);
       setShowSuggestions(true);
 
-      // Debounce API call by 300ms
       searchTimeoutRef.current = setTimeout(async () => {
         try {
-          const results = await playerValuesApi.searchPlayers(value.trim(), 10);
+          const results = await playerValuesApi.searchPlayers(value.trim(), searchMaxResults);
           setSuggestions(results);
         } catch (error) {
           console.error('Error searching players:', error);
@@ -146,7 +176,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
         } finally {
           setSearchLoading(false);
         }
-      }, 300);
+      }, searchDebounceMs);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -157,6 +187,38 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const selectSuggestion = (player: PlayerValue) => {
     setSearchTerm(player.player_name);
     setShowSuggestions(false);
+  };
+
+  const getAdjustedValue = (player: PlayerValue): number => {
+    let value = player.fdp_value;
+
+    if (leagueFormat === 'redraft') {
+      if (player.years_experience !== null && player.years_experience !== undefined) {
+        if (player.position === 'RB' && player.years_experience >= 6) {
+          value *= 0.92;
+        } else if (player.position === 'RB' && player.years_experience <= 2) {
+          value *= 0.95;
+        }
+
+        if (player.position === 'QB' && player.years_experience <= 2) {
+          value *= 0.95;
+        }
+      }
+
+      if (player.metadata?.projected_points) {
+        value = value * 0.85 + (player.metadata.projected_points * 12);
+      }
+    }
+
+    if (scoringFormat === 'half-ppr') {
+      if (player.position === 'WR' || player.position === 'RB') {
+        value *= 0.93;
+      } else if (player.position === 'TE') {
+        value *= 0.95;
+      }
+    }
+
+    return Math.round(value);
   };
 
   const filterPlayers = () => {
@@ -266,10 +328,18 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
               Player Values
             </h2>
             <p className="text-fdp-text-3 text-sm mt-1">
-              Dynasty rankings powered by Fantasy Draft Pros
+              {leagueFormat === 'dynasty' ? 'Dynasty' : 'Redraft'} rankings • {scoringFormat === 'ppr' ? 'Full PPR' : 'Half PPR'} scoring
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className="flex items-center gap-2 px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg hover:bg-fdp-border-1 transition-colors"
+              title="League Settings"
+            >
+              <Settings className="w-4 h-4" />
+              Settings
+            </button>
             <button
               onClick={syncPlayerValues}
               disabled={syncing || !user}
@@ -284,6 +354,136 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
             </span>
           </div>
         </div>
+
+        {showSettings && (
+          <div className="mb-6 p-6 bg-fdp-surface-2 border border-fdp-border-1 rounded-lg space-y-6">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold text-fdp-text-1 flex items-center gap-2">
+                <Settings className="w-5 h-5" />
+                League & Search Settings
+              </h3>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-fdp-text-3 hover:text-fdp-text-1 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-fdp-text-2 uppercase tracking-wider">League Format</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 p-3 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg cursor-pointer hover:border-fdp-accent-1 transition-colors">
+                    <input
+                      type="radio"
+                      name="leagueFormat"
+                      value="dynasty"
+                      checked={leagueFormat === 'dynasty'}
+                      onChange={(e) => setLeagueFormat(e.target.value as LeagueFormat)}
+                      className="w-4 h-4 text-fdp-accent-2"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-fdp-text-1">Dynasty</div>
+                      <div className="text-xs text-fdp-text-3">Factors in player age and long-term value</div>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg cursor-pointer hover:border-fdp-accent-1 transition-colors">
+                    <input
+                      type="radio"
+                      name="leagueFormat"
+                      value="redraft"
+                      checked={leagueFormat === 'redraft'}
+                      onChange={(e) => setLeagueFormat(e.target.value as LeagueFormat)}
+                      className="w-4 h-4 text-fdp-accent-2"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-fdp-text-1">Redraft</div>
+                      <div className="text-xs text-fdp-text-3">Weights current season projections more heavily</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-fdp-text-2 uppercase tracking-wider">Scoring Format</h4>
+                <div className="space-y-3">
+                  <label className="flex items-center gap-3 p-3 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg cursor-pointer hover:border-fdp-accent-1 transition-colors">
+                    <input
+                      type="radio"
+                      name="scoringFormat"
+                      value="ppr"
+                      checked={scoringFormat === 'ppr'}
+                      onChange={(e) => setScoringFormat(e.target.value as ScoringFormat)}
+                      className="w-4 h-4 text-fdp-accent-2"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-fdp-text-1">Full PPR</div>
+                      <div className="text-xs text-fdp-text-3">1 point per reception</div>
+                    </div>
+                  </label>
+                  <label className="flex items-center gap-3 p-3 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg cursor-pointer hover:border-fdp-accent-1 transition-colors">
+                    <input
+                      type="radio"
+                      name="scoringFormat"
+                      value="half-ppr"
+                      checked={scoringFormat === 'half-ppr'}
+                      onChange={(e) => setScoringFormat(e.target.value as ScoringFormat)}
+                      className="w-4 h-4 text-fdp-accent-2"
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-fdp-text-1">Half PPR</div>
+                      <div className="text-xs text-fdp-text-3">0.5 points per reception</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-fdp-border-1 pt-6">
+              <h4 className="text-sm font-semibold text-fdp-text-2 uppercase tracking-wider mb-4">Search Settings</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm text-fdp-text-3 mb-2">Min Characters</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={searchMinChars}
+                    onChange={(e) => setSearchMinChars(parseInt(e.target.value) || 2)}
+                    className="w-full px-3 py-2 bg-fdp-surface-1 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 outline-none"
+                  />
+                  <p className="text-xs text-fdp-text-3 mt-1">Characters needed to start search</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-fdp-text-3 mb-2">Max Results</label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="50"
+                    value={searchMaxResults}
+                    onChange={(e) => setSearchMaxResults(parseInt(e.target.value) || 10)}
+                    className="w-full px-3 py-2 bg-fdp-surface-1 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 outline-none"
+                  />
+                  <p className="text-xs text-fdp-text-3 mt-1">Maximum search results to show</p>
+                </div>
+                <div>
+                  <label className="block text-sm text-fdp-text-3 mb-2">Debounce (ms)</label>
+                  <input
+                    type="number"
+                    min="100"
+                    max="1000"
+                    step="50"
+                    value={searchDebounceMs}
+                    onChange={(e) => setSearchDebounceMs(parseInt(e.target.value) || 300)}
+                    className="w-full px-3 py-2 bg-fdp-surface-1 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 outline-none"
+                  />
+                  <p className="text-xs text-fdp-text-3 mt-1">Search delay for performance</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mb-6 border-b border-fdp-border-1">
           <button
@@ -342,11 +542,11 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
             )}
             <input
               type="text"
-              placeholder="Search players by name..."
+              placeholder={`Search players (min ${searchMinChars} chars)...`}
               value={searchTerm}
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => {
-                if (searchTerm.trim().length >= 2 && suggestions.length > 0) {
+                if (searchTerm.trim().length >= searchMinChars && suggestions.length > 0) {
                   setShowSuggestions(true);
                 }
               }}
@@ -384,7 +584,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="text-fdp-accent-2 font-bold text-lg">
-                            {playerValuesApi.formatValue(player.fdp_value)}
+                            {playerValuesApi.formatValue(getAdjustedValue(player))}
                           </div>
                           <div className="text-fdp-text-3 text-xs">
                             Dynasty: {playerValuesApi.formatValue(player.ktc_value)}
@@ -542,7 +742,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(player.fdp_value)}</div>
+                          <div className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(getAdjustedValue(player))}</div>
                           {getValueChangeDisplay(player.player_id, moversPeriod)}
                         </div>
                       </div>
@@ -569,7 +769,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(player.fdp_value)}</div>
+                          <div className="text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(getAdjustedValue(player))}</div>
                           {getValueChangeDisplay(player.player_id, moversPeriod)}
                         </div>
                       </div>
@@ -670,7 +870,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                         </td>
                         <td className="px-4 py-3 text-center">{getValueChangeDisplay(player.player_id, '7d')}</td>
                         <td className="px-4 py-3 text-right text-fdp-text-1 font-medium">{playerValuesApi.formatValue(player.ktc_value)}</td>
-                        <td className="px-4 py-3 text-right text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(player.fdp_value)}</td>
+                        <td className="px-4 py-3 text-right text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(getAdjustedValue(player))}</td>
                       </tr>
                     ))
                   )}
@@ -712,9 +912,11 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
           About FDP Value Adjustments
         </h3>
         <p className="text-sm text-fdp-text-3 mb-3">
-          <span className="text-fdp-accent-2 font-medium">Data Source:</span> Player data from SportsData.io API combined with Fantasy Draft Pros dynasty rankings
+          <span className="text-fdp-accent-2 font-medium">Data Source:</span> Player data from SportsData.io API combined with Fantasy Draft Pros rankings
         </p>
         <ul className="text-sm text-fdp-text-3 space-y-1">
+          <li>• <span className="text-fdp-accent-2 font-medium">League Format:</span> {leagueFormat === 'dynasty' ? 'Dynasty mode factors in player age and long-term value' : 'Redraft mode weights current season projections more heavily'}</li>
+          <li>• <span className="text-fdp-accent-2 font-medium">Scoring Format:</span> {scoringFormat === 'ppr' ? 'Full PPR (1 point per reception)' : 'Half PPR (0.5 points per reception)'}</li>
           <li>• <span className="text-fdp-accent-2 font-medium">Playoff Schedule:</span> Adjusts for strength of schedule in weeks 15-17</li>
           <li>• <span className="text-fdp-accent-2 font-medium">Recent Performance:</span> Weights last 4 weeks more heavily</li>
           <li>• <span className="text-fdp-accent-2 font-medium">Team Situation:</span> Factors in coaching changes and offensive scheme</li>
