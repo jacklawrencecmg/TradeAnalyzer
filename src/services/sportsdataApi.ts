@@ -77,6 +77,27 @@ interface NewsItem {
   Source: string;
 }
 
+interface DailyFantasyPlayer {
+  PlayerID: number;
+  Date: string;
+  Name: string;
+  ShortName: string;
+  Team: string;
+  Opponent: string;
+  HomeOrAway: string;
+  Position: string;
+  Salary: number;
+  LastGameFantasyPoints: number;
+  ProjectedFantasyPoints: number;
+  OpponentRank: number;
+  OpponentPositionRank: number;
+  Status: string;
+  StatusCode: string;
+  FanDuelSalary: number;
+  DraftKingsSalary: number;
+  YahooSalary: number;
+}
+
 class SportsDataAPI {
   private cache: Map<string, { data: any; timestamp: number }> = new Map();
   private cacheTimeout = 5 * 60 * 1000; // 5 minutes
@@ -130,6 +151,11 @@ class SportsDataAPI {
 
   async getNews(): Promise<NewsItem[]> {
     return this.fetchWithCache<NewsItem[]>('/scores/json/News');
+  }
+
+  async getDailyFantasyPlayers(date?: string): Promise<DailyFantasyPlayer[]> {
+    const today = date || new Date().toISOString().split('T')[0];
+    return this.fetchWithCache<DailyFantasyPlayer[]>(`/stats/json/DailyFantasyPlayers/${today}`);
   }
 
   async getPlayerNews(playerName: string): Promise<NewsItem[]> {
@@ -218,4 +244,4 @@ class SportsDataAPI {
 }
 
 export const sportsDataAPI = new SportsDataAPI();
-export type { PlayerInfo, PlayerProjection, PlayerStats, InjuryInfo, NewsItem };
+export type { PlayerInfo, PlayerProjection, PlayerStats, InjuryInfo, NewsItem, DailyFantasyPlayer };

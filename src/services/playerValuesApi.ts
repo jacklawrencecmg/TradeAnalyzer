@@ -171,88 +171,81 @@ class PlayerValuesApi {
 
   async syncPlayerValuesFromSportsData(isSuperflex: boolean = false): Promise<number> {
     try {
-      const [sleeperPlayers, projections, injuries, playerInfo, recentStats] = await Promise.all([
+      const [sleeperPlayers, dfPlayers, injuries, playerInfo] = await Promise.all([
         this.fetchSleeperPlayers(),
-        sportsDataAPI.getPlayerProjections().catch(() => []),
+        sportsDataAPI.getDailyFantasyPlayers().catch(() => []),
         sportsDataAPI.getInjuries().catch(() => []),
         sportsDataAPI.getAllPlayers().catch(() => []),
-        sportsDataAPI.getPlayerStats().catch(() => []),
       ]);
 
-      if (projections.length === 0) {
-        throw new Error('No SportsData.io projections fetched');
+      if (dfPlayers.length === 0) {
+        throw new Error('No Daily Fantasy Players data fetched from SportsData.io');
       }
 
       const playerValues: any[] = [];
       const sleeperNameMap = new Map(sleeperPlayers.map(p => [p.full_name.toLowerCase(), p.player_id]));
 
-      projections.forEach((projection) => {
-        if (!projection.Position || !['QB', 'RB', 'WR', 'TE'].includes(projection.Position)) return;
+      dfPlayers.forEach((dfPlayer) => {
+        if (!dfPlayer.Position || !['QB', 'RB', 'WR', 'TE'].includes(dfPlayer.Position)) return;
 
-        const playerNameLower = projection.Name.toLowerCase();
+        const playerNameLower = dfPlayer.Name.toLowerCase();
         const sleeperId = sleeperNameMap.get(playerNameLower);
 
         if (!sleeperId) {
-          console.log(`No Sleeper ID found for: ${projection.Name}`);
           return;
         }
 
         const injury = injuries.find(i => i.Name?.toLowerCase() === playerNameLower);
-        const info = playerInfo.find(p => p.PlayerID === projection.PlayerID);
-        const stats = recentStats.find(s => s.PlayerID === projection.PlayerID);
+        const info = playerInfo.find(p => p.PlayerID === dfPlayer.PlayerID);
 
-        const baseValue = this.calculateProjectionBasedValue(
-          projection,
-          stats,
-          injury,
-          info,
-          isSuperflex
-        );
+        const lastGamePoints = dfPlayer.LastGameFantasyPoints || 0;
+        const projectedPoints = dfPlayer.ProjectedFantasyPoints || 0;
+        const avgDfsSalary = (dfPlayer.FanDuelSalary + dfPlayer.DraftKingsSalary) / 2000;
+
+        const baseValue = (projectedPoints * 12) + (avgDfsSalary * 50) + (lastGamePoints * 5);
 
         const factors: Partial<ValueAdjustmentFactors> = {
-          superflex_boost: isSuperflex && projection.Position === 'QB' ? 0.5 : 0,
-          recent_performance: stats ? this.calculateRecentPerformance(stats, projection) : 0,
-          playoff_schedule: 0,
-          injury_risk: this.calculateInjuryRisk(injury?.Status),
-          age_factor: info?.Experience ? this.calculateAgeFactor(info.Experience, projection.Position) : 0,
+          superflex_boost: isSuperflex && dfPlayer.Position === 'QB' ? 0.5 : 0,
+          recent_performance: lastGamePoints > 0 && projectedPoints > 0
+            ? (lastGamePoints - projectedPoints) / projectedPoints
+            : 0,
+          playoff_schedule: dfPlayer.OpponentPositionRank ? (15 - dfPlayer.OpponentPositionRank) * 0.01 : 0,
+          injury_risk: this.calculateInjuryRisk(injury?.Status || dfPlayer.Status),
+          age_factor: info?.Experience ? this.calculateAgeFactor(info.Experience, dfPlayer.Position) : 0,
           team_situation: 0,
         };
 
         const fdpValue = this.calculateFDPValue(baseValue, factors, isSuperflex);
 
         let trend: 'up' | 'down' | 'stable' = 'stable';
-        if (stats && projection.FantasyPointsPPR) {
-          const recentPPG = stats.Games > 0 ? stats.FantasyPointsPPR / stats.Games : 0;
-          const projectedPPG = projection.Games > 0 ? projection.FantasyPointsPPR / projection.Games : 0;
-          if (recentPPG > projectedPPG * 1.1) trend = 'up';
-          else if (recentPPG < projectedPPG * 0.9) trend = 'down';
+        if (lastGamePoints > 0 && projectedPoints > 0) {
+          if (lastGamePoints > projectedPoints * 1.15) trend = 'up';
+          else if (lastGamePoints < projectedPoints * 0.85) trend = 'down';
         }
 
         playerValues.push({
           player_id: sleeperId,
-          player_name: projection.Name,
-          position: projection.Position,
-          team: projection.Team || null,
+          player_name: dfPlayer.Name,
+          position: dfPlayer.Position,
+          team: dfPlayer.Team || null,
           ktc_value: Math.round(baseValue * 0.8),
           fdp_value: fdpValue,
           trend: trend,
           last_updated: new Date().toISOString(),
-          injury_status: injury?.Status?.toLowerCase() || null,
+          injury_status: (injury?.Status || dfPlayer.Status)?.toLowerCase() || null,
           years_experience: info?.Experience || null,
           metadata: {
             is_superflex: isSuperflex,
-            source: 'sportsdata_projections',
+            source: 'sportsdata_daily_fantasy',
             injury_body_part: injury?.InjuryBodyPart || null,
             injury_notes: injury?.InjuryNotes || null,
-            projected_points: projection.FantasyPointsPPR || null,
-            projected_games: projection.Games || null,
-            passing_yards: projection.PassingYards || null,
-            passing_tds: projection.PassingTouchdowns || null,
-            rushing_yards: projection.RushingYards || null,
-            rushing_tds: projection.RushingTouchdowns || null,
-            receptions: projection.Receptions || null,
-            receiving_yards: projection.ReceivingYards || null,
-            receiving_tds: projection.ReceivingTouchdowns || null,
+            projected_points: projectedPoints,
+            last_game_points: lastGamePoints,
+            fanduel_salary: dfPlayer.FanDuelSalary,
+            draftkings_salary: dfPlayer.DraftKingsSalary,
+            opponent: dfPlayer.Opponent,
+            opponent_rank: dfPlayer.OpponentRank,
+            opponent_position_rank: dfPlayer.OpponentPositionRank,
             experience: info?.Experience || null,
           },
         });
@@ -264,7 +257,7 @@ class PlayerValuesApi {
           .upsert(playerValues, { onConflict: 'player_id' });
 
         if (error) throw error;
-        console.log(`Synced ${playerValues.length} player values from SportsData.io projections`);
+        console.log(`Synced ${playerValues.length} player values from SportsData.io Daily Fantasy`);
       }
 
       return playerValues.length;
