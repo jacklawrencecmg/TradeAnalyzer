@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, AlertTriangle } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, AlertTriangle, Info } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from './Toast';
 import Tooltip from './Tooltip';
+import { playerValuesApi } from '../services/playerValuesApi';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -56,6 +57,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [assetTypeB, setAssetTypeB] = useState<'players' | 'picks' | 'faab'>('players');
   const [tradeDirectionA, setTradeDirectionA] = useState<'gives' | 'gets'>('gives');
   const [tradeDirectionB, setTradeDirectionB] = useState<'gives' | 'gets'>('gets');
+  const [enhancedPlayerData, setEnhancedPlayerData] = useState<Record<string, any>>({});
 
   useEffect(() => {
     loadPlayers();
@@ -214,14 +216,34 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     return results.slice(0, 12);
   }
 
+  async function fetchEnhancedPlayerData(playerId: string, playerName: string) {
+    if (enhancedPlayerData[playerId]) return;
+
+    try {
+      const details = await playerValuesApi.getPlayerDetailsFromSportsData(playerName);
+      if (details) {
+        setEnhancedPlayerData(prev => ({
+          ...prev,
+          [playerId]: details
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch enhanced player data:', error);
+    }
+  }
+
   function addPlayer(playerId: string, team: 'A' | 'B', type: 'gives' | 'gets') {
     if (team === 'A' && type === 'gives') {
       if (!teamAGives.includes(playerId)) {
         setTeamAGives([...teamAGives, playerId]);
+        const player = players[playerId];
+        if (player) fetchEnhancedPlayerData(playerId, player.full_name);
       }
     } else if (team === 'A' && type === 'gets') {
       if (!teamAGets.includes(playerId)) {
         setTeamAGets([...teamAGets, playerId]);
+        const player = players[playerId];
+        if (player) fetchEnhancedPlayerData(playerId, player.full_name);
       }
     }
     setSearchTermA('');
@@ -963,6 +985,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 {teamAGives.map((playerId) => {
                   const player = players[playerId];
                   const inactive = isPlayerInactive(player);
+                  const enhanced = enhancedPlayerData[playerId];
                   return (
                     <div
                       key={playerId}
@@ -982,9 +1005,41 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                         <div className="flex items-center gap-2">
                           <span className="text-white font-medium">{player.full_name}</span>
                           {getInjuryStatusBadge(player)}
+                          {enhanced && (
+                            <Tooltip content={
+                              <div className="space-y-2 text-xs">
+                                {enhanced.projection && (
+                                  <div>
+                                    <div className="font-semibold text-[#00d4ff]">Projected Points</div>
+                                    <div>{Math.round(enhanced.projection.FantasyPointsPPR || 0)} PPR pts</div>
+                                  </div>
+                                )}
+                                {enhanced.injury && (
+                                  <div>
+                                    <div className="font-semibold text-orange-400">Injury</div>
+                                    <div>{enhanced.injury.InjuryBodyPart}: {enhanced.injury.Status}</div>
+                                    {enhanced.injury.InjuryNotes && (
+                                      <div className="text-gray-400 mt-1">{enhanced.injury.InjuryNotes}</div>
+                                    )}
+                                  </div>
+                                )}
+                                {enhanced.news && enhanced.news.length > 0 && (
+                                  <div>
+                                    <div className="font-semibold text-green-400">Latest News</div>
+                                    <div className="text-gray-400">{enhanced.news[0].Title}</div>
+                                  </div>
+                                )}
+                              </div>
+                            }>
+                              <Info className="w-4 h-4 text-[#00d4ff] cursor-help" />
+                            </Tooltip>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-400">
-                          {player.position} - {player.team || 'FA'}
+                        <div className="text-sm text-gray-400 flex items-center gap-2">
+                          <span>{player.position} - {player.team || 'FA'}</span>
+                          {enhanced?.projection && (
+                            <span className="text-[#00d4ff]">• {Math.round(enhanced.projection.FantasyPointsPPR || 0)} pts</span>
+                          )}
                         </div>
                       </div>
                       <button
@@ -1105,6 +1160,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 {teamAGets.map((playerId) => {
                   const player = players[playerId];
                   const inactive = isPlayerInactive(player);
+                  const enhanced = enhancedPlayerData[playerId];
                   return (
                     <div
                       key={playerId}
@@ -1124,9 +1180,41 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                         <div className="flex items-center gap-2">
                           <span className="text-white font-medium">{player.full_name}</span>
                           {getInjuryStatusBadge(player)}
+                          {enhanced && (
+                            <Tooltip content={
+                              <div className="space-y-2 text-xs">
+                                {enhanced.projection && (
+                                  <div>
+                                    <div className="font-semibold text-[#00d4ff]">Projected Points</div>
+                                    <div>{Math.round(enhanced.projection.FantasyPointsPPR || 0)} PPR pts</div>
+                                  </div>
+                                )}
+                                {enhanced.injury && (
+                                  <div>
+                                    <div className="font-semibold text-orange-400">Injury</div>
+                                    <div>{enhanced.injury.InjuryBodyPart}: {enhanced.injury.Status}</div>
+                                    {enhanced.injury.InjuryNotes && (
+                                      <div className="text-gray-400 mt-1">{enhanced.injury.InjuryNotes}</div>
+                                    )}
+                                  </div>
+                                )}
+                                {enhanced.news && enhanced.news.length > 0 && (
+                                  <div>
+                                    <div className="font-semibold text-green-400">Latest News</div>
+                                    <div className="text-gray-400">{enhanced.news[0].Title}</div>
+                                  </div>
+                                )}
+                              </div>
+                            }>
+                              <Info className="w-4 h-4 text-[#00d4ff] cursor-help" />
+                            </Tooltip>
+                          )}
                         </div>
-                        <div className="text-sm text-gray-400">
-                          {player.position} - {player.team || 'FA'}
+                        <div className="text-sm text-gray-400 flex items-center gap-2">
+                          <span>{player.position} - {player.team || 'FA'}</span>
+                          {enhanced?.projection && (
+                            <span className="text-[#00d4ff]">• {Math.round(enhanced.projection.FantasyPointsPPR || 0)} pts</span>
+                          )}
                         </div>
                       </div>
                       <button

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { sportsDataAPI } from './sportsdataApi';
 
 export interface PlayerValue {
   id: string;
@@ -98,22 +99,52 @@ export interface SportsDataPlayer {
 }
 
 class PlayerValuesApi {
-  private readonly SPORTS_DATA_API_KEY = '15f968f1d055437186750d24b8ced580';
-  private readonly SPORTS_DATA_BASE = 'https://api.sportsdata.io/v3/nfl';
-
   async fetchSportsDataPlayers(): Promise<SportsDataPlayer[]> {
     try {
-      const response = await fetch(
-        `${this.SPORTS_DATA_BASE}/projections/json/FantasyPlayers?key=${this.SPORTS_DATA_API_KEY}`
-      );
-      if (!response.ok) {
-        throw new Error('Failed to fetch SportsData.io player data');
-      }
-      const data = await response.json();
-      return data || [];
+      const players = await sportsDataAPI.getAllPlayers();
+      const projections = await sportsDataAPI.getPlayerProjections();
+
+      return players.map(player => {
+        const projection = projections.find(p => p.PlayerID === player.PlayerID);
+        return {
+          PlayerID: player.PlayerID,
+          Name: player.Name,
+          Team: player.Team,
+          Position: player.Position,
+          FantasyPoints: projection?.FantasyPointsPPR || 0,
+          AverageDraftPosition: 0,
+          LastGameFantasyPoints: 0,
+          ProjectedFantasyPoints: projection?.FantasyPointsPPR || 0,
+        };
+      });
     } catch (error) {
       console.error('Error fetching SportsData.io values:', error);
       return [];
+    }
+  }
+
+  async getPlayerDetailsFromSportsData(playerName: string): Promise<any> {
+    try {
+      const [playerInfo, projection, news, injuries] = await Promise.all([
+        sportsDataAPI.getPlayerByName(playerName),
+        sportsDataAPI.getPlayerProjection(playerName),
+        sportsDataAPI.getPlayerNews(playerName),
+        sportsDataAPI.getInjuries(),
+      ]);
+
+      const injury = injuries.find(i =>
+        i.Name?.toLowerCase() === playerName.toLowerCase()
+      );
+
+      return {
+        info: playerInfo,
+        projection,
+        news: news.slice(0, 5),
+        injury,
+      };
+    } catch (error) {
+      console.error('Error fetching player details:', error);
+      return null;
     }
   }
 
@@ -202,7 +233,11 @@ class PlayerValuesApi {
 
   async syncPlayerValuesFromSportsData(isSuperflex: boolean = false): Promise<number> {
     try {
-      const ktcValueMap = await this.fetchKTCValues(isSuperflex);
+      const [ktcValueMap, injuries, projections] = await Promise.all([
+        this.fetchKTCValues(isSuperflex),
+        sportsDataAPI.getInjuries().catch(() => []),
+        sportsDataAPI.getPlayerProjections().catch(() => []),
+      ]);
 
       if (ktcValueMap.size === 0) {
         throw new Error('No KTC values fetched');
@@ -213,11 +248,19 @@ class PlayerValuesApi {
       ktcValueMap.forEach((ktcData, sleeperId) => {
         if (!ktcData.position || !['QB', 'RB', 'WR', 'TE', 'PICK'].includes(ktcData.position)) return;
 
+        const injury = injuries.find(i =>
+          i.Name?.toLowerCase() === ktcData.playerName?.toLowerCase()
+        );
+
+        const projection = projections.find(p =>
+          p.Name?.toLowerCase() === ktcData.playerName?.toLowerCase()
+        );
+
         const factors: Partial<ValueAdjustmentFactors> = {
           superflex_boost: isSuperflex && ktcData.position === 'QB' ? 0.05 : 0,
           recent_performance: 0,
           playoff_schedule: 0,
-          injury_risk: 0,
+          injury_risk: this.calculateInjuryRisk(injury?.Status),
           age_factor: 0,
           team_situation: 0,
         };
@@ -235,9 +278,14 @@ class PlayerValuesApi {
           fdp_value: fdpValue,
           trend: trend,
           last_updated: new Date().toISOString(),
+          injury_status: injury?.Status?.toLowerCase() || null,
           metadata: {
             is_superflex: isSuperflex,
-            source: 'ktc'
+            source: 'ktc_and_sportsdata',
+            injury_body_part: injury?.InjuryBodyPart || null,
+            injury_notes: injury?.InjuryNotes || null,
+            projected_points: projection?.FantasyPointsPPR || null,
+            projected_games: projection?.Games || null,
           },
         });
       });
@@ -248,7 +296,7 @@ class PlayerValuesApi {
           .upsert(playerValues, { onConflict: 'player_id' });
 
         if (error) throw error;
-        console.log(`Synced ${playerValues.length} player values from KTC`);
+        console.log(`Synced ${playerValues.length} player values from KTC and SportsData.io`);
       }
 
       return playerValues.length;
@@ -256,6 +304,15 @@ class PlayerValuesApi {
       console.error('Error syncing player values:', error);
       return 0;
     }
+  }
+
+  private calculateInjuryRisk(status?: string): number {
+    if (!status) return 0;
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes('out') || statusLower.includes('ir')) return -0.3;
+    if (statusLower.includes('doubtful')) return -0.15;
+    if (statusLower.includes('questionable')) return -0.05;
+    return 0;
   }
 
   calculateFDPValue(
@@ -283,6 +340,10 @@ class PlayerValuesApi {
 
     if (factors.team_situation) {
       adjustedValue *= (1 + factors.team_situation);
+    }
+
+    if (factors.injury_risk) {
+      adjustedValue *= (1 + factors.injury_risk);
     }
 
     return Math.round(adjustedValue);
