@@ -38,7 +38,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    loadPlayerValues();
+    loadPlayerValues(true); // Auto-sync on first load if empty
     loadDraftPicks();
   }, []);
 
@@ -62,11 +62,18 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     };
   }, []);
 
-  const loadPlayerValues = async () => {
+  const loadPlayerValues = async (autoSyncIfEmpty: boolean = false) => {
     setLoading(true);
     try {
       const data = await playerValuesApi.getPlayerValues(undefined, 500);
       setPlayers(data);
+
+      // Auto-sync if database is empty and user is authenticated
+      if (autoSyncIfEmpty && data.length === 0 && user) {
+        setLoading(false);
+        await syncPlayerValues();
+        return;
+      }
 
       const playerIds = data.map(p => p.player_id);
       const changes = await playerValuesApi.getPlayerValueChanges(playerIds);
@@ -267,10 +274,10 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
               onClick={syncPlayerValues}
               disabled={syncing || !user}
               className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-              title={!user ? 'Sign in to sync player values' : 'Sync player values from Keep Trade Cut'}
+              title={!user ? 'Sign in to sync player values' : 'Sync player values from SportsData.io'}
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync KTC Data'}
+              {syncing ? 'Syncing...' : 'Sync Values'}
             </button>
             <span title="FDP Values apply custom adjustments for playoff schedules, recent performance, team situations, and league settings to give you a competitive edge.">
               <Info className="w-5 h-5 text-fdp-text-3 cursor-help" />
