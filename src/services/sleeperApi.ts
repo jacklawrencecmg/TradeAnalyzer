@@ -212,12 +212,16 @@ let ktcValues: Record<string, number> = {};
 let ktcSuperflexValues: Record<string, number> = {};
 let dbPlayerValues: Map<string, PlayerValue> = new Map();
 
-export async function fetchPlayerValues(isSuperflex: boolean = false): Promise<void> {
+export async function fetchPlayerValues(
+  isSuperflex: boolean = false,
+  leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
+  scoringFormat: 'ppr' | 'half' | 'standard' = 'ppr'
+): Promise<void> {
   const currentYear = new Date().getFullYear();
   const targetYear = currentYear >= 2025 ? currentYear : 2025;
   const format = isSuperflex ? 2 : 1;
-  const cacheKey = `ktc_values_${targetYear}_${format}`;
-  const dbCacheKey = `db_player_values`;
+  const cacheKey = `ktc_values_${targetYear}_${format}_${leagueFormat}_${scoringFormat}`;
+  const dbCacheKey = `db_player_values_${leagueFormat}_${scoringFormat}`;
 
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
   const dbCached = getCachedData(dbCacheKey, PLAYER_CACHE_DURATION);
@@ -236,7 +240,7 @@ export async function fetchPlayerValues(isSuperflex: boolean = false): Promise<v
   }
 
   try {
-    const dbValues = await playerValuesApi.getPlayerValues(undefined, 5000);
+    const dbValues = await playerValuesApi.getPlayerValues(undefined, 5000, leagueFormat, scoringFormat);
     if (dbValues && dbValues.length > 0) {
       dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
       setCachedData(dbCacheKey, dbPlayerValues);
@@ -591,7 +595,9 @@ export async function analyzeTrade(
   teamAGetsPicks: DraftPick[] = [],
   teamAGivesFAAB: number = 0,
   teamAGetsFAAB: number = 0,
-  leagueSettings?: Partial<LeagueSettings>
+  leagueSettings?: Partial<LeagueSettings>,
+  leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
+  scoringFormat: 'ppr' | 'half' | 'standard' = 'ppr'
 ): Promise<TradeAnalysis> {
   let settings: LeagueSettings | Partial<LeagueSettings>;
 
@@ -614,7 +620,7 @@ export async function analyzeTrade(
     };
   }
 
-  await fetchPlayerValues(settings.isSuperflex);
+  await fetchPlayerValues(settings.isSuperflex, leagueFormat, scoringFormat);
 
   const players = await fetchAllPlayers();
 

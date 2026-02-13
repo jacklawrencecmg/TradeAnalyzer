@@ -56,6 +56,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [tradeDirectionA, setTradeDirectionA] = useState<'gives' | 'gets'>('gives');
   const [tradeDirectionB, setTradeDirectionB] = useState<'gives' | 'gets'>('gets');
   const [enhancedPlayerData, setEnhancedPlayerData] = useState<Record<string, any>>({});
+  const [leagueFormat, setLeagueFormat] = useState<'dynasty' | 'redraft'>('dynasty');
+  const [scoringFormat, setScoringFormat] = useState<'ppr' | 'half' | 'standard'>('ppr');
 
   useEffect(() => {
     loadPlayers();
@@ -350,7 +352,9 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
         teamAGetsPicks,
         teamAGivesFAAB,
         teamAGetsFAAB,
-        !leagueId ? leagueSettings : undefined
+        !leagueId ? leagueSettings : undefined,
+        leagueFormat,
+        scoringFormat
       );
       setAnalysis(result);
 
@@ -870,6 +874,71 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             <Settings className="w-5 h-5 text-[#00d4ff]" />
             <h3 className="text-lg font-semibold text-white">{leagueId ? 'Search Settings' : 'League & Search Settings'}</h3>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">League Format</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setLeagueFormat('dynasty')}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    leagueFormat === 'dynasty'
+                      ? 'bg-[#00d4ff] text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Dynasty
+                </button>
+                <button
+                  onClick={() => setLeagueFormat('redraft')}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    leagueFormat === 'redraft'
+                      ? 'bg-[#00d4ff] text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Redraft
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Scoring Format</label>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setScoringFormat('ppr')}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                    scoringFormat === 'ppr'
+                      ? 'bg-[#00d4ff] text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  PPR
+                </button>
+                <button
+                  onClick={() => setScoringFormat('half')}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                    scoringFormat === 'half'
+                      ? 'bg-[#00d4ff] text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Half PPR
+                </button>
+                <button
+                  onClick={() => setScoringFormat('standard')}
+                  className={`flex-1 px-3 py-2 rounded-lg font-medium transition-colors text-sm ${
+                    scoringFormat === 'standard'
+                      ? 'bg-[#00d4ff] text-white'
+                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}
+                >
+                  Standard
+                </button>
+              </div>
+            </div>
+          </div>
+
           {!leagueId && (
             <div className="flex flex-wrap gap-4 mb-3">
               <label className="flex items-center gap-2 cursor-pointer">
