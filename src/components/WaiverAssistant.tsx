@@ -201,7 +201,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
             <button
               onClick={forceRefreshValues}
               disabled={refreshing}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm font-semibold transition disabled:opacity-50"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold transition disabled:opacity-50"
               title="Clear cache and reload fresh player values"
             >
               {refreshing ? 'Refreshing...' : 'Force Refresh'}

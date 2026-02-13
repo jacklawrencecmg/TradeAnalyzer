@@ -112,7 +112,7 @@ export default function DraftKit({ leagueId, userId }: DraftKitProps) {
       'border-yellow-500 bg-yellow-500/10',
       'border-blue-500 bg-blue-500/10',
       'border-green-500 bg-green-500/10',
-      'border-purple-500 bg-purple-500/10',
+      'border-orange-500 bg-orange-500/10',
       'border-gray-500 bg-gray-500/10'
     ];
     return colors[Math.min(tier - 1, colors.length - 1)];
