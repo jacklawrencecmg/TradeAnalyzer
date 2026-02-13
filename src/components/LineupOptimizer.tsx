@@ -9,6 +9,8 @@ import {
   getLeagueSettings,
   type LeagueSettings
 } from '../services/sleeperApi';
+import { PlayerAvatar } from './PlayerAvatar';
+import { AchievementBadge } from './AchievementBadge';
 
 interface Player {
   player_id: string;
@@ -243,11 +245,12 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
 
   const renderLineupSlot = (slot: LineupSlot, index: number, isOptimal = false) => {
     const isDifferent = isOptimal && slot.player && lineup[index]?.player?.player_id !== slot.player.player_id;
+    const hasInjury = slot.player?.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(slot.player.injury_status);
 
     return (
       <div
         key={index}
-        className={`p-4 rounded-lg border transition ${
+        className={`p-4 rounded-lg border transition hover-lift card-enter ${
           isDifferent
             ? 'bg-fdp-accent-1/10 border-fdp-accent-1'
             : slot.player?.injury_status
@@ -255,14 +258,23 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
             : 'bg-fdp-surface-2 border-fdp-border-1'
         }`}
       >
-        <div className="flex justify-between items-start">
+        <div className="flex items-center gap-3">
+          {slot.player && (
+            <PlayerAvatar
+              playerName={slot.player.name}
+              team={slot.player.team}
+              position={slot.player.position}
+              size="md"
+              showTeamLogo={true}
+              showBadge={hasInjury}
+              badgeContent={hasInjury ? <AchievementBadge type="injury" size="sm" /> : undefined}
+            />
+          )}
           <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <p className="text-sm font-semibold text-fdp-text-3">{slot.position}</p>
               {isDifferent && (
-                <span className="text-xs px-2 py-0.5 bg-fdp-accent-1/20 text-fdp-accent-1 rounded-full">
-                  Better
-                </span>
+                <AchievementBadge type="trending" size="sm" label="Better" />
               )}
               {slot.player?.injury_status && (
                 <span className="text-xs px-2 py-0.5 bg-fdp-neg/20 text-fdp-neg rounded-full">
@@ -419,23 +431,37 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
                 {players
                   .filter(p => !optimalLineup.some(slot => slot.player?.player_id === p.player_id))
                   .sort((a, b) => b.value - a.value)
-                  .map(player => (
-                    <div key={player.player_id} className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-4 hover:border-fdp-accent-1 transition">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-fdp-text-1">{player.name}</p>
-                        {player.injury_status && (
-                          <span className="text-xs px-2 py-0.5 bg-fdp-neg/20 text-fdp-neg rounded-full">
-                            {player.injury_status}
-                          </span>
-                        )}
+                  .map(player => {
+                    const hasInjury = player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status);
+                    return (
+                      <div key={player.player_id} className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-4 hover:border-fdp-accent-1 transition hover-lift card-enter">
+                        <div className="flex items-center gap-3 mb-2">
+                          <PlayerAvatar
+                            playerName={player.name}
+                            team={player.team}
+                            position={player.position}
+                            size="sm"
+                            showTeamLogo={true}
+                            showBadge={hasInjury}
+                            badgeContent={hasInjury ? <AchievementBadge type="injury" size="sm" /> : undefined}
+                          />
+                          <div className="flex-1">
+                            <p className="font-semibold text-fdp-text-1">{player.name}</p>
+                            {player.injury_status && (
+                              <span className="text-xs px-2 py-0.5 bg-fdp-neg/20 text-fdp-neg rounded-full">
+                                {player.injury_status}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-sm text-fdp-text-3">{player.position} - {player.team}</p>
+                        <div className="flex gap-4 mt-2">
+                          <p className="text-sm text-fdp-accent-1">Value: {player.value.toLocaleString()}</p>
+                          <p className="text-sm text-fdp-text-3">Proj: {(player.projected_points || 0).toFixed(1)} pts</p>
+                        </div>
                       </div>
-                      <p className="text-sm text-fdp-text-3">{player.position} - {player.team}</p>
-                      <div className="flex gap-4 mt-2">
-                        <p className="text-sm text-fdp-accent-1">Value: {player.value.toLocaleString()}</p>
-                        <p className="text-sm text-fdp-text-3">Proj: {(player.projected_points || 0).toFixed(1)} pts</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
               </div>
             </div>
           </>

@@ -19,6 +19,9 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from './Toast';
 import Tooltip from './Tooltip';
 import { playerValuesApi } from '../services/playerValuesApi';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -656,13 +659,12 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                       : 'hover:bg-gray-800'
                                   }`}
                                 >
-                                  <img
-                                    src={getPlayerImageUrl(playerId)}
-                                    alt={player.full_name}
-                                    className="w-10 h-10 rounded-full object-cover bg-gray-700"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                    }}
+                                  <PlayerAvatar
+                                    playerName={player.full_name}
+                                    team={player.team}
+                                    position={player.position}
+                                    size="sm"
+                                    showTeamLogo={true}
                                   />
                                   <div className="flex-1">
                                     <div className="text-white text-sm font-medium">{player.full_name}</div>
@@ -1046,21 +1048,23 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 {teamAGives.map((playerId) => {
                   const player = players[playerId];
                   const enhanced = enhancedPlayerData[playerId];
+                  const hasInjury = player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status);
                   return (
                     <div
                       key={playerId}
-                      className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700"
+                      className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700 hover-lift card-enter"
                     >
-                      <img
-                        src={getPlayerImageUrl(playerId)}
-                        alt={player.full_name}
-                        className="w-12 h-12 rounded-full object-cover bg-gray-700"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
+                      <PlayerAvatar
+                        playerName={player.full_name}
+                        team={player.team}
+                        position={player.position}
+                        size="lg"
+                        showTeamLogo={true}
+                        showBadge={hasInjury}
+                        badgeContent={hasInjury ? <AchievementBadge type="injury" size="sm" /> : undefined}
                       />
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-white font-medium">{player.full_name}</span>
                           {getInjuryStatusBadge(player)}
                           {enhanced && (
@@ -1099,6 +1103,15 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                             <span className="text-[#00d4ff]">• {Math.round(enhanced.projection.FantasyPointsPPR || 0)} pts</span>
                           )}
                         </div>
+                        {enhanced?.recentGames && enhanced.recentGames.length > 0 && (
+                          <div className="mt-2">
+                            <StatSparkline
+                              data={enhanced.recentGames.map((g: any) => g.FantasyPointsPPR || 0).slice(-5)}
+                              color="cyan"
+                              height={24}
+                            />
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => removePlayer(playerId, 'A', 'gives')}
@@ -1223,21 +1236,23 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 {teamAGets.map((playerId) => {
                   const player = players[playerId];
                   const enhanced = enhancedPlayerData[playerId];
+                  const hasInjury = player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status);
                   return (
                     <div
                       key={playerId}
-                      className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700"
+                      className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700 hover-lift card-enter"
                     >
-                      <img
-                        src={getPlayerImageUrl(playerId)}
-                        alt={player.full_name}
-                        className="w-12 h-12 rounded-full object-cover bg-gray-700"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
+                      <PlayerAvatar
+                        playerName={player.full_name}
+                        team={player.team}
+                        position={player.position}
+                        size="lg"
+                        showTeamLogo={true}
+                        showBadge={hasInjury}
+                        badgeContent={hasInjury ? <AchievementBadge type="injury" size="sm" /> : undefined}
                       />
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-white font-medium">{player.full_name}</span>
                           {getInjuryStatusBadge(player)}
                           {enhanced && (
@@ -1276,6 +1291,15 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                             <span className="text-[#00d4ff]">• {Math.round(enhanced.projection.FantasyPointsPPR || 0)} pts</span>
                           )}
                         </div>
+                        {enhanced?.recentGames && enhanced.recentGames.length > 0 && (
+                          <div className="mt-2">
+                            <StatSparkline
+                              data={enhanced.recentGames.map((g: any) => g.FantasyPointsPPR || 0).slice(-5)}
+                              color="cyan"
+                              height={24}
+                            />
+                          </div>
+                        )}
                       </div>
                       <button
                         onClick={() => removePlayer(playerId, 'A', 'gets')}

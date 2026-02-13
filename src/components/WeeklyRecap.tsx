@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { FileText, Download, Share2 } from 'lucide-react';
 import { getLeagueRosters } from '../services/sleeperApi';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface WeeklyStats {
   highest_score: { team: string; score: number };
@@ -148,25 +151,25 @@ ${weeklyStats.biggest_blowout.winner} demolished ${weeklyStats.biggest_blowout.l
         {stats && (
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="bg-green-500/10 backdrop-blur-sm rounded-lg border border-green-500/30 p-6">
+              <div className="bg-green-500/10 backdrop-blur-sm rounded-lg border border-green-500/30 p-6 hover-lift card-enter">
                 <p className="text-gray-400 mb-2">Highest Score</p>
                 <p className="text-2xl font-bold text-green-400">{stats.highest_score.team}</p>
                 <p className="text-xl">{stats.highest_score.score.toFixed(1)} pts</p>
               </div>
 
-              <div className="bg-red-500/10 backdrop-blur-sm rounded-lg border border-red-500/30 p-6">
+              <div className="bg-red-500/10 backdrop-blur-sm rounded-lg border border-red-500/30 p-6 hover-lift card-enter">
                 <p className="text-gray-400 mb-2">Lowest Score</p>
                 <p className="text-2xl font-bold text-red-400">{stats.lowest_score.team}</p>
                 <p className="text-xl">{stats.lowest_score.score.toFixed(1)} pts</p>
               </div>
 
-              <div className="bg-blue-500/10 backdrop-blur-sm rounded-lg border border-blue-500/30 p-6">
+              <div className="bg-blue-500/10 backdrop-blur-sm rounded-lg border border-blue-500/30 p-6 hover-lift card-enter">
                 <p className="text-gray-400 mb-2">Closest Game</p>
                 <p className="text-lg font-bold">{stats.closest_game.team1} vs {stats.closest_game.team2}</p>
                 <p className="text-blue-400">Margin: {stats.closest_game.margin.toFixed(1)} pts</p>
               </div>
 
-              <div className="bg-yellow-500/10 backdrop-blur-sm rounded-lg border border-yellow-500/30 p-6">
+              <div className="bg-yellow-500/10 backdrop-blur-sm rounded-lg border border-yellow-500/30 p-6 hover-lift card-enter">
                 <p className="text-gray-400 mb-2">Biggest Blowout</p>
                 <p className="text-lg font-bold">{stats.biggest_blowout.winner}</p>
                 <p className="text-yellow-400">Won by {stats.biggest_blowout.margin.toFixed(1)} pts</p>

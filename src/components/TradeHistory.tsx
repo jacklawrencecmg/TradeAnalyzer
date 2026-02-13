@@ -6,6 +6,9 @@ import { fetchAllPlayers, getPlayerImageUrl, type SleeperPlayer } from '../servi
 import { useToast } from './Toast';
 import ConfirmDialog from './ConfirmDialog';
 import { TradeCardSkeleton } from './LoadingSkeleton';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface TradeHistoryProps {
   leagueId: string;
@@ -142,7 +145,7 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
           {trades.map((trade) => (
             <div
               key={trade.id}
-              className="bg-gray-800 rounded-lg border border-gray-700 p-5 hover:border-[#00d4ff] transition-all duration-300"
+              className="bg-gray-800 rounded-lg border border-gray-700 p-5 hover:border-[#00d4ff] transition-all duration-300 hover-lift card-enter"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -219,25 +222,21 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"
                         >
                           <div className="flex items-center gap-2">
-                            {item.type === 'player' && (
-                              <img
-                                src={getPlayerImageUrl(item.id)}
-                                alt={item.name}
-                                className="w-6 h-6 rounded-full object-cover bg-gray-700"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
+                            {item.type === 'player' ? (
+                              <PlayerAvatar
+                                playerId={item.id}
+                                playerName={item.name}
+                                team=""
+                                position={item.position || ''}
+                                size="sm"
+                                showTeamLogo={false}
                               />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                                <span>{item.name}</span>
+                              </div>
                             )}
-                            {item.type === 'pick' && (
-                              <Calendar className="w-3 h-3 text-[#00d4ff]" />
-                            )}
-                            <span>
-                              {item.name}
-                              {item.position && (
-                                <span className="text-gray-500 ml-1">({item.position})</span>
-                              )}
-                            </span>
                           </div>
                           <span className="text-gray-400">{item.value}</span>
                         </div>
@@ -255,25 +254,21 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"
                         >
                           <div className="flex items-center gap-2">
-                            {item.type === 'player' && (
-                              <img
-                                src={getPlayerImageUrl(item.id)}
-                                alt={item.name}
-                                className="w-6 h-6 rounded-full object-cover bg-gray-700"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                }}
+                            {item.type === 'player' ? (
+                              <PlayerAvatar
+                                playerId={item.id}
+                                playerName={item.name}
+                                team=""
+                                position={item.position || ''}
+                                size="sm"
+                                showTeamLogo={false}
                               />
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                                <span>{item.name}</span>
+                              </div>
                             )}
-                            {item.type === 'pick' && (
-                              <Calendar className="w-3 h-3 text-[#00d4ff]" />
-                            )}
-                            <span>
-                              {item.name}
-                              {item.position && (
-                                <span className="text-gray-500 ml-1">({item.position})</span>
-                              )}
-                            </span>
                           </div>
                           <span className="text-gray-400">{item.value}</span>
                         </div>
@@ -291,15 +286,14 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                           key={playerId}
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                         >
-                          <img
-                            src={getPlayerImageUrl(playerId)}
-                            alt={getPlayerName(playerId)}
-                            className="w-6 h-6 rounded-full object-cover bg-gray-700"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
+                          <PlayerAvatar
+                            playerId={playerId}
+                            playerName={getPlayerName(playerId)}
+                            team={players[playerId]?.team || ''}
+                            position={players[playerId]?.position || ''}
+                            size="sm"
+                            showTeamLogo={false}
                           />
-                          {getPlayerName(playerId)}
                         </div>
                       )) ||
                         trade.team_a_gives?.map((playerId: string) => (
@@ -307,15 +301,14 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                             key={playerId}
                             className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                           >
-                            <img
-                              src={getPlayerImageUrl(playerId)}
-                              alt={getPlayerName(playerId)}
-                              className="w-6 h-6 rounded-full object-cover bg-gray-700"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                              }}
+                            <PlayerAvatar
+                              playerId={playerId}
+                              playerName={getPlayerName(playerId)}
+                              team={players[playerId]?.team || ''}
+                              position={players[playerId]?.position || ''}
+                              size="sm"
+                              showTeamLogo={false}
                             />
-                            {getPlayerName(playerId)}
                           </div>
                         ))}
                       {trade.trade_data?.team_a_gives_picks?.map((pick) => (
@@ -337,15 +330,14 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                           key={playerId}
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                         >
-                          <img
-                            src={getPlayerImageUrl(playerId)}
-                            alt={getPlayerName(playerId)}
-                            className="w-6 h-6 rounded-full object-cover bg-gray-700"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                            }}
+                          <PlayerAvatar
+                            playerId={playerId}
+                            playerName={getPlayerName(playerId)}
+                            team={players[playerId]?.team || ''}
+                            position={players[playerId]?.position || ''}
+                            size="sm"
+                            showTeamLogo={false}
                           />
-                          {getPlayerName(playerId)}
                         </div>
                       )) ||
                         trade.team_a_gets?.map((playerId: string) => (
@@ -353,15 +345,14 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                             key={playerId}
                             className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center gap-2"
                           >
-                            <img
-                              src={getPlayerImageUrl(playerId)}
-                              alt={getPlayerName(playerId)}
-                              className="w-6 h-6 rounded-full object-cover bg-gray-700"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                              }}
+                            <PlayerAvatar
+                              playerId={playerId}
+                              playerName={getPlayerName(playerId)}
+                              team={players[playerId]?.team || ''}
+                              position={players[playerId]?.position || ''}
+                              size="sm"
+                              showTeamLogo={false}
                             />
-                            {getPlayerName(playerId)}
                           </div>
                         ))}
                       {trade.trade_data?.team_a_gets_picks?.map((pick) => (

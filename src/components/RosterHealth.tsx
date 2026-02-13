@@ -3,6 +3,9 @@ import { Activity, AlertTriangle, CheckCircle, Calendar, Info } from 'lucide-rea
 import { getLeagueRosters } from '../services/sleeperApi';
 import { sportsDataAPI } from '../services/sportsdataApi';
 import Tooltip from './Tooltip';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface PlayerHealth {
   player_id: string;
@@ -183,13 +186,27 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
             {players.map(player => (
               <div
                 key={player.player_id}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-4 hover:border-blue-500 transition"
+                className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-4 hover:border-blue-500 transition hover-lift card-enter"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-bold">{player.name}</h3>
-                      <span className="text-sm text-gray-400">{player.position} - {player.team}</span>
+                      <PlayerAvatar
+                        playerId={player.player_id}
+                        playerName={player.name}
+                        team={player.team}
+                        position={player.position}
+                        size="lg"
+                        showTeamLogo={true}
+                        showBadge={player.status !== 'Healthy'}
+                        badgeContent={player.status !== 'Healthy' ? (
+                          <AchievementBadge
+                            icon="injury"
+                            color="red"
+                            tooltip={`${player.status}${player.injury_body_part ? ` - ${player.injury_body_part}` : ''}`}
+                          />
+                        ) : undefined}
+                      />
                       {(player.injury_body_part || player.sportsdata_injury_notes) && (
                         <Tooltip content={
                           <div className="space-y-2 text-xs">

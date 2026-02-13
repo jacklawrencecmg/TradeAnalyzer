@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, Search, Star, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getPlayerValueById as getPlayerValue, getLeagueRosters, fetchPlayerValues } from '../services/sleeperApi';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface Player {
   player_id: string;
@@ -267,16 +270,28 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
             {filteredRecommendations.map((player, index) => (
               <div
                 key={player.player_id}
-                className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-6 hover:border-blue-500 transition"
+                className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-6 hover:border-blue-500 transition hover-lift card-enter"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-2xl font-bold text-gray-500">#{index + 1}</span>
-                      <div>
-                        <h3 className="text-xl font-bold">{player.full_name}</h3>
-                        <p className="text-gray-400">{player.position} - {player.team}</p>
-                      </div>
+                      <PlayerAvatar
+                        playerId={player.player_id}
+                        playerName={player.full_name}
+                        team={player.team}
+                        position={player.position}
+                        size="lg"
+                        showTeamLogo={true}
+                        showBadge={(player as WaiverPlayer).injury_status !== undefined}
+                        badgeContent={(player as WaiverPlayer).injury_status ? (
+                          <AchievementBadge
+                            icon="injury"
+                            color="red"
+                            tooltip={`Injury: ${(player as WaiverPlayer).injury_status}`}
+                          />
+                        ) : undefined}
+                      />
                     </div>
                     <div className="flex gap-6 mt-4">
                       <div>

@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Clipboard, Star, Search } from 'lucide-react';
 import { getPlayerValueById as getPlayerValue } from '../services/sleeperApi';
 import { supabase } from '../lib/supabase';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface DraftPlayer {
   player_id: string;
@@ -188,7 +191,7 @@ export default function DraftKit({ leagueId, userId }: DraftKitProps) {
             {filteredPlayers.map(player => (
               <div
                 key={player.player_id}
-                className={`backdrop-blur-sm rounded-lg border p-4 hover:border-blue-500 transition ${getTierColor(player.tier)}`}
+                className={`backdrop-blur-sm rounded-lg border p-4 hover:border-blue-500 transition hover-lift card-enter ${getTierColor(player.tier)}`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4 flex-1">
@@ -199,12 +202,18 @@ export default function DraftKit({ leagueId, userId }: DraftKitProps) {
                         <span className="text-lg font-bold">{player.tier}</span>
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-bold">{player.full_name}</h3>
-                      <p className="text-sm text-gray-400">
-                        {player.position} - {player.team}
-                        {player.age && ` - ${player.age}yo`}
-                      </p>
+                    <div className="flex items-center gap-3 flex-1">
+                      <PlayerAvatar
+                        playerId={player.player_id}
+                        playerName={player.full_name}
+                        team={player.team}
+                        position={player.position}
+                        size="lg"
+                        showTeamLogo={true}
+                      />
+                      {player.age && (
+                        <p className="text-sm text-gray-400">{player.age}yo</p>
+                      )}
                     </div>
                     <div className="text-right">
                       <p className="text-sm text-gray-400">Dynasty Value</p>

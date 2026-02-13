@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Search, ArrowLeftRight, TrendingUp, Users } from 'lucide-react';
 import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers, fetchAllPlayers, SleeperPlayer } from '../services/sleeperApi';
+import { PlayerAvatar } from './PlayerAvatar';
+import { StatSparkline } from './StatSparkline';
+import { AchievementBadge } from './AchievementBadge';
 
 interface TradeProposal {
   target_team: string;
@@ -339,7 +342,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
             {proposals.map((proposal, index) => (
               <div
                 key={index}
-                className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-6 hover:border-fdp-accent-1 transition"
+                className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-6 hover:border-fdp-accent-1 transition hover-lift card-enter"
               >
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -363,10 +366,18 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
                   <div className="bg-fdp-neg/10 border border-fdp-neg/30 rounded-lg p-4">
                     <p className="text-sm text-fdp-text-3 mb-3 font-semibold">You Give</p>
                     {proposal.give_players.map(player => (
-                      <div key={player.id} className="mb-2">
-                        <p className="font-semibold text-fdp-text-1">{player.name}</p>
-                        <p className="text-sm text-fdp-text-3">{player.position}</p>
-                        <p className="text-sm text-fdp-neg">Value: {player.value.toFixed(1)}</p>
+                      <div key={player.id} className="mb-3 flex items-center gap-3">
+                        <PlayerAvatar
+                          playerId={player.id}
+                          playerName={player.name}
+                          team=""
+                          position={player.position}
+                          size="md"
+                          showTeamLogo={true}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm text-fdp-neg font-semibold">Value: {player.value.toFixed(1)}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -374,10 +385,18 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
                   <div className="bg-fdp-pos/10 border border-fdp-pos/30 rounded-lg p-4">
                     <p className="text-sm text-fdp-text-3 mb-3 font-semibold">You Receive</p>
                     {proposal.receive_players.map(player => (
-                      <div key={player.id} className="mb-2">
-                        <p className="font-semibold text-fdp-text-1">{player.name}</p>
-                        <p className="text-sm text-fdp-text-3">{player.position}</p>
-                        <p className="text-sm text-fdp-pos">Value: {player.value.toFixed(1)}</p>
+                      <div key={player.id} className="mb-3 flex items-center gap-3">
+                        <PlayerAvatar
+                          playerId={player.id}
+                          playerName={player.name}
+                          team=""
+                          position={player.position}
+                          size="md"
+                          showTeamLogo={true}
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm text-fdp-pos font-semibold">Value: {player.value.toFixed(1)}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
