@@ -1,3 +1,5 @@
+import { playerValuesApi, type PlayerValue } from './playerValuesApi';
+
 const SLEEPER_API_BASE = 'https://api.sleeper.app/v1';
 
 const cache = new Map<string, { data: any; timestamp: number }>();
@@ -208,13 +210,17 @@ const POSITION_BASE_VALUES: Record<string, number> = {
 
 let ktcValues: Record<string, number> = {};
 let ktcSuperflexValues: Record<string, number> = {};
+let dbPlayerValues: Map<string, PlayerValue> = new Map();
 
 export async function fetchPlayerValues(isSuperflex: boolean = false): Promise<void> {
   const currentYear = new Date().getFullYear();
   const targetYear = currentYear >= 2025 ? currentYear : 2025;
   const format = isSuperflex ? 2 : 1;
   const cacheKey = `ktc_values_${targetYear}_${format}`;
+  const dbCacheKey = `db_player_values`;
+
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
+  const dbCached = getCachedData(dbCacheKey, PLAYER_CACHE_DURATION);
 
   if (cached) {
     if (isSuperflex) {
@@ -222,8 +228,25 @@ export async function fetchPlayerValues(isSuperflex: boolean = false): Promise<v
     } else {
       ktcValues = cached;
     }
-    return;
   }
+
+  if (dbCached) {
+    dbPlayerValues = dbCached;
+    if (cached) return;
+  }
+
+  try {
+    const dbValues = await playerValuesApi.getPlayerValues(undefined, 5000);
+    if (dbValues && dbValues.length > 0) {
+      dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
+      setCachedData(dbCacheKey, dbPlayerValues);
+      console.log(`Loaded ${dbValues.length} player values from database (SportsData.io enhanced)`);
+    }
+  } catch (error) {
+    console.warn('Failed to fetch player values from database:', error);
+  }
+
+  if (cached) return;
 
   try {
     const response = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?season=${targetYear}&format=${format}`, {
@@ -408,6 +431,21 @@ export function getPlayerValue(
   };
 
   const finalSettings = { ...defaultSettings, ...settings };
+
+  const dbValue = dbPlayerValues.get(player.player_id);
+  if (dbValue) {
+    let value = dbValue.fdp_value;
+
+    if (player.position === 'TE' && finalSettings.isTEPremium && !dbValue.metadata?.te_premium_applied) {
+      value *= 1.15;
+    }
+
+    if (player.status === 'Inactive' || player.status === 'Retired') {
+      value *= 0.15;
+    }
+
+    return Math.round(value);
+  }
 
   const ktcValueSource = finalSettings.isSuperflex ? ktcSuperflexValues : ktcValues;
 
