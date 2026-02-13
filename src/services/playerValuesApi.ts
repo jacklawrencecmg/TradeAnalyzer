@@ -233,59 +233,89 @@ class PlayerValuesApi {
 
   async syncPlayerValuesFromSportsData(isSuperflex: boolean = false): Promise<number> {
     try {
-      const [ktcValueMap, injuries, projections] = await Promise.all([
-        this.fetchKTCValues(isSuperflex),
-        sportsDataAPI.getInjuries().catch(() => []),
+      const [sleeperPlayers, projections, injuries, playerInfo, recentStats] = await Promise.all([
+        this.fetchSleeperPlayers(),
         sportsDataAPI.getPlayerProjections().catch(() => []),
+        sportsDataAPI.getInjuries().catch(() => []),
+        sportsDataAPI.getAllPlayers().catch(() => []),
+        sportsDataAPI.getPlayerStats().catch(() => []),
       ]);
 
-      if (ktcValueMap.size === 0) {
-        throw new Error('No KTC values fetched');
+      if (projections.length === 0) {
+        throw new Error('No SportsData.io projections fetched');
       }
 
       const playerValues: any[] = [];
+      const sleeperNameMap = new Map(sleeperPlayers.map(p => [p.full_name.toLowerCase(), p.player_id]));
 
-      ktcValueMap.forEach((ktcData, sleeperId) => {
-        if (!ktcData.position || !['QB', 'RB', 'WR', 'TE', 'PICK'].includes(ktcData.position)) return;
+      projections.forEach((projection) => {
+        if (!projection.Position || !['QB', 'RB', 'WR', 'TE'].includes(projection.Position)) return;
 
-        const injury = injuries.find(i =>
-          i.Name?.toLowerCase() === ktcData.playerName?.toLowerCase()
-        );
+        const playerNameLower = projection.Name.toLowerCase();
+        const sleeperId = sleeperNameMap.get(playerNameLower);
 
-        const projection = projections.find(p =>
-          p.Name?.toLowerCase() === ktcData.playerName?.toLowerCase()
+        if (!sleeperId) {
+          console.log(`No Sleeper ID found for: ${projection.Name}`);
+          return;
+        }
+
+        const injury = injuries.find(i => i.Name?.toLowerCase() === playerNameLower);
+        const info = playerInfo.find(p => p.PlayerID === projection.PlayerID);
+        const stats = recentStats.find(s => s.PlayerID === projection.PlayerID);
+
+        const baseValue = this.calculateProjectionBasedValue(
+          projection,
+          stats,
+          injury,
+          info,
+          isSuperflex
         );
 
         const factors: Partial<ValueAdjustmentFactors> = {
-          superflex_boost: isSuperflex && ktcData.position === 'QB' ? 0.05 : 0,
-          recent_performance: 0,
+          superflex_boost: isSuperflex && projection.Position === 'QB' ? 0.5 : 0,
+          recent_performance: stats ? this.calculateRecentPerformance(stats, projection) : 0,
           playoff_schedule: 0,
           injury_risk: this.calculateInjuryRisk(injury?.Status),
-          age_factor: 0,
+          age_factor: info?.Experience ? this.calculateAgeFactor(info.Experience, projection.Position) : 0,
           team_situation: 0,
         };
 
-        const fdpValue = this.calculateFDPValue(ktcData.value, factors, isSuperflex);
+        const fdpValue = this.calculateFDPValue(baseValue, factors, isSuperflex);
 
         let trend: 'up' | 'down' | 'stable' = 'stable';
+        if (stats && projection.FantasyPointsPPR) {
+          const recentPPG = stats.Games > 0 ? stats.FantasyPointsPPR / stats.Games : 0;
+          const projectedPPG = projection.Games > 0 ? projection.FantasyPointsPPR / projection.Games : 0;
+          if (recentPPG > projectedPPG * 1.1) trend = 'up';
+          else if (recentPPG < projectedPPG * 0.9) trend = 'down';
+        }
 
         playerValues.push({
           player_id: sleeperId,
-          player_name: ktcData.playerName,
-          position: ktcData.position,
-          team: ktcData.team || null,
-          ktc_value: ktcData.value,
+          player_name: projection.Name,
+          position: projection.Position,
+          team: projection.Team || null,
+          ktc_value: Math.round(baseValue * 0.8),
           fdp_value: fdpValue,
           trend: trend,
           last_updated: new Date().toISOString(),
           injury_status: injury?.Status?.toLowerCase() || null,
+          years_experience: info?.Experience || null,
           metadata: {
             is_superflex: isSuperflex,
-            source: 'ktc_and_sportsdata',
+            source: 'sportsdata_projections',
             injury_body_part: injury?.InjuryBodyPart || null,
             injury_notes: injury?.InjuryNotes || null,
-            projected_points: projection?.FantasyPointsPPR || null,
-            projected_games: projection?.Games || null,
+            projected_points: projection.FantasyPointsPPR || null,
+            projected_games: projection.Games || null,
+            passing_yards: projection.PassingYards || null,
+            passing_tds: projection.PassingTouchdowns || null,
+            rushing_yards: projection.RushingYards || null,
+            rushing_tds: projection.RushingTouchdowns || null,
+            receptions: projection.Receptions || null,
+            receiving_yards: projection.ReceivingYards || null,
+            receiving_tds: projection.ReceivingTouchdowns || null,
+            experience: info?.Experience || null,
           },
         });
       });
@@ -296,7 +326,7 @@ class PlayerValuesApi {
           .upsert(playerValues, { onConflict: 'player_id' });
 
         if (error) throw error;
-        console.log(`Synced ${playerValues.length} player values from KTC and SportsData.io`);
+        console.log(`Synced ${playerValues.length} player values from SportsData.io projections`);
       }
 
       return playerValues.length;
@@ -304,6 +334,91 @@ class PlayerValuesApi {
       console.error('Error syncing player values:', error);
       return 0;
     }
+  }
+
+  private async fetchSleeperPlayers(): Promise<any[]> {
+    try {
+      const response = await fetch('https://api.sleeper.app/v1/players/nfl');
+      if (!response.ok) throw new Error('Failed to fetch Sleeper players');
+      const data = await response.json();
+
+      return Object.entries(data).map(([id, player]: [string, any]) => ({
+        player_id: id,
+        full_name: player.full_name || `${player.first_name} ${player.last_name}`,
+        position: player.position,
+        team: player.team,
+      }));
+    } catch (error) {
+      console.error('Error fetching Sleeper players:', error);
+      return [];
+    }
+  }
+
+  private calculateProjectionBasedValue(
+    projection: any,
+    stats: any,
+    injury: any,
+    info: any,
+    isSuperflex: boolean
+  ): number {
+    const ppr = projection.FantasyPointsPPR || 0;
+    const games = projection.Games || 16;
+
+    const ppg = games > 0 ? ppr / games : 0;
+
+    const positionMultipliers: Record<string, number> = {
+      'QB': isSuperflex ? 85 : 50,
+      'RB': 75,
+      'WR': 65,
+      'TE': 55,
+    };
+
+    const multiplier = positionMultipliers[projection.Position] || 50;
+
+    let baseValue = ppg * multiplier;
+
+    if (ppg > 20) baseValue *= 1.3;
+    else if (ppg > 15) baseValue *= 1.2;
+    else if (ppg > 10) baseValue *= 1.1;
+    else if (ppg < 5) baseValue *= 0.7;
+
+    return Math.round(baseValue);
+  }
+
+  private calculateRecentPerformance(stats: any, projection: any): number {
+    if (!stats.Games || stats.Games === 0) return 0;
+
+    const recentPPG = stats.FantasyPointsPPR / stats.Games;
+    const projectedPPG = projection.Games > 0 ? projection.FantasyPointsPPR / projection.Games : 0;
+
+    if (projectedPPG === 0) return 0;
+
+    const performanceRatio = recentPPG / projectedPPG;
+
+    if (performanceRatio > 1.2) return 0.15;
+    if (performanceRatio > 1.1) return 0.10;
+    if (performanceRatio < 0.8) return -0.15;
+    if (performanceRatio < 0.9) return -0.10;
+
+    return 0;
+  }
+
+  private calculateAgeFactor(experience: number, position: string): number {
+    if (position === 'RB') {
+      if (experience <= 2) return 0.10;
+      if (experience <= 4) return 0.05;
+      if (experience >= 7) return -0.15;
+      if (experience >= 6) return -0.10;
+    } else if (position === 'WR' || position === 'TE') {
+      if (experience <= 2) return 0.05;
+      if (experience >= 10) return -0.10;
+      if (experience >= 8) return -0.05;
+    } else if (position === 'QB') {
+      if (experience <= 3) return 0.05;
+      if (experience >= 12) return -0.05;
+    }
+
+    return 0;
   }
 
   private calculateInjuryRisk(status?: string): number {
