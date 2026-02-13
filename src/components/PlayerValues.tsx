@@ -248,7 +248,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     }
 
     if (showOnlyDifferences) {
-      filtered = filtered.filter(p => Math.abs(p.fdp_value - p.ktc_value) > 1.0);
+      filtered = filtered.filter(p => Math.abs(p.fdp_value - p.base_value) > 1.0);
     }
 
     if (viewMode === 'rookies') {
@@ -587,7 +587,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                             {playerValuesApi.formatValue(getAdjustedValue(player))}
                           </div>
                           <div className="text-fdp-text-3 text-xs">
-                            Base: {playerValuesApi.formatValue(player.ktc_value)}
+                            Base: {playerValuesApi.formatValue(player.base_value)}
                           </div>
                         </div>
                         <div className="flex-shrink-0">
@@ -869,7 +869,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                           </div>
                         </td>
                         <td className="px-4 py-3 text-center">{getValueChangeDisplay(player.player_id, '7d')}</td>
-                        <td className="px-4 py-3 text-right text-fdp-text-1 font-medium">{playerValuesApi.formatValue(player.ktc_value)}</td>
+                        <td className="px-4 py-3 text-right text-fdp-text-1 font-medium">{playerValuesApi.formatValue(player.base_value)}</td>
                         <td className="px-4 py-3 text-right text-fdp-accent-2 font-bold">{playerValuesApi.formatValue(getAdjustedValue(player))}</td>
                       </tr>
                     ))

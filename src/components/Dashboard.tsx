@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
 import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
+import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
 import PowerRankings from './PowerRankings';
 import PlayoffSimulator from './PlayoffSimulator';
@@ -30,6 +31,7 @@ type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineu
 
 export function Dashboard() {
   const { user, signOut } = useAuth();
+  const { showToast } = useToast();
   const [leagues, setLeagues] = useState<UserLeague[]>([]);
   const [currentLeague, setCurrentLeague] = useState<UserLeague | null>(null);
   const [showAddLeague, setShowAddLeague] = useState(false);
@@ -62,6 +64,7 @@ export function Dashboard() {
       }
     } catch (error) {
       console.error('Error loading leagues:', error);
+      showToast('Failed to load your leagues. Please try refreshing the page.', 'error');
     } finally {
       setLoading(false);
     }
@@ -84,12 +87,13 @@ export function Dashboard() {
 
       await loadLeagues();
       setShowAddLeague(false);
+      showToast('League added successfully!', 'success');
     } catch (error: any) {
+      console.error('Error adding league:', error);
       if (error.message?.includes('duplicate')) {
-        alert('This league is already saved to your account.');
+        showToast('This league is already saved to your account.', 'error');
       } else {
-        console.error('Error adding league:', error);
-        alert('Failed to add league. Please try again.');
+        showToast('Failed to add league. Please try again.', 'error');
       }
     }
   };

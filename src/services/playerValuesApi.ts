@@ -7,7 +7,7 @@ export interface PlayerValue {
   player_name: string;
   position: string;
   team: string | null;
-  ktc_value: number;
+  base_value: number;
   fdp_value: number;
   trend: 'up' | 'down' | 'stable';
   last_updated: string;
@@ -140,9 +140,9 @@ class PlayerValuesApi {
   }
 
 
-  convertSportsDataToPlayerValue(player: SportsDataPlayer, ktcValue: number = 0): Partial<PlayerValue> {
-    const baseValue = player.FantasyPoints || player.ProjectedFantasyPoints || 0;
-    const normalizedValue = parseFloat((baseValue / 4).toFixed(1));
+  convertSportsDataToPlayerValue(player: SportsDataPlayer, baseValue: number = 0): Partial<PlayerValue> {
+    const fantasyValue = player.FantasyPoints || player.ProjectedFantasyPoints || 0;
+    const normalizedValue = parseFloat((fantasyValue / 4).toFixed(1));
 
     let trend: 'up' | 'down' | 'stable' = 'stable';
     if (player.LastGameFantasyPoints > player.FantasyPoints) {
@@ -156,7 +156,7 @@ class PlayerValuesApi {
       player_name: player.Name,
       position: player.Position,
       team: player.Team,
-      ktc_value: ktcValue || normalizedValue,
+      base_value: baseValue || normalizedValue,
       fdp_value: normalizedValue,
       trend,
       last_updated: new Date().toISOString(),
@@ -228,7 +228,7 @@ class PlayerValuesApi {
           player_name: dfPlayer.Name,
           position: dfPlayer.Position,
           team: dfPlayer.Team || null,
-          ktc_value: parseFloat((baseValue * 0.8).toFixed(1)),
+          base_value: parseFloat((baseValue * 0.8).toFixed(1)),
           fdp_value: fdpValue,
           trend: trend,
           last_updated: new Date().toISOString(),
@@ -362,11 +362,11 @@ class PlayerValuesApi {
   }
 
   calculateFDPValue(
-    ktcValue: number,
+    baseValue: number,
     factors: Partial<ValueAdjustmentFactors>,
     isSuperflex: boolean = false
   ): number {
-    let adjustedValue = ktcValue;
+    let adjustedValue = baseValue;
 
     if (factors.superflex_boost && isSuperflex) {
       adjustedValue *= (1 + factors.superflex_boost);
