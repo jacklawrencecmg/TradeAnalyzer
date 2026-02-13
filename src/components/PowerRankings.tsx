@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Trophy, TrendingUp, Users, X, ChevronLeft, ChevronRight, Calendar, DollarSign } from 'lucide-react';
+import { Trophy, TrendingUp, Users, X, ChevronLeft, ChevronRight, Calendar, DollarSign, RefreshCw } from 'lucide-react';
 import { calculatePowerRankings, type TeamRanking } from '../services/sleeperApi';
+import { playerValuesApi } from '../services/playerValuesApi';
 
 interface PowerRankingsProps {
   leagueId: string;
@@ -11,6 +12,7 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<TeamRanking | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadRankings();
@@ -27,6 +29,21 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
       setError('Failed to load power rankings. Please try again.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function syncPlayerValues() {
+    setSyncing(true);
+    setError(null);
+    try {
+      const count = await playerValuesApi.syncPlayerValuesFromSportsData(false);
+      console.log(`Synced ${count} player values from SportsData.io`);
+      await loadRankings();
+    } catch (err) {
+      console.error('Failed to sync player values:', err);
+      setError('Failed to sync player values from SportsData.io. Please try again.');
+    } finally {
+      setSyncing(false);
     }
   }
 
@@ -91,12 +108,24 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
             <TrendingUp className="w-7 h-7 text-[#00d4ff]" />
             Power Rankings
           </h2>
-          <button
-            onClick={loadRankings}
-            className="text-sm px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-700"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={syncPlayerValues}
+              disabled={syncing}
+              className="text-sm px-4 py-2 bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff] rounded-lg transition-colors border border-[#00d4ff]/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              title="Sync player values from SportsData.io"
+            >
+              <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync Values'}
+            </button>
+            <button
+              onClick={loadRankings}
+              disabled={loading}
+              className="text-sm px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4">
