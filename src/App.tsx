@@ -6,11 +6,16 @@ import TradeAnalyzer from './components/TradeAnalyzer';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Footer from './components/Footer';
+import { FAQ } from './components/FAQ';
+import { Help } from './components/Help';
 import { LogIn } from 'lucide-react';
+
+type Page = 'home' | 'faq' | 'help';
 
 function AppContent() {
   const { user, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
+  const [currentPage, setCurrentPage] = useState<Page>('home');
 
   if (loading) {
     return (
@@ -21,7 +26,21 @@ function AppContent() {
   }
 
   if (user) {
-    return <Dashboard />;
+    if (currentPage === 'faq') {
+      return <FAQ onClose={() => setCurrentPage('home')} />;
+    }
+    if (currentPage === 'help') {
+      return <Help onClose={() => setCurrentPage('home')} />;
+    }
+    return <Dashboard onNavigate={setCurrentPage} />;
+  }
+
+  if (currentPage === 'faq') {
+    return <FAQ onClose={() => setCurrentPage('home')} />;
+  }
+
+  if (currentPage === 'help') {
+    return <Help onClose={() => setCurrentPage('home')} />;
   }
 
   if (showAuth) {
@@ -83,7 +102,7 @@ function AppContent() {
         <TradeAnalyzer />
       </div>
 
-      <Footer />
+      <Footer onNavigate={setCurrentPage} />
     </div>
   );
 }

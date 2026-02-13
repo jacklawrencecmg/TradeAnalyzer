@@ -1,7 +1,11 @@
 import React from 'react';
 import { Facebook, Instagram } from 'lucide-react';
 
-export default function Footer() {
+interface FooterProps {
+  onNavigate?: (page: 'home' | 'faq' | 'help') => void;
+}
+
+export default function Footer({ onNavigate }: FooterProps) {
   const currentYear = new Date().getFullYear();
 
   return (
@@ -20,18 +24,18 @@ export default function Footer() {
               >
                 Contact Us
               </a>
-              <a
-                href="#"
+              <button
+                onClick={() => onNavigate?.('faq')}
                 className="text-fdp-text-2 hover:text-fdp-accent-1 transition-colors"
               >
                 FAQ
-              </a>
-              <a
-                href="#"
+              </button>
+              <button
+                onClick={() => onNavigate?.('help')}
                 className="text-fdp-text-2 hover:text-fdp-accent-1 transition-colors"
               >
                 Help
-              </a>
+              </button>
             </div>
 
             <div className="flex items-center gap-4">

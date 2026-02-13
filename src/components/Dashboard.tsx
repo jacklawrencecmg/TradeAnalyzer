@@ -29,7 +29,11 @@ import Footer from './Footer';
 
 type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values';
 
-export function Dashboard() {
+interface DashboardProps {
+  onNavigate?: (page: 'home' | 'faq' | 'help') => void;
+}
+
+export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const { user, signOut } = useAuth();
   const { showToast } = useToast();
   const [leagues, setLeagues] = useState<UserLeague[]>([]);
@@ -326,7 +330,7 @@ export function Dashboard() {
         )}
       </div>
 
-      <Footer />
+      <Footer onNavigate={onNavigate} />
     </div>
   );
 }
