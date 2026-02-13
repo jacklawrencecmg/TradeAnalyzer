@@ -161,7 +161,7 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                   <div className="text-right ml-4">
                     <div className="text-sm text-gray-400 mb-1">Total Value</div>
                     <div className="text-2xl font-bold text-[#00d4ff]">
-                      {team.total_value.toLocaleString()}
+                      {team.total_value.toFixed(1)}
                     </div>
                   </div>
                 </div>
@@ -183,8 +183,8 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                     <div className="text-xs text-gray-400 mb-1">Avg Player</div>
                     <div className="text-lg font-bold text-white">
                       {team.all_players.length > 0
-                        ? Math.round(team.total_value / team.all_players.length).toLocaleString()
-                        : '0'}
+                        ? (team.total_value / team.all_players.length).toFixed(1)
+                        : '0.0'}
                     </div>
                   </div>
                 </div>
@@ -216,7 +216,7 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                     </span>
                     <span className="text-gray-400">{selectedTeam.points_for.toFixed(1)} pts</span>
                     <span className="text-[#00d4ff] font-semibold">
-                      Value: {selectedTeam.total_value.toLocaleString()}
+                      Value: {selectedTeam.total_value.toFixed(1)}
                     </span>
                   </div>
                 </div>
@@ -286,7 +286,7 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                           <div className="text-xs text-gray-500 mb-2">{player.team}</div>
                         )}
                         <div className="text-xs font-medium text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded inline-block">
-                          {player.value.toLocaleString()}
+                          {player.value.toFixed(1)}
                         </div>
                       </div>
                     ))}

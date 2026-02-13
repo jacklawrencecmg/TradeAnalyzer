@@ -139,7 +139,7 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
                     <span className="text-3xl font-bold text-gray-500">#{index + 1}</span>
                     <div>
                       <h3 className="text-xl font-bold">{team.team_name}</h3>
-                      <p className="text-gray-400">Total Value: {team.total_value.toLocaleString()}</p>
+                      <p className="text-gray-400">Total Value: {team.total_value.toFixed(1)}</p>
                     </div>
                   </div>
                   {index === 0 && (

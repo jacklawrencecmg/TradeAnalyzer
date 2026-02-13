@@ -95,15 +95,15 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
     const needs: string[] = [];
     const surpluses: string[] = [];
 
-    if (positionCounts.QB < 2 || avgValues.QB < 3000) needs.push('QB');
-    if (positionCounts.RB < 4 || avgValues.RB < 2500) needs.push('RB');
-    if (positionCounts.WR < 4 || avgValues.WR < 2500) needs.push('WR');
-    if (positionCounts.TE < 2 || avgValues.TE < 1500) needs.push('TE');
+    if (positionCounts.QB < 2 || avgValues.QB < 30.0) needs.push('QB');
+    if (positionCounts.RB < 4 || avgValues.RB < 25.0) needs.push('RB');
+    if (positionCounts.WR < 4 || avgValues.WR < 25.0) needs.push('WR');
+    if (positionCounts.TE < 2 || avgValues.TE < 15.0) needs.push('TE');
 
-    if (positionCounts.QB > 3 && avgValues.QB > 3000) surpluses.push('QB');
-    if (positionCounts.RB > 5 && avgValues.RB > 2500) surpluses.push('RB');
-    if (positionCounts.WR > 6 && avgValues.WR > 2500) surpluses.push('WR');
-    if (positionCounts.TE > 3 && avgValues.TE > 1500) surpluses.push('TE');
+    if (positionCounts.QB > 3 && avgValues.QB > 30.0) surpluses.push('QB');
+    if (positionCounts.RB > 5 && avgValues.RB > 25.0) surpluses.push('RB');
+    if (positionCounts.WR > 6 && avgValues.WR > 25.0) surpluses.push('WR');
+    if (positionCounts.TE > 3 && avgValues.TE > 15.0) surpluses.push('TE');
 
     return { needs, surpluses, positionPlayers, positionCounts, avgValues };
   };
@@ -146,7 +146,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
         })
       );
 
-      const validUserPlayers = userPlayers.filter(p => p !== null && p.value > 500);
+      const validUserPlayers = userPlayers.filter(p => p !== null && p.value > 5.0);
       const userAnalysis = analyzeTeamNeeds(validUserPlayers, allPlayers);
 
       const tradeSuggestions: TradeProposal[] = [];
@@ -167,7 +167,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
           })
         );
 
-        const validTheirPlayers = theirPlayers.filter(p => p !== null && p.value > 500);
+        const validTheirPlayers = theirPlayers.filter(p => p !== null && p.value > 5.0);
         const theirAnalysis = analyzeTeamNeeds(validTheirPlayers, allPlayers);
 
         for (const need of userAnalysis.needs) {
@@ -179,7 +179,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
 
               for (const myPlayer of myPlayers) {
                 const valueDiff = Math.abs(theirPlayer.value - myPlayer.value);
-                if (valueDiff > 3000) continue;
+                if (valueDiff > 30.0) continue;
 
                 const fairness = 100 - (valueDiff / Math.max(theirPlayer.value, myPlayer.value)) * 100;
 
@@ -209,7 +209,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
             if (userAnalysis.surpluses.includes(myPlayer.position)) continue;
 
             const valueDiff = Math.abs(theirPlayer.value - myPlayer.value);
-            if (valueDiff > 2500) continue;
+            if (valueDiff > 25.0) continue;
 
             const fairness = 100 - (valueDiff / Math.max(theirPlayer.value, myPlayer.value)) * 100;
             let matchScore = fairness;
@@ -263,14 +263,14 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
       reasons.push(`Acquire from their ${receive.position} depth`);
     }
 
-    if (valueDiff < 500) {
+    if (valueDiff < 5.0) {
       reasons.push('Excellent value match');
-    } else if (valueDiff < 1500) {
+    } else if (valueDiff < 15.0) {
       reasons.push('Fair value trade');
     }
 
     if (receive.value > give.value) {
-      reasons.push(`Gain ${(receive.value - give.value).toLocaleString()} value`);
+      reasons.push(`Gain ${(receive.value - give.value).toFixed(1)} value`);
     } else if (give.value > receive.value) {
       reasons.push(`Upgrade at position despite slight value loss`);
     }
@@ -366,7 +366,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
                       <div key={player.id} className="mb-2">
                         <p className="font-semibold text-fdp-text-1">{player.name}</p>
                         <p className="text-sm text-fdp-text-3">{player.position}</p>
-                        <p className="text-sm text-fdp-neg">Value: {player.value.toLocaleString()}</p>
+                        <p className="text-sm text-fdp-neg">Value: {player.value.toFixed(1)}</p>
                       </div>
                     ))}
                   </div>
@@ -377,7 +377,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
                       <div key={player.id} className="mb-2">
                         <p className="font-semibold text-fdp-text-1">{player.name}</p>
                         <p className="text-sm text-fdp-text-3">{player.position}</p>
-                        <p className="text-sm text-fdp-pos">Value: {player.value.toLocaleString()}</p>
+                        <p className="text-sm text-fdp-pos">Value: {player.value.toFixed(1)}</p>
                       </div>
                     ))}
                   </div>
@@ -387,7 +387,7 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
                   <p className="text-sm text-fdp-text-2">{proposal.reasoning}</p>
                   {proposal.value_difference !== 0 && (
                     <p className={`text-sm mt-2 font-semibold ${proposal.value_difference > 0 ? 'text-fdp-pos' : 'text-fdp-neg'}`}>
-                      Net value: {proposal.value_difference > 0 ? '+' : ''}{proposal.value_difference.toLocaleString()}
+                      Net value: {proposal.value_difference > 0 ? '+' : ''}{proposal.value_difference.toFixed(1)}
                     </p>
                   )}
                 </div>

@@ -181,7 +181,7 @@ export default function ValueTrendTracker({ leagueId }: ValueTrendTrackerProps) 
                     <div className="grid grid-cols-3 gap-6">
                       <div>
                         <p className="text-sm text-gray-400 mb-1">Current Value</p>
-                        <p className="text-2xl font-bold">{trend.current_value.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">{trend.current_value.toFixed(1)}</p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-400 mb-1">7-Day Change</p>
@@ -189,7 +189,7 @@ export default function ValueTrendTracker({ leagueId }: ValueTrendTrackerProps) 
                           trend.change_7d > 0 ? 'text-green-400' :
                           trend.change_7d < 0 ? 'text-red-400' : 'text-gray-400'
                         }`}>
-                          {trend.change_7d > 0 ? '+' : ''}{trend.change_7d.toLocaleString()}
+                          {trend.change_7d > 0 ? '+' : ''}{trend.change_7d.toFixed(1)}
                         </p>
                       </div>
                       <div>
@@ -198,7 +198,7 @@ export default function ValueTrendTracker({ leagueId }: ValueTrendTrackerProps) 
                           trend.change_30d > 0 ? 'text-green-400' :
                           trend.change_30d < 0 ? 'text-red-400' : 'text-gray-400'
                         }`}>
-                          {trend.change_30d > 0 ? '+' : ''}{trend.change_30d.toLocaleString()}
+                          {trend.change_30d > 0 ? '+' : ''}{trend.change_30d.toFixed(1)}
                         </p>
                       </div>
                     </div>
@@ -211,7 +211,7 @@ export default function ValueTrendTracker({ leagueId }: ValueTrendTrackerProps) 
                             <p className="text-xs text-gray-500 mb-1">
                               {new Date(point.recorded_at).toLocaleDateString()}
                             </p>
-                            <p className="text-sm font-semibold">{point.value.toLocaleString()}</p>
+                            <p className="text-sm font-semibold">{point.value.toFixed(1)}</p>
                           </div>
                         ))}
                       </div>

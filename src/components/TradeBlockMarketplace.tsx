@@ -202,7 +202,7 @@ export default function TradeBlockMarketplace({ leagueId, userId }: TradeBlockMa
                             {player.team && <span>• {player.team}</span>}
                           </div>
                           <p className="text-sm text-fdp-pos mt-1">
-                            Value: {player.value.toLocaleString()}
+                            Value: {player.value.toFixed(1)}
                           </p>
                         </div>
                       </div>
@@ -221,7 +221,7 @@ export default function TradeBlockMarketplace({ leagueId, userId }: TradeBlockMa
                       <div className="flex justify-between items-start mb-3">
                         <div>
                           <h3 className="font-bold text-lg">{item.player_name}</h3>
-                          <p className="text-sm text-fdp-text-3">Asking: {item.asking_value.toLocaleString()}</p>
+                          <p className="text-sm text-fdp-text-3">Asking: {item.asking_value.toFixed(1)}</p>
                         </div>
                         <button
                           onClick={() => removeFromTradeBlock(item.id)}
@@ -251,7 +251,7 @@ export default function TradeBlockMarketplace({ leagueId, userId }: TradeBlockMa
                   {otherItems.map(item => (
                     <div key={item.id} className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-4 hover:border-fdp-accent-1 transition">
                       <h3 className="font-bold text-lg">{item.player_name}</h3>
-                      <p className="text-sm text-fdp-text-3">Asking: {item.asking_value.toLocaleString()}</p>
+                      <p className="text-sm text-fdp-text-3">Asking: {item.asking_value.toFixed(1)}</p>
                       {item.notes && (
                         <p className="text-sm text-fdp-text-2 mt-2">{item.notes}</p>
                       )}
