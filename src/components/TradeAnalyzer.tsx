@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, AlertTriangle, Info } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, Info } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
@@ -44,8 +44,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     isSuperflex: false,
     isTEPremium: false,
   });
-  const [showInactiveWarning, setShowInactiveWarning] = useState(false);
-  const [showInactivePlayers, setShowInactivePlayers] = useState(false);
   const [rosters, setRosters] = useState<SleeperRoster[]>([]);
   const [users, setUsers] = useState<SleeperUser[]>([]);
   const [tradedPicks, setTradedPicks] = useState<any[]>([]);
@@ -197,7 +195,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             player.full_name?.toLowerCase().includes(term) &&
             player.position &&
             ['QB', 'RB', 'WR', 'TE', 'K', 'DEF', 'DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position) &&
-            (showInactivePlayers || (player.status !== 'Retired' && player.status !== 'Inactive'))
+            player.status !== 'Retired' && player.status !== 'Inactive'
         )
         .sort((a, b) => {
           const aName = a.full_name?.toLowerCase() || '';
@@ -320,24 +318,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       </span>
     );
   }
-
-  function isPlayerInactive(player: SleeperPlayer): boolean {
-    const status = player.injury_status || (player as any).status;
-    return ['Inactive', 'Retired', 'IR', 'Out', 'PUP', 'COV'].includes(status || '');
-  }
-
-  function checkForInactivePlayers() {
-    const allPlayerIds = [...teamAGives, ...teamAGets];
-    const hasInactive = allPlayerIds.some(id => {
-      const player = players[id];
-      return player && isPlayerInactive(player);
-    });
-    setShowInactiveWarning(hasInactive);
-  }
-
-  useEffect(() => {
-    checkForInactivePlayers();
-  }, [teamAGives, teamAGets, players]);
 
   async function handleAnalyzeTrade() {
     if (
@@ -916,20 +896,13 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               </label>
             </div>
           )}
-          <div className={!leagueId ? 'border-t border-gray-700 pt-3' : ''}>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showInactivePlayers}
-                onChange={(e) => setShowInactivePlayers(e.target.checked)}
-                className="w-4 h-4 text-[#00d4ff] bg-gray-700 border-gray-600 rounded focus:ring-[#00d4ff] focus:ring-2"
-              />
-              <span className="text-gray-300">Show Retired/Inactive Players</span>
-            </label>
-            <p className="text-sm text-gray-400 mt-2">
-              {!leagueId && 'League settings adjust player values. '}By default, retired and inactive players are hidden from search results to prevent trading for players who aren't playing.
-            </p>
-          </div>
+          {!leagueId && (
+            <div className="border-t border-gray-700 pt-3">
+              <p className="text-sm text-gray-400">
+                League settings adjust player values. Retired and inactive players are automatically hidden.
+              </p>
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -1003,14 +976,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               <div className="mt-3 space-y-2">
                 {teamAGives.map((playerId) => {
                   const player = players[playerId];
-                  const inactive = isPlayerInactive(player);
                   const enhanced = enhancedPlayerData[playerId];
                   return (
                     <div
                       key={playerId}
-                      className={`flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border ${
-                        inactive ? 'border-red-500 bg-red-950 bg-opacity-20' : 'border-gray-700'
-                      }`}
+                      className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700"
                     >
                       <img
                         src={getPlayerImageUrl(playerId)}
@@ -1183,14 +1153,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               <div className="mt-3 space-y-2">
                 {teamAGets.map((playerId) => {
                   const player = players[playerId];
-                  const inactive = isPlayerInactive(player);
                   const enhanced = enhancedPlayerData[playerId];
                   return (
                     <div
                       key={playerId}
-                      className={`flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border ${
-                        inactive ? 'border-red-500 bg-red-950 bg-opacity-20' : 'border-gray-700'
-                      }`}
+                      className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700"
                     >
                       <img
                         src={getPlayerImageUrl(playerId)}
@@ -1293,20 +1260,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             </div>
           </div>
         </div>
-
-        {showInactiveWarning && (
-          <div className="mt-4 bg-yellow-900 bg-opacity-30 border border-yellow-500 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-yellow-400 font-semibold mb-1">Inactive Players Detected</h4>
-                <p className="text-sm text-gray-300">
-                  This trade includes players who are injured, on IR, or inactive. Their values have been adjusted, but verify their status before accepting the trade.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="mt-6">
           <button
