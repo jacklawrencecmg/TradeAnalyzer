@@ -46,7 +46,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #3CBEDC;
+  outline: 2px solid #00d4ff;
   outline-offset: 2px;
 }
 
@@ -95,16 +95,16 @@ input[type="radio"] {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1A2F4F;
+  background: #162032;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3CBEDC;
+  background: #00d4ff;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #0694B5;
+  background: #3de0ff;
 }
 
 /* Smooth scroll behavior */
