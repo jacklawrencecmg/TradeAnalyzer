@@ -234,13 +234,17 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
   function addPlayer(playerId: string, team: 'A' | 'B', type: 'gives' | 'gets') {
     if (team === 'A' && type === 'gives') {
-      if (!teamAGives.includes(playerId)) {
+      if (teamAGives.includes(playerId)) {
+        setTeamAGives(teamAGives.filter(id => id !== playerId));
+      } else {
         setTeamAGives([...teamAGives, playerId]);
         const player = players[playerId];
         if (player) fetchEnhancedPlayerData(playerId, player.full_name);
       }
     } else if (team === 'A' && type === 'gets') {
-      if (!teamAGets.includes(playerId)) {
+      if (teamAGets.includes(playerId)) {
+        setTeamAGets(teamAGets.filter(id => id !== playerId));
+      } else {
         setTeamAGets([...teamAGets, playerId]);
         const player = players[playerId];
         if (player) fetchEnhancedPlayerData(playerId, player.full_name);
@@ -489,12 +493,20 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
   function addRosterPlayer(playerId: string, direction: 'gives' | 'gets') {
     if (direction === 'gives') {
-      if (!teamAGives.includes(playerId)) {
+      if (teamAGives.includes(playerId)) {
+        setTeamAGives(teamAGives.filter(id => id !== playerId));
+      } else {
         setTeamAGives([...teamAGives, playerId]);
+        const player = players[playerId];
+        if (player) fetchEnhancedPlayerData(playerId, player.full_name);
       }
     } else {
-      if (!teamAGets.includes(playerId)) {
+      if (teamAGets.includes(playerId)) {
+        setTeamAGets(teamAGets.filter(id => id !== playerId));
+      } else {
         setTeamAGets([...teamAGets, playerId]);
+        const player = players[playerId];
+        if (player) fetchEnhancedPlayerData(playerId, player.full_name);
       }
     }
   }
@@ -646,7 +658,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                             {getRosterPlayers(selectedTeamA).map((playerId) => {
                               const player = players[playerId];
                               if (!player) return null;
-                              const alreadyAdded = tradeDirectionA === 'gives'
+                              const isSelected = tradeDirectionA === 'gives'
                                 ? teamAGives.includes(playerId)
                                 : teamAGets.includes(playerId);
 
@@ -654,9 +666,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                 <button
                                   key={playerId}
                                   onClick={() => addRosterPlayer(playerId, tradeDirectionA)}
-                                  disabled={alreadyAdded}
-                                  className={`w-full flex items-center gap-3 p-2 rounded hover:bg-gray-800 transition-colors text-left ${
-                                    alreadyAdded ? 'opacity-50 cursor-not-allowed' : ''
+                                  className={`w-full flex items-center gap-3 p-2 rounded transition-colors text-left ${
+                                    isSelected
+                                      ? 'bg-[#00d4ff]/20 border border-[#00d4ff] hover:bg-[#00d4ff]/30'
+                                      : 'hover:bg-gray-800'
                                   }`}
                                 >
                                   <img
@@ -784,7 +797,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                             {getRosterPlayers(selectedTeamB).map((playerId) => {
                               const player = players[playerId];
                               if (!player) return null;
-                              const alreadyAdded = tradeDirectionB === 'gives'
+                              const isSelected = tradeDirectionB === 'gives'
                                 ? teamAGives.includes(playerId)
                                 : teamAGets.includes(playerId);
 
@@ -792,9 +805,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                 <button
                                   key={playerId}
                                   onClick={() => addRosterPlayer(playerId, tradeDirectionB)}
-                                  disabled={alreadyAdded}
-                                  className={`w-full flex items-center gap-3 p-2 rounded hover:bg-gray-800 transition-colors text-left ${
-                                    alreadyAdded ? 'opacity-50 cursor-not-allowed' : ''
+                                  className={`w-full flex items-center gap-3 p-2 rounded transition-colors text-left ${
+                                    isSelected
+                                      ? 'bg-[#00d4ff]/20 border border-[#00d4ff] hover:bg-[#00d4ff]/30'
+                                      : 'hover:bg-gray-800'
                                   }`}
                                 >
                                   <img
@@ -936,12 +950,17 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               </div>
               {searchTermA.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
-                  {getFilteredResults(searchTermA).map((result, idx) => (
-                    result.type === 'player' && result.player ? (
+                  {getFilteredResults(searchTermA).map((result, idx) => {
+                    const isPlayerSelected = result.type === 'player' && result.player && teamAGives.includes(result.player.player_id);
+                    return result.type === 'player' && result.player ? (
                       <button
                         key={result.player.player_id}
                         onClick={() => addPlayer(result.player!.player_id, 'A', 'gives')}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center gap-3 group"
+                        className={`w-full px-4 py-2 text-left transition-colors flex items-center gap-3 group ${
+                          isPlayerSelected
+                            ? 'bg-[#00d4ff]/20 border-l-4 border-[#00d4ff] hover:bg-[#00d4ff]/30'
+                            : 'hover:bg-gray-700'
+                        }`}
                       >
                         <img
                           src={getPlayerImageUrl(result.player.player_id)}
@@ -978,7 +997,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                         <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
                       </button>
                     ) : null
-                  ))}
+                  })}
                 </div>
               )}
               <div className="mt-3 space-y-2">
@@ -1111,12 +1130,17 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               </div>
               {searchTermB.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
-                  {getFilteredResults(searchTermB).map((result, idx) => (
-                    result.type === 'player' && result.player ? (
+                  {getFilteredResults(searchTermB).map((result, idx) => {
+                    const isPlayerSelected = result.type === 'player' && result.player && teamAGets.includes(result.player.player_id);
+                    return result.type === 'player' && result.player ? (
                       <button
                         key={result.player.player_id}
                         onClick={() => addPlayer(result.player!.player_id, 'A', 'gets')}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center gap-3 group"
+                        className={`w-full px-4 py-2 text-left transition-colors flex items-center gap-3 group ${
+                          isPlayerSelected
+                            ? 'bg-[#00d4ff]/20 border-l-4 border-[#00d4ff] hover:bg-[#00d4ff]/30'
+                            : 'hover:bg-gray-700'
+                        }`}
                       >
                         <img
                           src={getPlayerImageUrl(result.player.player_id)}
@@ -1153,7 +1177,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                         <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
                       </button>
                     ) : null
-                  ))}
+                  })}
                 </div>
               )}
               <div className="mt-3 space-y-2">
