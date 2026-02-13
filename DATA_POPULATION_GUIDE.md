@@ -1,7 +1,7 @@
 # Player Values Data Population Guide
 
 ## Overview
-The KTC-style enhancements add many new player data fields. This guide explains how to populate them.
+The Fantasy Draft Pros-style enhancements add many new player data fields. This guide explains how to populate them.
 
 ## Required Data Population
 
@@ -186,7 +186,7 @@ SET volatility_score = (
 ### Complete Sync Function
 ```typescript
 async function fullDataSync() {
-  // 1. Sync KTC values (already implemented)
+  // 1. Sync Fantasy Draft Pros values (already implemented)
   await playerValuesApi.syncPlayerValuesFromSportsData(isSuperflex);
 
   // 2. Fetch Sleeper player data
@@ -246,7 +246,7 @@ async function fullDataSync() {
 
 If you want to get started quickly, focus on:
 
-1. **Player Values** - Already syncing from KTC ✅
+1. **Player Values** - Already syncing from Fantasy Draft Pros ✅
 2. **Value Snapshots** - Run daily
 3. **Value Changes** - Calculate after snapshots
 4. **Injury Status** - Sync from Sleeper API

@@ -1,5 +1,5 @@
 /*
-  # KTC-Style Player Values Enhancements
+  # Fantasy Draft Pros Player Values Enhancements
 
   1. New Tables
     - `player_value_history`

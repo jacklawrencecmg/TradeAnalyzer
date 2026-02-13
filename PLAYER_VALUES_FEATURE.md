@@ -1,12 +1,12 @@
-# Player Values Feature - KTC Integration with FDP Custom Adjustments
+# Player Values Feature - Fantasy Draft Pros Custom Adjustments
 
 ## Overview
 
-The Player Values feature integrates KeepTradeCut (KTC) player values with custom FDP (Fantasy Draft Pros) adjustments to provide you with a competitive edge in fantasy football trades and roster decisions.
+The Player Values feature provides Fantasy Draft Pros (FDP) player values with custom adjustments to provide you with a competitive edge in fantasy football trades and roster decisions.
 
 ## What Makes FDP Values Different?
 
-Unlike standard KTC values, FDP values apply intelligent adjustments based on:
+FDP values apply intelligent adjustments based on:
 
 ### 1. **Playoff Schedule Strength**
 - Analyzes strength of opponents in weeks 15-17
@@ -44,10 +44,10 @@ Unlike standard KTC values, FDP values apply intelligent adjustments based on:
 - **Search & Filter**: Find players by name, position, or team
 - **Position Filters**: View QB, RB, WR, TE, or all positions
 - **Trend Filters**: See rising, falling, or stable values
-- **Key Differences Toggle**: Show only players with significant KTC vs FDP differences
+- **Key Differences Toggle**: Show only players with significant Base vs FDP differences
 
 ### Side-by-Side Comparison
-- **KTC Value**: Industry-standard baseline value
+- **Base Value**: Industry-standard baseline value
 - **FDP Value**: Our adjusted value with custom factors
 - **Difference Indicator**: Clear visualization of value gaps
 - **Trend Arrows**: See which direction player value is moving
@@ -59,7 +59,7 @@ Unlike standard KTC values, FDP values apply intelligent adjustments based on:
 - Real-time filtering updates
 
 ### Value Insights
-The "Key Differences" filter highlights players where our FDP algorithm sees value differently than standard KTC rankings. These are potential trade targets or sell opportunities.
+The "Key Differences" filter highlights players where our FDP algorithm sees value differently than standard Base rankings. These are potential trade targets or sell opportunities.
 
 ## How to Use
 
@@ -74,8 +74,8 @@ The "Key Differences" filter highlights players where our FDP algorithm sees val
 
 3. **Identify Value Opportunities**
    - Click "Key Differences" to see players with significant adjustments
-   - Look for players where FDP value > KTC value (undervalued in standard rankings)
-   - Look for players where FDP value < KTC value (potentially overvalued)
+   - Look for players where FDP value > Base value (undervalued in standard rankings)
+   - Look for players where FDP value < Base value (potentially overvalued)
 
 4. **Make Informed Trades**
    - Use FDP values in the Trade Analyzer
@@ -87,7 +87,7 @@ The "Key Differences" filter highlights players where our FDP algorithm sees val
 ### Tables Created
 
 #### `player_values`
-Stores KTC and FDP values for all fantasy-relevant players
+Stores Base and FDP values for all fantasy-relevant players
 - Includes position, team, trend indicators
 - Updated regularly with latest values
 - Public read access for all users
@@ -110,7 +110,7 @@ Allows users to set personal overrides
 ## API Integration
 
 The system includes a complete API service (`playerValuesApi.ts`) with methods for:
-- Fetching KTC values from their API
+- Fetching Base values from their API
 - Calculating FDP adjustments
 - Searching players
 - Comparing values

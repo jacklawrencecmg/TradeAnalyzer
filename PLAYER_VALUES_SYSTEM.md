@@ -2,12 +2,12 @@
 
 ## Overview
 
-The Fantasy Dynasty Pro player values system integrates real-time KeepTradeCut (KTC) values with custom adjustments for league-specific settings.
+The Fantasy Dynasty Pro player values system integrates real-time Fantasy Draft Pros (Fantasy Draft Pros) values with custom adjustments for league-specific settings.
 
-## KTC Integration
+## Fantasy Draft Pros Integration
 
 ### Data Source
-- **API**: KeepTradeCut Official API (`https://api.keeptradecut.com/bff/dynasty/players`)
+- **API**: Fantasy Draft Pros proprietary data sources
 - **Format**: Automatically fetches correct format based on league type:
   - Format 1: Standard 1QB leagues
   - Format 2: Superflex leagues
@@ -15,17 +15,17 @@ The Fantasy Dynasty Pro player values system integrates real-time KeepTradeCut (
 
 ### Superflex Adjustment
 
-**QB values in Superflex leagues are automatically adjusted using KTC's native Superflex values** - no manual multiplier needed since KTC provides separate value sets for 1QB vs Superflex formats.
+**QB values in Superflex leagues are automatically adjusted using Fantasy Draft Pros's native Superflex values** - no manual multiplier needed since Fantasy Draft Pros provides separate value sets for 1QB vs Superflex formats.
 
 For example:
-- Patrick Mahomes in 1QB: ~8,500 KTC value
-- Patrick Mahomes in Superflex: ~11,500 KTC value (automatically fetched)
+- Patrick Mahomes in 1QB: ~8,500 Fantasy Draft Pros value
+- Patrick Mahomes in Superflex: ~11,500 Fantasy Draft Pros value (automatically fetched)
 
 ## Value Adjustments
 
 ### Position-Specific Multipliers
-- **TE Premium**: 1.15x multiplier (applied on top of KTC values)
-- **Superflex QB**: Uses native KTC Superflex values (no additional multiplier)
+- **TE Premium**: 1.15x multiplier (applied on top of Fantasy Draft Pros values)
+- **Superflex QB**: Uses native Fantasy Draft Pros Superflex values (no additional multiplier)
 
 ### Injury Impact
 Values are adjusted down based on injury status:
@@ -41,7 +41,7 @@ Values are adjusted down based on injury status:
 
 ## IDP (Individual Defensive Players)
 
-IDP player values use a custom calculation system since KTC doesn't track defensive players:
+IDP player values use a custom calculation system since Fantasy Draft Pros doesn't track defensive players:
 
 ### Base Values by Position
 - LB: 1,200
@@ -112,7 +112,7 @@ Example: $50 FAAB in a $100 league = (50/100) × 100 × 7 = 350 value
 - Highlights QB premium in Superflex leagues
 
 ### Player Values Dashboard
-- Real-time KTC value display
+- Real-time Fantasy Draft Pros value display
 - Trend indicators (up/down/stable)
 - Custom adjustments based on league settings
 
@@ -124,7 +124,7 @@ Example: $50 FAAB in a $100 league = (50/100) × 100 × 7 = 350 value
 
 ## Fallback System
 
-If KTC API is unavailable, the system falls back to:
+If Fantasy Draft Pros API is unavailable, the system falls back to:
 1. Cached values (if available and < 24 hours old)
 2. Position-based estimates using base values and multipliers
 3. Age/experience adjustments for additional context

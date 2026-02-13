@@ -8,7 +8,7 @@
       - `player_name` (text)
       - `position` (text)
       - `team` (text)
-      - `ktc_value` (integer) - Base KTC value
+      - `ktc_value` (integer) - Base value from Fantasy Draft Pros
       - `fdp_value` (integer) - Our custom adjusted value
       - `trend` (text) - 'up', 'down', or 'stable'
       - `last_updated` (timestamptz)

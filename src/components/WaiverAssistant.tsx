@@ -195,7 +195,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
                 Showing available players from your league's waiver wire, sorted by dynasty value
               </p>
               <p className="text-xs text-gray-500">
-                Values from KeepTradeCut API • Higher values indicate more valuable players
+                Values from Fantasy Draft Pros • Higher values indicate more valuable players
               </p>
             </div>
             <button

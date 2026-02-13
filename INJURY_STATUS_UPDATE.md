@@ -14,7 +14,7 @@ Removed automatic value penalties for injured players. Injury status is now disp
 - Injury status is still tracked and displayed prominently with color-coded badges
 - No automatic value adjustments are made based on injury status
 - Users can see injury information and make their own valuation decisions
-- Values remain consistent with Keep Trade Cut rankings
+- Values remain consistent with Fantasy Draft Pros rankings
 
 ## Why This Change?
 
@@ -39,7 +39,7 @@ Removed automatic value penalties for injured players. Injury status is now disp
 - Or avoiding players with concerning injury histories
 
 ### Values
-- FDP value = KTC base value + your league adjustments
+- FDP value = Base value + your league adjustments
 - League adjustments include:
   - ✅ Superflex boost for QBs
   - ✅ Playoff schedule strength

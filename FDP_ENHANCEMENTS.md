@@ -1,7 +1,7 @@
-# KTC-Style Player Values Enhancements
+# Fantasy Draft Pros-Style Player Values Enhancements
 
 ## Overview
-Enhanced the Player Values system with features similar to KeepTradeCut (KTC) to provide a more comprehensive dynasty fantasy football analysis tool.
+Enhanced the Player Values system with features similar to industry-leading sources (Fantasy Draft Pros) to provide a more comprehensive dynasty fantasy football analysis tool.
 
 ## New Database Features
 
@@ -9,7 +9,7 @@ Enhanced the Player Values system with features similar to KeepTradeCut (KTC) to
 - **Table**: `player_value_history`
 - Stores daily value snapshots for all players
 - Enables trend analysis and value charts
-- Tracks both KTC and FDP values separately
+- Tracks both Fantasy Draft Pros and FDP values separately
 
 ### 2. Value Change Analytics
 - **Table**: `player_value_changes`
@@ -49,7 +49,7 @@ Four distinct views for different analysis needs:
 - Age and injury status badges
 - Player tier indicators
 - 7-day value change tracking
-- Side-by-side KTC vs FDP values
+- Side-by-side Fantasy Draft Pros vs FDP values
 
 #### Biggest Movers View
 - Split view: Risers vs Fallers
@@ -127,9 +127,9 @@ Each player row now displays:
 8. **getTierBadgeColor(tier)**
    - Returns appropriate Tailwind classes for tier badges
 
-## How It Compares to KTC
+## How It Compares to Fantasy Draft Pros
 
-### Features Now Similar to KTC:
+### Features Now Similar to Fantasy Draft Pros:
 1. ✅ Historical value tracking
 2. ✅ Value change indicators (7d, 30d, season)
 3. ✅ Dynasty draft pick values
@@ -188,7 +188,7 @@ Each player row now displays:
 ## Usage Instructions
 
 ### For Users:
-1. Click the **Sync KTC Data** button to fetch latest values
+1. Click the **Sync Fantasy Draft Pros Data** button to fetch latest values
 2. Use the **tabs** to switch between different views
 3. Apply **filters** to narrow down players
 4. View **value changes** in the 7d Change column
@@ -203,7 +203,7 @@ Each player row now displays:
 
 ## Data Sources
 
-- **KTC Values**: Keep Trade Cut API (dynasty values)
+- **Fantasy Draft Pros Values**: Fantasy Draft Pros API combined with SportsData.io (dynasty values)
 - **Player Metadata**: Needs to be populated via external APIs (SportsData.io, ESPN, etc.)
 - **Draft Pick Values**: Pre-populated with industry-standard values
 - **Value History**: Automatically tracked from daily snapshots

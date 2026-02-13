@@ -248,7 +248,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     }
 
     if (showOnlyDifferences) {
-      filtered = filtered.filter(p => Math.abs(p.ktc_value - p.fdp_value) > 1.0);
+      filtered = filtered.filter(p => Math.abs(p.fdp_value - p.ktc_value) > 1.0);
     }
 
     if (viewMode === 'rookies') {
@@ -259,17 +259,17 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     setFilteredPlayers(filtered);
   };
 
-  const getValueDifferenceColor = (ktcValue: number, fdpValue: number) => {
-    const diff = fdpValue - ktcValue;
-    const percentage = ktcValue !== 0 ? (diff / ktcValue) * 100 : 0;
+  const getValueDifferenceColor = (baseValue: number, fdpValue: number) => {
+    const diff = fdpValue - baseValue;
+    const percentage = baseValue !== 0 ? (diff / baseValue) * 100 : 0;
 
     if (Math.abs(percentage) < 2) return 'text-fdp-text-3';
     if (diff > 0) return 'text-fdp-pos';
     return 'text-fdp-accent-2';
   };
 
-  const getValueDifferenceText = (ktcValue: number, fdpValue: number) => {
-    const diff = fdpValue - ktcValue;
+  const getValueDifferenceText = (baseValue: number, fdpValue: number) => {
+    const diff = fdpValue - baseValue;
     if (Math.abs(diff) < 0.2) return '≈';
     return diff > 0 ? `+${playerValuesApi.formatValue(diff)}` : playerValuesApi.formatValue(diff);
   };
@@ -587,7 +587,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                             {playerValuesApi.formatValue(getAdjustedValue(player))}
                           </div>
                           <div className="text-fdp-text-3 text-xs">
-                            Dynasty: {playerValuesApi.formatValue(player.ktc_value)}
+                            Base: {playerValuesApi.formatValue(player.ktc_value)}
                           </div>
                         </div>
                         <div className="flex-shrink-0">
@@ -789,8 +789,8 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Player</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Details</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">7d Change</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Dynasty Value</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider"><span className="text-fdp-accent-2">FDP Adjusted</span></th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Base Value</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider"><span className="text-fdp-accent-2">FDP Value</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-fdp-border-1">

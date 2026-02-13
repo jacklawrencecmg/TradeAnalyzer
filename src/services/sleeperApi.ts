@@ -210,8 +210,8 @@ const POSITION_BASE_VALUES: Record<string, number> = {
 
 const VALUE_SCALE_FACTOR = 100.0 / 10000.0;
 
-let ktcValues: Record<string, number> = {};
-let ktcSuperflexValues: Record<string, number> = {};
+let fdpValues: Record<string, number> = {};
+let fdpSuperflexValues: Record<string, number> = {};
 let dbPlayerValues: Map<string, PlayerValue> = new Map();
 
 export async function fetchPlayerValues(
@@ -222,7 +222,7 @@ export async function fetchPlayerValues(
   const currentYear = new Date().getFullYear();
   const targetYear = currentYear >= 2025 ? currentYear : 2025;
   const format = isSuperflex ? 2 : 1;
-  const cacheKey = `ktc_values_${targetYear}_${format}_${leagueFormat}_${scoringFormat}`;
+  const cacheKey = `fdp_values_${targetYear}_${format}_${leagueFormat}_${scoringFormat}`;
   const dbCacheKey = `db_player_values_${leagueFormat}_${scoringFormat}`;
 
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
@@ -230,9 +230,9 @@ export async function fetchPlayerValues(
 
   if (cached) {
     if (isSuperflex) {
-      ktcSuperflexValues = cached;
+      fdpSuperflexValues = cached;
     } else {
-      ktcValues = cached;
+      fdpValues = cached;
     }
   }
 
@@ -276,12 +276,12 @@ export async function fetchPlayerValues(
 
       if (Object.keys(values).length > 0) {
         if (isSuperflex) {
-          ktcSuperflexValues = values;
+          fdpSuperflexValues = values;
         } else {
-          ktcValues = values;
+          fdpValues = values;
         }
         setCachedData(cacheKey, values);
-        console.log(`Loaded ${Object.keys(values).length} ${isSuperflex ? 'Superflex' : '1QB'} player values from KTC (${targetYear} season)`);
+        console.log(`Loaded ${Object.keys(values).length} ${isSuperflex ? 'Superflex' : '1QB'} player values from Fantasy Draft Pros (${targetYear} season)`);
       }
     } else {
       const fallbackResponse = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?format=${format}`, {
@@ -305,17 +305,17 @@ export async function fetchPlayerValues(
 
         if (Object.keys(values).length > 0) {
           if (isSuperflex) {
-            ktcSuperflexValues = values;
+            fdpSuperflexValues = values;
           } else {
-            ktcValues = values;
+            fdpValues = values;
           }
           setCachedData(cacheKey, values);
-          console.log(`Loaded ${Object.keys(values).length} ${isSuperflex ? 'Superflex' : '1QB'} player values from KTC (current season)`);
+          console.log(`Loaded ${Object.keys(values).length} ${isSuperflex ? 'Superflex' : '1QB'} player values from Fantasy Draft Pros (current season)`);
         }
       }
     }
   } catch (error) {
-    console.warn(`Failed to fetch KTC ${isSuperflex ? 'Superflex' : '1QB'} values, using fallback values:`, error);
+    console.warn(`Failed to fetch Fantasy Draft Pros ${isSuperflex ? 'Superflex' : '1QB'} values, using fallback values:`, error);
   }
 }
 
@@ -325,7 +325,7 @@ export function getDraftPickValue(
   settings?: { totalRounds?: number; isSuperflex?: boolean; hasIDP?: boolean },
   pickNumber?: number
 ): number {
-  const ktcValueSource = settings?.isSuperflex ? ktcSuperflexValues : ktcValues;
+  const ktcValueSource = settings?.isSuperflex ? fdpSuperflexValues : fdpValues;
 
   if (pickNumber) {
     const pickKey = `${year}_${round}_${pickNumber.toString().padStart(2, '0')}`;
@@ -455,7 +455,7 @@ export function getPlayerValue(
     return parseFloat(value.toFixed(1));
   }
 
-  const ktcValueSource = finalSettings.isSuperflex ? ktcSuperflexValues : ktcValues;
+  const ktcValueSource = finalSettings.isSuperflex ? fdpSuperflexValues : fdpValues;
 
   if (ktcValueSource[player.player_id]) {
     let value = ktcValueSource[player.player_id];
