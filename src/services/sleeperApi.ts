@@ -988,12 +988,24 @@ export async function simulatePlayoffOdds(
     const pointsFor = roster.settings.fpts || 0;
     const pointsAgainst = roster.settings.fpts_against || 0;
 
-    const teamStrength = pointsFor / (avgPointsFor || 1);
-    const oppStrength = pointsAgainst / (avgPointsAgainst || 1);
+    // Calculate team strength relative to league average
+    const teamStrength = avgPointsFor > 0 ? pointsFor / avgPointsFor : 1;
 
-    const adjustedWinPct = gamesPlayed > 0
-      ? Math.min(0.95, Math.max(0.05, (roster.settings.wins / gamesPlayed) * (teamStrength / Math.max(oppStrength, 0.5))))
-      : 0.5;
+    // Calculate defensive strength (lower is better)
+    const defenseStrength = avgPointsAgainst > 0 ? pointsAgainst / avgPointsAgainst : 1;
+
+    // Use a combination of actual win percentage and team strength
+    // Weight 60% current record, 40% point differential strength
+    let adjustedWinPct = 0.5;
+    if (gamesPlayed > 0) {
+      const actualWinPct = roster.settings.wins / gamesPlayed;
+      // Team strength factor: higher points for = better, lower points against = better
+      const strengthFactor = (teamStrength / defenseStrength);
+      const strengthWinPct = Math.min(0.95, Math.max(0.05, 0.5 * strengthFactor));
+      adjustedWinPct = Math.min(0.95, Math.max(0.05,
+        (actualWinPct * 0.6) + (strengthWinPct * 0.4)
+      ));
+    }
 
     return {
       roster_id: roster.roster_id,
