@@ -142,7 +142,7 @@ class PlayerValuesApi {
 
   convertSportsDataToPlayerValue(player: SportsDataPlayer, ktcValue: number = 0): Partial<PlayerValue> {
     const baseValue = player.FantasyPoints || player.ProjectedFantasyPoints || 0;
-    const normalizedValue = Math.round(baseValue * 100);
+    const normalizedValue = parseFloat((baseValue / 4).toFixed(1));
 
     let trend: 'up' | 'down' | 'stable' = 'stable';
     if (player.LastGameFantasyPoints > player.FantasyPoints) {
@@ -202,7 +202,7 @@ class PlayerValuesApi {
         const projectedPoints = dfPlayer.ProjectedFantasyPoints || 0;
         const avgDfsSalary = (dfPlayer.FanDuelSalary + dfPlayer.DraftKingsSalary) / 2000;
 
-        const baseValue = (projectedPoints * 12) + (avgDfsSalary * 50) + (lastGamePoints * 5);
+        const baseValue = ((projectedPoints * 12) + (avgDfsSalary * 50) + (lastGamePoints * 5)) * 0.01;
 
         const factors: Partial<ValueAdjustmentFactors> = {
           superflex_boost: isSuperflex && dfPlayer.Position === 'QB' ? 0.5 : 0,
@@ -228,7 +228,7 @@ class PlayerValuesApi {
           player_name: dfPlayer.Name,
           position: dfPlayer.Position,
           team: dfPlayer.Team || null,
-          ktc_value: Math.round(baseValue * 0.8),
+          ktc_value: parseFloat((baseValue * 0.8).toFixed(1)),
           fdp_value: fdpValue,
           trend: trend,
           last_updated: new Date().toISOString(),
@@ -298,13 +298,13 @@ class PlayerValuesApi {
     const ppg = games > 0 ? ppr / games : 0;
 
     const positionMultipliers: Record<string, number> = {
-      'QB': isSuperflex ? 85 : 50,
-      'RB': 75,
-      'WR': 65,
-      'TE': 55,
+      'QB': isSuperflex ? 0.85 : 0.50,
+      'RB': 0.75,
+      'WR': 0.65,
+      'TE': 0.55,
     };
 
-    const multiplier = positionMultipliers[projection.Position] || 50;
+    const multiplier = positionMultipliers[projection.Position] || 0.50;
 
     let baseValue = ppg * multiplier;
 
@@ -313,7 +313,7 @@ class PlayerValuesApi {
     else if (ppg > 10) baseValue *= 1.1;
     else if (ppg < 5) baseValue *= 0.7;
 
-    return Math.round(baseValue);
+    return parseFloat(baseValue.toFixed(1));
   }
 
   private calculateRecentPerformance(stats: any, projection: any): number {
@@ -392,12 +392,14 @@ class PlayerValuesApi {
       adjustedValue *= (1 + factors.injury_risk);
     }
 
-    return Math.round(adjustedValue);
+    return parseFloat(adjustedValue.toFixed(1));
   }
 
   async getPlayerValues(
     position?: string,
-    limit: number = 100
+    limit: number = 100,
+    leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
+    scoringFormat: 'ppr' | 'half-ppr' = 'ppr'
   ): Promise<PlayerValue[]> {
     try {
       let query = supabase
@@ -561,10 +563,7 @@ class PlayerValuesApi {
   }
 
   formatValue(value: number): string {
-    if (value >= 10000) {
-      return `${(value / 1000).toFixed(1)}k`;
-    }
-    return value.toString();
+    return value.toFixed(1);
   }
 
   getValueDifference(value1: number, value2: number): {

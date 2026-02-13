@@ -206,7 +206,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
       }
 
       if (player.metadata?.projected_points) {
-        value = value * 0.85 + (player.metadata.projected_points * 12);
+        value = value * 0.85 + (player.metadata.projected_points * 0.12);
       }
     }
 
@@ -218,7 +218,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
       }
     }
 
-    return Math.round(value);
+    return parseFloat(value.toFixed(1));
   };
 
   const filterPlayers = () => {
@@ -248,7 +248,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     }
 
     if (showOnlyDifferences) {
-      filtered = filtered.filter(p => Math.abs(p.ktc_value - p.fdp_value) > 100);
+      filtered = filtered.filter(p => Math.abs(p.ktc_value - p.fdp_value) > 1.0);
     }
 
     if (viewMode === 'rookies') {
@@ -270,7 +270,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
 
   const getValueDifferenceText = (ktcValue: number, fdpValue: number) => {
     const diff = fdpValue - ktcValue;
-    if (Math.abs(diff) < 20) return '≈';
+    if (Math.abs(diff) < 0.2) return '≈';
     return diff > 0 ? `+${playerValuesApi.formatValue(diff)}` : playerValuesApi.formatValue(diff);
   };
 
