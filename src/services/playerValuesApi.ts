@@ -78,13 +78,15 @@ export interface UserCustomValue {
   updated_at: string;
 }
 
-export interface KTCPlayer {
-  playerName: string;
-  slug: string;
+export interface FantasyNerdsPlayer {
+  playerId: string;
+  name: string;
   position: string;
   team: string;
-  value: number;
-  trend: string;
+  dynastyRank: number;
+  dynastyValue: number;
+  adp?: number;
+  byeWeek?: number;
 }
 
 export interface SportsDataPlayer {
@@ -99,6 +101,51 @@ export interface SportsDataPlayer {
 }
 
 class PlayerValuesApi {
+  async fetchFantasyNerdsDynastyValues(): Promise<Map<string, { value: number; rank: number; playerName: string; position: string; team: string }>> {
+    try {
+      const apiKey = import.meta.env.VITE_FANTASY_NERDS_API_KEY || 'TW8ASCBMH778RSS9GECJ';
+      const response = await fetch(`https://api.fantasynerds.com/v1/nfl/dynasty?apikey=${apiKey}`, {
+        headers: {
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Fantasy Nerds API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return this.parseFantasyNerdsData(data);
+    } catch (error) {
+      console.error('Error fetching Fantasy Nerds dynasty values:', error);
+      return new Map();
+    }
+  }
+
+  private parseFantasyNerdsData(data: any): Map<string, { value: number; rank: number; playerName: string; position: string; team: string }> {
+    const valueMap = new Map<string, { value: number; rank: number; playerName: string; position: string; team: string }>();
+
+    if (Array.isArray(data)) {
+      data.forEach((player: any, index: number) => {
+        const playerId = player.playerId || player.player_id || player.sleeperId || player.sleeper_id;
+        if (playerId) {
+          const dynastyValue = player.dynastyValue || player.dynasty_value || player.value || 0;
+          const rank = player.dynastyRank || player.dynasty_rank || player.rank || index + 1;
+
+          valueMap.set(playerId, {
+            value: typeof dynastyValue === 'number' ? dynastyValue : parseInt(dynastyValue, 10) || 0,
+            rank: typeof rank === 'number' ? rank : parseInt(rank, 10) || index + 1,
+            playerName: player.name || player.playerName || '',
+            position: player.position || '',
+            team: player.team || ''
+          });
+        }
+      });
+    }
+
+    return valueMap;
+  }
+
   async fetchSportsDataPlayers(): Promise<SportsDataPlayer[]> {
     try {
       const players = await sportsDataAPI.getAllPlayers();
@@ -148,59 +195,6 @@ class PlayerValuesApi {
     }
   }
 
-  async fetchKTCValues(isSuperflex: boolean = false): Promise<Map<string, { value: number; playerName: string; position: string; team: string }>> {
-    try {
-      const currentYear = new Date().getFullYear();
-      const targetYear = currentYear >= 2025 ? currentYear : 2025;
-      const format = isSuperflex ? 2 : 1;
-
-      const response = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?season=${targetYear}&format=${format}`, {
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const fallbackResponse = await fetch(`https://api.keeptradecut.com/bff/dynasty/players?format=${format}`, {
-          headers: {
-            'Accept': 'application/json',
-          },
-        });
-
-        if (!fallbackResponse.ok) {
-          throw new Error('Failed to fetch KTC values');
-        }
-
-        const data = await fallbackResponse.json();
-        return this.parseKTCData(data);
-      }
-
-      const data = await response.json();
-      return this.parseKTCData(data);
-    } catch (error) {
-      console.error('Error fetching KTC values:', error);
-      return new Map();
-    }
-  }
-
-  private parseKTCData(data: any): Map<string, { value: number; playerName: string; position: string; team: string }> {
-    const valueMap = new Map<string, { value: number; playerName: string; position: string; team: string }>();
-
-    if (Array.isArray(data)) {
-      data.forEach((item: any) => {
-        if (item.sleeperId && item.value) {
-          valueMap.set(item.sleeperId, {
-            value: parseInt(item.value, 10),
-            playerName: item.playerName || '',
-            position: item.position || '',
-            team: item.team || ''
-          });
-        }
-      });
-    }
-
-    return valueMap;
-  }
 
   convertSportsDataToPlayerValue(player: SportsDataPlayer, ktcValue: number = 0): Partial<PlayerValue> {
     const baseValue = player.FantasyPoints || player.ProjectedFantasyPoints || 0;
@@ -233,92 +227,158 @@ class PlayerValuesApi {
 
   async syncPlayerValuesFromSportsData(isSuperflex: boolean = false): Promise<number> {
     try {
-      const [sleeperPlayers, projections, injuries, playerInfo, recentStats] = await Promise.all([
+      const [sleeperPlayers, fantasyNerdsValues, projections, injuries, playerInfo, recentStats] = await Promise.all([
         this.fetchSleeperPlayers(),
+        this.fetchFantasyNerdsDynastyValues(),
         sportsDataAPI.getPlayerProjections().catch(() => []),
         sportsDataAPI.getInjuries().catch(() => []),
         sportsDataAPI.getAllPlayers().catch(() => []),
         sportsDataAPI.getPlayerStats().catch(() => []),
       ]);
 
-      if (projections.length === 0) {
-        throw new Error('No SportsData.io projections fetched');
+      if (projections.length === 0 && fantasyNerdsValues.size === 0) {
+        throw new Error('No data fetched from APIs');
       }
 
       const playerValues: any[] = [];
       const sleeperNameMap = new Map(sleeperPlayers.map(p => [p.full_name.toLowerCase(), p.player_id]));
+      const sleeperIdMap = new Map(sleeperPlayers.map(p => [p.player_id, p]));
 
-      projections.forEach((projection) => {
-        if (!projection.Position || !['QB', 'RB', 'WR', 'TE'].includes(projection.Position)) return;
+      if (fantasyNerdsValues.size > 0) {
+        console.log(`Loaded ${fantasyNerdsValues.size} dynasty values from Fantasy Nerds`);
 
-        const playerNameLower = projection.Name.toLowerCase();
-        const sleeperId = sleeperNameMap.get(playerNameLower);
+        fantasyNerdsValues.forEach((fnData, sleeperId) => {
+          const sleeperPlayer = sleeperIdMap.get(sleeperId);
+          if (!sleeperPlayer) return;
 
-        if (!sleeperId) {
-          console.log(`No Sleeper ID found for: ${projection.Name}`);
-          return;
-        }
+          const projection = projections.find(p => p.Name.toLowerCase() === sleeperPlayer.full_name.toLowerCase());
+          const injury = injuries.find(i => i.Name?.toLowerCase() === sleeperPlayer.full_name.toLowerCase());
+          const info = projection ? playerInfo.find(p => p.PlayerID === projection.PlayerID) : null;
+          const stats = projection ? recentStats.find(s => s.PlayerID === projection.PlayerID) : null;
 
-        const injury = injuries.find(i => i.Name?.toLowerCase() === playerNameLower);
-        const info = playerInfo.find(p => p.PlayerID === projection.PlayerID);
-        const stats = recentStats.find(s => s.PlayerID === projection.PlayerID);
+          const dynastyValue = fnData.value;
 
-        const baseValue = this.calculateProjectionBasedValue(
-          projection,
-          stats,
-          injury,
-          info,
-          isSuperflex
-        );
+          const factors: Partial<ValueAdjustmentFactors> = {
+            superflex_boost: isSuperflex && sleeperPlayer.position === 'QB' ? 0.5 : 0,
+            recent_performance: stats && projection ? this.calculateRecentPerformance(stats, projection) : 0,
+            playoff_schedule: 0,
+            injury_risk: this.calculateInjuryRisk(injury?.Status),
+            age_factor: info?.Experience ? this.calculateAgeFactor(info.Experience, sleeperPlayer.position) : 0,
+            team_situation: 0,
+          };
 
-        const factors: Partial<ValueAdjustmentFactors> = {
-          superflex_boost: isSuperflex && projection.Position === 'QB' ? 0.5 : 0,
-          recent_performance: stats ? this.calculateRecentPerformance(stats, projection) : 0,
-          playoff_schedule: 0,
-          injury_risk: this.calculateInjuryRisk(injury?.Status),
-          age_factor: info?.Experience ? this.calculateAgeFactor(info.Experience, projection.Position) : 0,
-          team_situation: 0,
-        };
+          const fdpValue = this.calculateFDPValue(dynastyValue, factors, isSuperflex);
 
-        const fdpValue = this.calculateFDPValue(baseValue, factors, isSuperflex);
+          let trend: 'up' | 'down' | 'stable' = 'stable';
+          if (stats && projection?.FantasyPointsPPR) {
+            const recentPPG = stats.Games > 0 ? stats.FantasyPointsPPR / stats.Games : 0;
+            const projectedPPG = projection.Games > 0 ? projection.FantasyPointsPPR / projection.Games : 0;
+            if (recentPPG > projectedPPG * 1.1) trend = 'up';
+            else if (recentPPG < projectedPPG * 0.9) trend = 'down';
+          }
 
-        let trend: 'up' | 'down' | 'stable' = 'stable';
-        if (stats && projection.FantasyPointsPPR) {
-          const recentPPG = stats.Games > 0 ? stats.FantasyPointsPPR / stats.Games : 0;
-          const projectedPPG = projection.Games > 0 ? projection.FantasyPointsPPR / projection.Games : 0;
-          if (recentPPG > projectedPPG * 1.1) trend = 'up';
-          else if (recentPPG < projectedPPG * 0.9) trend = 'down';
-        }
-
-        playerValues.push({
-          player_id: sleeperId,
-          player_name: projection.Name,
-          position: projection.Position,
-          team: projection.Team || null,
-          ktc_value: Math.round(baseValue * 0.8),
-          fdp_value: fdpValue,
-          trend: trend,
-          last_updated: new Date().toISOString(),
-          injury_status: injury?.Status?.toLowerCase() || null,
-          years_experience: info?.Experience || null,
-          metadata: {
-            is_superflex: isSuperflex,
-            source: 'sportsdata_projections',
-            injury_body_part: injury?.InjuryBodyPart || null,
-            injury_notes: injury?.InjuryNotes || null,
-            projected_points: projection.FantasyPointsPPR || null,
-            projected_games: projection.Games || null,
-            passing_yards: projection.PassingYards || null,
-            passing_tds: projection.PassingTouchdowns || null,
-            rushing_yards: projection.RushingYards || null,
-            rushing_tds: projection.RushingTouchdowns || null,
-            receptions: projection.Receptions || null,
-            receiving_yards: projection.ReceivingYards || null,
-            receiving_tds: projection.ReceivingTouchdowns || null,
-            experience: info?.Experience || null,
-          },
+          playerValues.push({
+            player_id: sleeperId,
+            player_name: fnData.playerName || sleeperPlayer.full_name,
+            position: fnData.position || sleeperPlayer.position,
+            team: fnData.team || sleeperPlayer.team,
+            ktc_value: dynastyValue,
+            fdp_value: fdpValue,
+            trend: trend,
+            last_updated: new Date().toISOString(),
+            injury_status: injury?.Status?.toLowerCase() || null,
+            years_experience: info?.Experience || null,
+            metadata: {
+              is_superflex: isSuperflex,
+              source: 'fantasy_nerds_dynasty',
+              dynasty_rank: fnData.rank,
+              injury_body_part: injury?.InjuryBodyPart || null,
+              injury_notes: injury?.InjuryNotes || null,
+              projected_points: projection?.FantasyPointsPPR || null,
+              projected_games: projection?.Games || null,
+              passing_yards: projection?.PassingYards || null,
+              passing_tds: projection?.PassingTouchdowns || null,
+              rushing_yards: projection?.RushingYards || null,
+              rushing_tds: projection?.RushingTouchdowns || null,
+              receptions: projection?.Receptions || null,
+              receiving_yards: projection?.ReceivingYards || null,
+              receiving_tds: projection?.ReceivingTouchdowns || null,
+              experience: info?.Experience || null,
+            },
+          });
         });
-      });
+      } else {
+        console.log('Falling back to projection-based values');
+
+        projections.forEach((projection) => {
+          if (!projection.Position || !['QB', 'RB', 'WR', 'TE'].includes(projection.Position)) return;
+
+          const playerNameLower = projection.Name.toLowerCase();
+          const sleeperId = sleeperNameMap.get(playerNameLower);
+
+          if (!sleeperId) return;
+
+          const injury = injuries.find(i => i.Name?.toLowerCase() === playerNameLower);
+          const info = playerInfo.find(p => p.PlayerID === projection.PlayerID);
+          const stats = recentStats.find(s => s.PlayerID === projection.PlayerID);
+
+          const baseValue = this.calculateProjectionBasedValue(
+            projection,
+            stats,
+            injury,
+            info,
+            isSuperflex
+          );
+
+          const factors: Partial<ValueAdjustmentFactors> = {
+            superflex_boost: isSuperflex && projection.Position === 'QB' ? 0.5 : 0,
+            recent_performance: stats ? this.calculateRecentPerformance(stats, projection) : 0,
+            playoff_schedule: 0,
+            injury_risk: this.calculateInjuryRisk(injury?.Status),
+            age_factor: info?.Experience ? this.calculateAgeFactor(info.Experience, projection.Position) : 0,
+            team_situation: 0,
+          };
+
+          const fdpValue = this.calculateFDPValue(baseValue, factors, isSuperflex);
+
+          let trend: 'up' | 'down' | 'stable' = 'stable';
+          if (stats && projection.FantasyPointsPPR) {
+            const recentPPG = stats.Games > 0 ? stats.FantasyPointsPPR / stats.Games : 0;
+            const projectedPPG = projection.Games > 0 ? projection.FantasyPointsPPR / projection.Games : 0;
+            if (recentPPG > projectedPPG * 1.1) trend = 'up';
+            else if (recentPPG < projectedPPG * 0.9) trend = 'down';
+          }
+
+          playerValues.push({
+            player_id: sleeperId,
+            player_name: projection.Name,
+            position: projection.Position,
+            team: projection.Team || null,
+            ktc_value: Math.round(baseValue * 0.8),
+            fdp_value: fdpValue,
+            trend: trend,
+            last_updated: new Date().toISOString(),
+            injury_status: injury?.Status?.toLowerCase() || null,
+            years_experience: info?.Experience || null,
+            metadata: {
+              is_superflex: isSuperflex,
+              source: 'sportsdata_projections',
+              injury_body_part: injury?.InjuryBodyPart || null,
+              injury_notes: injury?.InjuryNotes || null,
+              projected_points: projection.FantasyPointsPPR || null,
+              projected_games: projection.Games || null,
+              passing_yards: projection.PassingYards || null,
+              passing_tds: projection.PassingTouchdowns || null,
+              rushing_yards: projection.RushingYards || null,
+              rushing_tds: projection.RushingTouchdowns || null,
+              receptions: projection.Receptions || null,
+              receiving_yards: projection.ReceivingYards || null,
+              receiving_tds: projection.ReceivingTouchdowns || null,
+              experience: info?.Experience || null,
+            },
+          });
+        });
+      }
 
       if (playerValues.length > 0) {
         const { error } = await supabase
@@ -326,7 +386,7 @@ class PlayerValuesApi {
           .upsert(playerValues, { onConflict: 'player_id' });
 
         if (error) throw error;
-        console.log(`Synced ${playerValues.length} player values from SportsData.io projections`);
+        console.log(`Synced ${playerValues.length} player values`);
       }
 
       return playerValues.length;
