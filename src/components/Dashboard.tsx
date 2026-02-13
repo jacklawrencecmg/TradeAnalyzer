@@ -24,6 +24,7 @@ import NotificationsPanel from './NotificationsPanel';
 import PlayerNewsFeed from './PlayerNewsFeed';
 import ExportShare from './ExportShare';
 import { PlayerValues } from './PlayerValues';
+import Footer from './Footer';
 
 type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values';
 
@@ -102,7 +103,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0">
+    <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 flex flex-col">
       {/* Header */}
       <div className="bg-gradient-to-r from-fdp-surface-1 to-fdp-bg-1 border-b border-fdp-border-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -133,7 +134,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
         {/* League Selector */}
         <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -311,6 +312,8 @@ export function Dashboard() {
           />
         )}
       </div>
+
+      <Footer />
     </div>
   );
 }
