@@ -271,22 +271,36 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                         key={player.player_id}
                         className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-[#00d4ff] transition-all duration-200 hover:shadow-lg hover:shadow-[#00d4ff]/10"
                       >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-bold text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded">
-                            #{idx + 1}
-                          </span>
-                          <span className="text-xs px-2 py-1 bg-gray-900 rounded text-gray-300 font-semibold">
-                            {player.position}
-                          </span>
-                        </div>
-                        <div className="text-sm font-semibold text-white mb-1 truncate" title={player.name}>
-                          {player.name}
-                        </div>
-                        {player.team && (
-                          <div className="text-xs text-gray-500 mb-2">{player.team}</div>
-                        )}
-                        <div className="text-xs font-medium text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded inline-block">
-                          {player.value.toFixed(1)}
+                        <div className="flex items-start gap-3 mb-3">
+                          <div className="relative flex-shrink-0">
+                            <img
+                              src={`https://sleepercdn.com/content/nfl/players/thumb/${player.player_id}.jpg`}
+                              alt={player.name}
+                              className="w-16 h-16 rounded-full object-cover bg-gray-900 border-2 border-gray-700"
+                              onError={(e) => {
+                                e.currentTarget.src = `https://sleepercdn.com/images/v2/icons/player_default.webp`;
+                              }}
+                            />
+                            <span className="absolute -top-1 -right-1 text-xs font-bold text-[#00d4ff] bg-gray-900 px-1.5 py-0.5 rounded-full border border-[#00d4ff]/30">
+                              #{idx + 1}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="text-sm font-semibold text-white truncate" title={player.name}>
+                                {player.name}
+                              </div>
+                              <span className="text-xs px-2 py-1 bg-gray-900 rounded text-gray-300 font-semibold flex-shrink-0">
+                                {player.position}
+                              </span>
+                            </div>
+                            {player.team && (
+                              <div className="text-xs text-gray-500 mb-2">{player.team}</div>
+                            )}
+                            <div className="text-xs font-medium text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded inline-block">
+                              {player.value.toFixed(1)}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}
