@@ -1079,7 +1079,12 @@ export async function simulatePlayoffOdds(
 
   return teamStats.map((team) => {
     const currentSeed = currentStandings.findIndex((t) => t.roster_id === team.roster_id) + 1;
-    const projectedWins = team.current_wins + team.remaining_games * team.win_probability;
+
+    // Calculate projected wins from actual simulation results (more accurate than simple formula)
+    const projectedWins = Object.entries(team.win_distribution).reduce(
+      (sum, [wins, count]) => sum + (parseInt(wins) * count),
+      0
+    ) / simulations;
 
     const winDistribution = Object.entries(team.win_distribution)
       .map(([wins, count]) => ({
