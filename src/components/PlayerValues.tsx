@@ -266,7 +266,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
               Player Values
             </h2>
             <p className="text-fdp-text-3 text-sm mt-1">
-              Dynasty rankings powered by Keep Trade Cut with FDP enhancements
+              Dynasty rankings powered by Fantasy Draft Pros
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -387,7 +387,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                             {playerValuesApi.formatValue(player.fdp_value)}
                           </div>
                           <div className="text-fdp-text-3 text-xs">
-                            KTC: {playerValuesApi.formatValue(player.ktc_value)}
+                            Dynasty: {playerValuesApi.formatValue(player.ktc_value)}
                           </div>
                         </div>
                         <div className="flex-shrink-0">
@@ -589,8 +589,8 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Player</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Details</th>
                     <th className="px-4 py-3 text-center text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">7d Change</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">KTC</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider"><span className="text-fdp-accent-2">FDP</span></th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider">Dynasty Value</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-fdp-text-3 uppercase tracking-wider"><span className="text-fdp-accent-2">FDP Adjusted</span></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-fdp-border-1">
@@ -712,7 +712,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
           About FDP Value Adjustments
         </h3>
         <p className="text-sm text-fdp-text-3 mb-3">
-          <span className="text-fdp-accent-2 font-medium">Data Source:</span> Player data from SportsData.io API combined with Keep Trade Cut dynasty rankings
+          <span className="text-fdp-accent-2 font-medium">Data Source:</span> Player data from SportsData.io API combined with Fantasy Draft Pros dynasty rankings
         </p>
         <ul className="text-sm text-fdp-text-3 space-y-1">
           <li>• <span className="text-fdp-accent-2 font-medium">Playoff Schedule:</span> Adjusts for strength of schedule in weeks 15-17</li>

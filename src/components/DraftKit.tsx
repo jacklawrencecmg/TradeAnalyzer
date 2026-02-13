@@ -207,7 +207,7 @@ export default function DraftKit({ leagueId, userId }: DraftKitProps) {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-gray-400">KTC Value</p>
+                      <p className="text-sm text-gray-400">Dynasty Value</p>
                       <p className="text-xl font-bold text-blue-400">{player.value.toLocaleString()}</p>
                     </div>
                   </div>

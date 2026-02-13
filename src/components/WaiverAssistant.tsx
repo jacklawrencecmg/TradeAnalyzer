@@ -234,7 +234,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
               onChange={(e) => setSortBy(e.target.value as 'value' | 'recommendation')}
               className="px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
             >
-              <option value="value">Sort by KTC Value</option>
+              <option value="value">Sort by Dynasty Value</option>
               <option value="recommendation">Sort by Team Fit</option>
             </select>
             <button
@@ -280,7 +280,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
                     </div>
                     <div className="flex gap-6 mt-4">
                       <div>
-                        <p className="text-sm text-gray-400">KTC Value</p>
+                        <p className="text-sm text-gray-400">Dynasty Value</p>
                         <p className="text-2xl font-bold text-green-400">{player.value.toLocaleString()}</p>
                       </div>
                       <div>
