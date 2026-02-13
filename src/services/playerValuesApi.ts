@@ -7,12 +7,12 @@ export interface PlayerValue {
   player_name: string;
   position: string;
   team: string | null;
-  base_value: number;
-  fdp_value: number;
+  base_value: number | string;
+  fdp_value: number | string;
   trend: 'up' | 'down' | 'stable';
   last_updated: string;
   metadata: Record<string, any>;
-  age?: number | null;
+  age?: number | string | null;
   years_experience?: number | null;
   injury_status?: string | null;
   bye_week?: number | null;
@@ -22,7 +22,7 @@ export interface PlayerValue {
   draft_pick?: number | null;
   contract_years_remaining?: number | null;
   tier?: string | null;
-  volatility_score?: number | null;
+  volatility_score?: number | string | null;
 }
 
 export interface PlayerValueHistory {
@@ -59,12 +59,12 @@ export interface DynastyDraftPick {
 export interface ValueAdjustmentFactors {
   id: string;
   player_id: string;
-  superflex_boost: number;
-  playoff_schedule: number;
-  recent_performance: number;
-  injury_risk: number;
-  age_factor: number;
-  team_situation: number;
+  superflex_boost: number | string;
+  playoff_schedule: number | string;
+  recent_performance: number | string;
+  injury_risk: number | string;
+  age_factor: number | string;
+  team_situation: number | string;
   calculated_at: string;
 }
 
@@ -89,7 +89,16 @@ export interface SportsDataPlayer {
   ProjectedFantasyPoints: number;
 }
 
+function toNumber(value: number | string | null | undefined, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'number') return value;
+  const parsed = parseFloat(value);
+  return isNaN(parsed) ? defaultValue : parsed;
+}
+
 class PlayerValuesApi {
+  toNumber = toNumber;
+
   async fetchSportsDataPlayers(): Promise<SportsDataPlayer[]> {
     try {
       const players = await sportsDataAPI.getAllPlayers();
@@ -562,17 +571,20 @@ class PlayerValuesApi {
     }
   }
 
-  formatValue(value: number): string {
-    return value.toFixed(1);
+  formatValue(value: number | string): string {
+    const num = toNumber(value);
+    return num.toFixed(1);
   }
 
-  getValueDifference(value1: number, value2: number): {
+  getValueDifference(value1: number | string, value2: number | string): {
     difference: number;
     percentage: number;
     direction: 'positive' | 'negative' | 'neutral';
   } {
-    const difference = value1 - value2;
-    const percentage = value2 !== 0 ? (difference / value2) * 100 : 0;
+    const v1 = toNumber(value1);
+    const v2 = toNumber(value2);
+    const difference = v1 - v2;
+    const percentage = v2 !== 0 ? (difference / v2) * 100 : 0;
     const direction = difference > 0 ? 'positive' : difference < 0 ? 'negative' : 'neutral';
 
     return { difference, percentage, direction };

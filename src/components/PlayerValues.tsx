@@ -248,7 +248,11 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     }
 
     if (showOnlyDifferences) {
-      filtered = filtered.filter(p => Math.abs(p.fdp_value - p.base_value) > 1.0);
+      filtered = filtered.filter(p => {
+        const fdpVal = playerValuesApi.toNumber(p.fdp_value);
+        const baseVal = playerValuesApi.toNumber(p.base_value);
+        return Math.abs(fdpVal - baseVal) > 1.0;
+      });
     }
 
     if (viewMode === 'rookies') {
