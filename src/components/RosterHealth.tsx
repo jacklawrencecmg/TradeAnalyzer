@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, AlertTriangle, CheckCircle, Calendar } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Calendar, Info } from 'lucide-react';
 import { getLeagueRosters } from '../services/sleeperApi';
+import { sportsDataAPI } from '../services/sportsdataApi';
+import Tooltip from './Tooltip';
 
 interface PlayerHealth {
   player_id: string;
@@ -10,6 +12,8 @@ interface PlayerHealth {
   status: 'Healthy' | 'Questionable' | 'Doubtful' | 'Out' | 'IR';
   injury_notes: string;
   bye_week: number;
+  injury_body_part?: string;
+  sportsdata_injury_notes?: string;
 }
 
 interface RosterHealthProps {
@@ -37,26 +41,37 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
         return;
       }
 
-      const allPlayers = await fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json());
+      const [allPlayers, sportsDataInjuries] = await Promise.all([
+        fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json()),
+        sportsDataAPI.getInjuries().catch(() => [])
+      ]);
 
       const healthData: PlayerHealth[] = (userRoster.players || []).map((playerId: string) => {
         const player = allPlayers[playerId];
         if (!player) return null;
 
+        const playerName = player.full_name || `${player.first_name} ${player.last_name}`;
+        const sportsDataInjury = sportsDataInjuries.find(
+          (inj: any) => inj.Name?.toLowerCase() === playerName.toLowerCase()
+        );
+
         let status: PlayerHealth['status'] = 'Healthy';
-        if (player.injury_status === 'Out') status = 'Out';
-        else if (player.injury_status === 'Doubtful') status = 'Doubtful';
-        else if (player.injury_status === 'Questionable') status = 'Questionable';
-        else if (player.injury_status === 'IR') status = 'IR';
+        const injuryStatus = sportsDataInjury?.Status || player.injury_status;
+        if (injuryStatus?.toLowerCase().includes('out') || injuryStatus?.toLowerCase() === 'ir') status = 'Out';
+        else if (injuryStatus?.toLowerCase().includes('doubtful')) status = 'Doubtful';
+        else if (injuryStatus?.toLowerCase().includes('questionable')) status = 'Questionable';
+        else if (injuryStatus?.toLowerCase() === 'ir') status = 'IR';
 
         return {
           player_id: playerId,
-          name: player.full_name || `${player.first_name} ${player.last_name}`,
+          name: playerName,
           position: player.position,
           team: player.team || 'FA',
           status,
           injury_notes: player.injury_notes || '',
-          bye_week: player.bye_week || 0
+          bye_week: player.bye_week || 0,
+          injury_body_part: sportsDataInjury?.InjuryBodyPart,
+          sportsdata_injury_notes: sportsDataInjury?.InjuryNotes
         };
       }).filter((p): p is PlayerHealth => p !== null);
 
@@ -175,6 +190,29 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-bold">{player.name}</h3>
                       <span className="text-sm text-gray-400">{player.position} - {player.team}</span>
+                      {(player.injury_body_part || player.sportsdata_injury_notes) && (
+                        <Tooltip content={
+                          <div className="space-y-2 text-xs">
+                            {player.injury_body_part && (
+                              <div>
+                                <div className="font-semibold text-orange-400">Injury Details</div>
+                                <div>Body Part: {player.injury_body_part}</div>
+                              </div>
+                            )}
+                            {player.sportsdata_injury_notes && (
+                              <div>
+                                <div className="font-semibold text-orange-400">Notes</div>
+                                <div className="text-gray-400">{player.sportsdata_injury_notes}</div>
+                              </div>
+                            )}
+                            <div className="text-gray-400 text-xs pt-2 border-t border-gray-600">
+                              Data from SportsData.io
+                            </div>
+                          </div>
+                        }>
+                          <Info className="w-4 h-4 text-blue-400 cursor-help" />
+                        </Tooltip>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -190,8 +228,10 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
                         </div>
                       )}
 
-                      {player.injury_notes && (
-                        <p className="text-sm text-gray-400 italic">{player.injury_notes}</p>
+                      {(player.injury_notes || player.sportsdata_injury_notes) && (
+                        <p className="text-sm text-gray-400 italic">
+                          {player.sportsdata_injury_notes || player.injury_notes}
+                        </p>
                       )}
                     </div>
                   </div>

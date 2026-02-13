@@ -4,6 +4,7 @@ import { playerValuesApi, PlayerValue, PlayerValueChange, DynastyDraftPick } fro
 import { useAuth } from '../hooks/useAuth';
 import { ListSkeleton } from './LoadingSkeleton';
 import { useToast } from './Toast';
+import Tooltip from './Tooltip';
 
 interface PlayerValuesProps {
   leagueId: string;
@@ -595,12 +596,53 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                       <tr key={player.id} className="hover:bg-fdp-surface-1 transition-colors">
                         <td className="px-4 py-3 text-fdp-text-3 text-sm">{index + 1}</td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-fdp-text-1">{player.player_name}</div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
-                              {player.position}
-                            </span>
-                            <span className="text-fdp-text-3 text-xs">{player.team || 'FA'}</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <div className="font-medium text-fdp-text-1">{player.player_name}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
+                                  {player.position}
+                                </span>
+                                <span className="text-fdp-text-3 text-xs">{player.team || 'FA'}</span>
+                                {player.metadata?.projected_points && (
+                                  <span className="text-fdp-accent-2 text-xs">
+                                    • {Math.round(player.metadata.projected_points)} pts
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {(player.injury_status || player.metadata?.injury_notes || player.metadata?.projected_points) && (
+                              <Tooltip content={
+                                <div className="space-y-2 text-xs max-w-xs">
+                                  {player.metadata?.projected_points && (
+                                    <div>
+                                      <div className="font-semibold text-fdp-accent-2">Season Projection</div>
+                                      <div>{Math.round(player.metadata.projected_points)} PPR points</div>
+                                      {player.metadata?.projected_games && (
+                                        <div className="text-fdp-text-3">Over {player.metadata.projected_games} games</div>
+                                      )}
+                                    </div>
+                                  )}
+                                  {(player.injury_status && player.injury_status !== 'healthy') && (
+                                    <div>
+                                      <div className="font-semibold text-orange-400">Injury Status</div>
+                                      <div>{player.injury_status.toUpperCase()}</div>
+                                      {player.metadata?.injury_body_part && (
+                                        <div className="text-fdp-text-3">Body Part: {player.metadata.injury_body_part}</div>
+                                      )}
+                                      {player.metadata?.injury_notes && (
+                                        <div className="text-fdp-text-3 mt-1">{player.metadata.injury_notes}</div>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="text-fdp-text-3 text-xs pt-2 border-t border-fdp-border-1">
+                                    Data from SportsData.io
+                                  </div>
+                                </div>
+                              }>
+                                <Info className="w-4 h-4 text-fdp-accent-2 cursor-help" />
+                              </Tooltip>
+                            )}
                           </div>
                         </td>
                         <td className="px-4 py-3">
