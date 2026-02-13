@@ -40,43 +40,63 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const getIcon = (type: ToastType) => {
+    const iconClass = "w-5 h-5 flex-shrink-0";
     switch (type) {
       case 'success':
-        return <CheckCircle className="w-5 h-5 text-green-400" />;
+        return (
+          <div className="relative">
+            <div className="absolute inset-0 bg-green-400 blur-md opacity-50"></div>
+            <CheckCircle className={`${iconClass} text-green-400 relative`} />
+          </div>
+        );
       case 'error':
-        return <AlertCircle className="w-5 h-5 text-red-400" />;
+        return (
+          <div className="relative">
+            <div className="absolute inset-0 bg-red-400 blur-md opacity-50"></div>
+            <AlertCircle className={`${iconClass} text-red-400 relative`} />
+          </div>
+        );
       case 'info':
-        return <Info className="w-5 h-5 text-blue-400" />;
+        return (
+          <div className="relative">
+            <div className="absolute inset-0 bg-[#00d4ff] blur-md opacity-50"></div>
+            <Info className={`${iconClass} text-[#00d4ff] relative`} />
+          </div>
+        );
     }
   };
 
   const getStyles = (type: ToastType) => {
     switch (type) {
       case 'success':
-        return 'border-green-500 bg-green-950/50';
+        return 'border-green-500/50 bg-gradient-to-r from-green-950/90 to-green-900/90 shadow-green-500/20';
       case 'error':
-        return 'border-red-500 bg-red-950/50';
+        return 'border-red-500/50 bg-gradient-to-r from-red-950/90 to-red-900/90 shadow-red-500/20';
       case 'info':
-        return 'border-blue-500 bg-blue-950/50';
+        return 'border-[#00d4ff]/50 bg-gradient-to-r from-gray-900/90 to-gray-800/90 shadow-[#00d4ff]/20';
     }
   };
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
-        {toasts.map((toast) => (
+      <div className="fixed bottom-4 right-4 z-50 space-y-3 max-w-md">
+        {toasts.map((toast, index) => (
           <div
             key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${getStyles(
+            className={`flex items-center gap-3 px-5 py-4 rounded-xl border-2 ${getStyles(
               toast.type
-            )} shadow-lg backdrop-blur-sm animate-in slide-in-from-right duration-300`}
+            )} shadow-2xl backdrop-blur-md transform transition-all duration-300 hover:scale-105 hover:shadow-3xl`}
+            style={{
+              animation: 'slideInRight 0.3s ease-out',
+              animationDelay: `${index * 0.1}s`
+            }}
           >
             {getIcon(toast.type)}
-            <p className="text-white text-sm font-medium flex-1">{toast.message}</p>
+            <p className="text-white text-sm font-medium flex-1 leading-relaxed">{toast.message}</p>
             <button
               onClick={() => removeToast(toast.id)}
-              className="text-gray-400 hover:text-white transition-colors"
+              className="text-gray-400 hover:text-white transition-colors p-1 hover:bg-white/10 rounded-lg"
             >
               <X className="w-4 h-4" />
             </button>

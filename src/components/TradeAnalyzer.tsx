@@ -22,6 +22,7 @@ import { playerValuesApi } from '../services/playerValuesApi';
 import { PlayerAvatar } from './PlayerAvatar';
 import { StatSparkline } from './StatSparkline';
 import { AchievementBadge } from './AchievementBadge';
+import { TradeGrade, calculateTradeGrade } from './TradeGrade';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -1474,28 +1475,44 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             </div>
           </div>
 
-          <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-            <div className="flex items-center justify-center gap-3 mb-4">
-              {analysis.winner === 'Fair' ? (
-                <Minus className="w-8 h-8 text-yellow-400" />
-              ) : analysis.winner === 'A' ? (
-                <TrendingUp className="w-8 h-8 text-green-400" />
-              ) : (
-                <TrendingDown className="w-8 h-8 text-red-400" />
-              )}
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white">
-                  {analysis.winner === 'Fair'
-                    ? 'Fair Trade'
-                    : `Team ${analysis.winner} Wins`}
+          <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border border-gray-700 shadow-lg">
+            <div className="flex flex-col items-center gap-4 mb-4">
+              <TradeGrade
+                grade={calculateTradeGrade(
+                  Math.max(analysis.teamAValue, analysis.teamBValue) > 0
+                    ? 100 - (Math.abs(analysis.teamAValue - analysis.teamBValue) / Math.max(analysis.teamAValue, analysis.teamBValue) * 100)
+                    : 100
+                )}
+                score={
+                  Math.max(analysis.teamAValue, analysis.teamBValue) > 0
+                    ? 100 - (Math.abs(analysis.teamAValue - analysis.teamBValue) / Math.max(analysis.teamAValue, analysis.teamBValue) * 100)
+                    : 100
+                }
+                size="lg"
+              />
+
+              <div className="flex items-center gap-3">
+                {analysis.winner === 'Fair' ? (
+                  <Minus className="w-8 h-8 text-yellow-400" />
+                ) : analysis.winner === 'A' ? (
+                  <TrendingUp className="w-8 h-8 text-green-400" />
+                ) : (
+                  <TrendingDown className="w-8 h-8 text-red-400" />
+                )}
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-white">
+                    {analysis.winner === 'Fair'
+                      ? 'Fair Trade'
+                      : `Team ${analysis.winner} Wins`}
+                  </div>
+                  <div className="text-sm text-gray-400 mt-1">{analysis.fairness}</div>
                 </div>
-                <div className="text-sm text-gray-400 mt-1">{analysis.fairness}</div>
               </div>
             </div>
 
             {analysis.winner !== 'Fair' && (
-              <p className="text-center text-gray-300 text-sm">
-                Team {analysis.winner} receives approximately {analysis.difference} more value in
+              <p className="text-center text-gray-300 text-sm bg-gray-900/50 rounded-lg p-3 border border-gray-700">
+                Team {analysis.winner} receives approximately <span className="font-bold text-[#00d4ff]">{analysis.difference}</span> more value in
                 this trade.
               </p>
             )}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
@@ -25,9 +25,10 @@ import NotificationsPanel from './NotificationsPanel';
 import PlayerNewsFeed from './PlayerNewsFeed';
 import ExportShare from './ExportShare';
 import { PlayerValues } from './PlayerValues';
+import { Contact } from './Contact';
 import Footer from './Footer';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -277,10 +278,11 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 </div>
 
                 <div>
-                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">News & Sharing</h3>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">News & Support</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Newspaper} label="Player News" shortLabel="News" tab="news" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Share2} label="Export & Share" shortLabel="Share" tab="export" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Mail} label="Contact Us" shortLabel="Contact" tab="contact" activeTab={activeTab} onClick={setActiveTab} />
                   </div>
                 </div>
               </div>
@@ -309,6 +311,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'notifications' && <NotificationsPanel userId={user?.id || ''} leagueId={currentLeague.league_id} />}
               {activeTab === 'news' && <PlayerNewsFeed />}
               {activeTab === 'export' && <ExportShare leagueId={currentLeague.league_id} rosterId="1" />}
+              {activeTab === 'contact' && <Contact />}
             </div>
           </div>
         )}

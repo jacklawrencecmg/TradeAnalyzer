@@ -1,8 +1,8 @@
 export function PlayerCardSkeleton() {
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 card-enter">
+    <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg p-4 border border-gray-700 card-enter hover-lift">
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-12 h-12 skeleton rounded-full"></div>
+        <div className="w-12 h-12 skeleton rounded-full ring-2 ring-gray-700"></div>
         <div className="flex-1">
           <div className="h-4 skeleton rounded w-3/4 mb-2"></div>
           <div className="h-3 skeleton rounded w-1/2"></div>
@@ -11,6 +11,7 @@ export function PlayerCardSkeleton() {
       <div className="space-y-2">
         <div className="h-3 skeleton rounded w-full"></div>
         <div className="h-3 skeleton rounded w-5/6"></div>
+        <div className="h-3 skeleton rounded w-4/6"></div>
       </div>
     </div>
   );
@@ -93,6 +94,25 @@ export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: nu
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+export function DashboardCardSkeleton() {
+  return (
+    <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border border-gray-700 p-6 card-enter">
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex-1">
+          <div className="h-4 skeleton rounded w-40 mb-2"></div>
+          <div className="h-3 skeleton rounded w-24"></div>
+        </div>
+        <div className="w-10 h-10 skeleton rounded-lg"></div>
+      </div>
+      <div className="h-10 skeleton rounded w-32 mb-4"></div>
+      <div className="flex items-center gap-2">
+        <div className="h-3 skeleton rounded w-16"></div>
+        <div className="h-3 skeleton rounded w-20"></div>
+      </div>
     </div>
   );
 }

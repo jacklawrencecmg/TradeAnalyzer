@@ -1,5 +1,7 @@
 import { X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { RadarChart } from './RadarChart';
+import { ProgressBar } from './ProgressBar';
 
 interface TeamStrength {
   category: string;
@@ -15,170 +17,114 @@ interface TeamStrengthsModalProps {
 }
 
 export function TeamStrengthsModal({ isOpen, onClose, teamName, strengths }: TeamStrengthsModalProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoveredSegment, setHoveredSegment] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!isOpen || !canvasRef.current) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const radius = Math.min(width, height) / 2 - 40;
-
-    ctx.clearRect(0, 0, width, height);
-
-    const total = strengths.reduce((sum, s) => sum + s.value, 0);
-    let currentAngle = -Math.PI / 2;
-
-    strengths.forEach((strength, index) => {
-      const sliceAngle = (strength.value / total) * 2 * Math.PI;
-      const isHovered = hoveredSegment === index;
-
-      ctx.beginPath();
-      ctx.moveTo(centerX, centerY);
-      ctx.arc(
-        centerX,
-        centerY,
-        isHovered ? radius + 10 : radius,
-        currentAngle,
-        currentAngle + sliceAngle
-      );
-      ctx.closePath();
-
-      ctx.fillStyle = strength.color;
-      ctx.fill();
-
-      ctx.strokeStyle = '#1a1a1a';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-
-      const labelAngle = currentAngle + sliceAngle / 2;
-      const labelRadius = radius * 0.7;
-      const labelX = centerX + Math.cos(labelAngle) * labelRadius;
-      const labelY = centerY + Math.sin(labelAngle) * labelRadius;
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 14px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-
-      const percentage = ((strength.value / total) * 100).toFixed(1);
-      ctx.fillText(`${percentage}%`, labelX, labelY);
-
-      currentAngle += sliceAngle;
-    });
-  }, [isOpen, strengths, hoveredSegment]);
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    const centerX = canvas.width / 2;
-    const centerY = canvas.height / 2;
-    const radius = Math.min(canvas.width, canvas.height) / 2 - 40;
-
-    const dx = x - centerX;
-    const dy = y - centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance <= radius + 10) {
-      let angle = Math.atan2(dy, dx) + Math.PI / 2;
-      if (angle < 0) angle += 2 * Math.PI;
-
-      const total = strengths.reduce((sum, s) => sum + s.value, 0);
-      let currentAngle = 0;
-
-      for (let i = 0; i < strengths.length; i++) {
-        const sliceAngle = (strengths[i].value / total) * 2 * Math.PI;
-        if (angle >= currentAngle && angle < currentAngle + sliceAngle) {
-          setHoveredSegment(i);
-          return;
-        }
-        currentAngle += sliceAngle;
-      }
-    }
-
-    setHoveredSegment(null);
-  };
 
   if (!isOpen) return null;
 
+  const maxValue = Math.max(...strengths.map(s => s.value));
+  const total = strengths.reduce((sum, s) => sum + s.value, 0);
+
+  const radarData = strengths.map(s => ({
+    label: s.category,
+    value: s.value,
+    max: maxValue * 1.2
+  }));
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-fdp-surface-1 rounded-lg border border-fdp-border-1 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-6 border-b border-fdp-border-1">
-          <h2 className="text-2xl font-bold text-fdp-text-1">{teamName} - Team Strengths</h2>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl border border-gray-700 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-gray-900/95 backdrop-blur-sm border-b border-gray-700 p-6 flex items-center justify-between z-10">
+          <div>
+            <h2 className="text-2xl font-bold text-white">{teamName}</h2>
+            <p className="text-gray-400 text-sm mt-1">Team Strengths Analysis</p>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-fdp-surface-2 rounded-lg transition-colors"
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-fdp-text-3" />
+            <X className="w-6 h-6 text-gray-400" />
           </button>
         </div>
 
         <div className="p-6">
-          <div className="flex flex-col lg:flex-row gap-8 items-center">
-            <canvas
-              ref={canvasRef}
-              width={400}
-              height={400}
-              className="cursor-pointer"
-              onMouseMove={handleMouseMove}
-              onMouseLeave={() => setHoveredSegment(null)}
-            />
+          <div className="flex flex-col lg:flex-row gap-8 items-center mb-8">
+            <div className="flex-shrink-0">
+              <RadarChart data={radarData} size={350} color="#00d4ff" />
+            </div>
 
             <div className="flex-1 w-full space-y-3">
+              <h3 className="text-lg font-bold text-white mb-4">Positional Breakdown</h3>
               {strengths.map((strength, index) => {
-                const total = strengths.reduce((sum, s) => sum + s.value, 0);
                 const percentage = ((strength.value / total) * 100).toFixed(1);
                 const isHovered = hoveredSegment === index;
 
                 return (
                   <div
                     key={index}
-                    className={`p-4 rounded-lg border transition-all ${
+                    className={`p-4 rounded-xl border transition-all duration-300 ${
                       isHovered
-                        ? 'border-fdp-accent-1 bg-fdp-surface-2 scale-105'
-                        : 'border-fdp-border-1 bg-fdp-surface-2'
+                        ? 'border-[#00d4ff] bg-gray-800 scale-105 shadow-lg shadow-[#00d4ff]/20'
+                        : 'border-gray-700 bg-gray-800/50'
                     }`}
                     onMouseEnter={() => setHoveredSegment(index)}
                     onMouseLeave={() => setHoveredSegment(null)}
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-4 h-4 rounded-full"
+                          className="w-4 h-4 rounded-full ring-2 ring-white/20"
                           style={{ backgroundColor: strength.color }}
                         />
-                        <span className="text-fdp-text-1 font-medium">{strength.category}</span>
+                        <span className="text-white font-semibold">{strength.category}</span>
                       </div>
                       <div className="text-right">
-                        <div className="text-fdp-text-1 font-bold text-lg">{percentage}%</div>
-                        <div className="text-fdp-text-3 text-sm">{strength.value.toFixed(0)} pts</div>
+                        <div className="text-white font-bold text-xl">{percentage}%</div>
+                        <div className="text-gray-400 text-sm">{strength.value.toFixed(0)} pts</div>
                       </div>
                     </div>
+                    <ProgressBar
+                      value={parseFloat(percentage)}
+                      max={100}
+                      color="blue"
+                      size="sm"
+                    />
                   </div>
                 );
               })}
             </div>
           </div>
 
-          <div className="mt-6 p-4 bg-fdp-surface-2 border border-fdp-border-1 rounded-lg">
-            <h3 className="text-fdp-text-1 font-semibold mb-2">About Team Strengths</h3>
-            <p className="text-fdp-text-3 text-sm">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="p-4 bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl">
+              <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                <div className="w-2 h-2 bg-[#00d4ff] rounded-full"></div>
+                Total Value
+              </h3>
+              <p className="text-3xl font-bold text-[#00d4ff]">{total.toFixed(0)}</p>
+              <p className="text-gray-400 text-sm mt-1">Combined positional strength</p>
+            </div>
+
+            <div className="p-4 bg-gradient-to-br from-gray-800 to-gray-900 border border-gray-700 rounded-xl">
+              <h3 className="text-white font-semibold mb-2 flex items-center gap-2">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                Strongest Position
+              </h3>
+              <p className="text-3xl font-bold text-emerald-500">
+                {strengths.reduce((max, s) => s.value > max.value ? s : max, strengths[0]).category}
+              </p>
+              <p className="text-gray-400 text-sm mt-1">
+                {((strengths.reduce((max, s) => s.value > max.value ? s : max, strengths[0]).value / total) * 100).toFixed(1)}% of total value
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 p-4 bg-gray-800/50 border border-gray-700 rounded-xl">
+            <h3 className="text-white font-semibold mb-2">About Team Strengths</h3>
+            <p className="text-gray-400 text-sm leading-relaxed">
               Team strengths are calculated based on positional value distribution across your roster.
               A balanced team typically has strength across all positions, while specialized teams may
-              excel in specific areas.
+              excel in specific areas. The radar chart provides a visual representation of your team's
+              positional balance.
             </p>
           </div>
         </div>
