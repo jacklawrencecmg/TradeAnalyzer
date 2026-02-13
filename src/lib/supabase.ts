@@ -17,6 +17,13 @@ export interface UserLeague {
   team_name?: string;
   is_superflex: boolean;
   is_active: boolean;
+  platform?: 'sleeper' | 'espn' | 'yahoo' | 'nfl';
+  platform_settings?: {
+    espn_s2?: string;
+    swid?: string;
+    yahoo_access_token?: string;
+    season?: number;
+  };
   created_at: string;
 }
 

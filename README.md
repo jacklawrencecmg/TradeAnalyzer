@@ -8,6 +8,16 @@
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-green.svg)](https://supabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+## 🎯 Multi-Platform Support
+
+Fantasy Draft Pros now supports multiple fantasy football platforms:
+- **🛌 Sleeper** - Fully supported (no auth required)
+- **🏈 ESPN Fantasy** - Fully supported (cookie auth)
+- **🟣 Yahoo Fantasy** - Coming soon
+- **🏆 NFL.com** - Coming soon
+
+See [MULTI_PLATFORM_SUPPORT.md](MULTI_PLATFORM_SUPPORT.md) for detailed instructions on connecting each platform.
+
 ## Features
 
 ### Trade Analysis
@@ -45,7 +55,7 @@
 
 ### Prerequisites
 - Node.js 18+ and npm
-- A Sleeper fantasy football league
+- A fantasy football league (Sleeper, ESPN, Yahoo, or NFL.com)
 - Supabase account (free tier works)
 
 ### Installation

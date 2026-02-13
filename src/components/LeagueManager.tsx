@@ -160,12 +160,30 @@ export function LeagueManager({ leagues, onClose, onUpdate }: LeagueManagerProps
                 <div>
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h4 className="font-bold text-fdp-text-1">{league.league_name}</h4>
-                      <p className="text-sm text-fdp-text-3">League ID: {league.league_id}</p>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-bold text-fdp-text-1">{league.league_name}</h4>
+                        {league.platform && league.platform !== 'sleeper' && (
+                          <span className="text-sm">
+                            {league.platform === 'espn' && '🏈'}
+                            {league.platform === 'yahoo' && '🟣'}
+                            {league.platform === 'nfl' && '🏆'}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-fdp-text-3">
+                        {league.platform ? league.platform.toUpperCase() : 'Sleeper'} League ID: {league.league_id}
+                      </p>
                       {league.team_name && (
                         <p className="text-sm text-fdp-text-3">Team: {league.team_name}</p>
                       )}
-                      <div className="flex gap-2 mt-1">
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        {league.platform && league.platform !== 'sleeper' && (
+                          <span className="px-2 py-1 bg-fdp-surface-2 text-fdp-text-2 rounded-full text-xs font-semibold">
+                            {league.platform === 'espn' && 'ESPN'}
+                            {league.platform === 'yahoo' && 'Yahoo'}
+                            {league.platform === 'nfl' && 'NFL.com'}
+                          </span>
+                        )}
                         {league.is_superflex && (
                           <span className="px-2 py-1 bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2 rounded-full text-xs font-semibold">
                             Superflex

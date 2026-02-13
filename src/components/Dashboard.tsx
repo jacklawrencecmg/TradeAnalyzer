@@ -70,7 +70,14 @@ export function Dashboard() {
     }
   };
 
-  const handleAddLeague = async (leagueId: string, leagueName: string, teamName: string, isSuperflex: boolean) => {
+  const handleAddLeague = async (
+    leagueId: string,
+    leagueName: string,
+    teamName: string,
+    isSuperflex: boolean,
+    platform: 'sleeper' | 'espn' | 'yahoo' | 'nfl' = 'sleeper',
+    platformSettings?: { espn_s2?: string; swid?: string; yahoo_access_token?: string }
+  ) => {
     if (!user) return;
 
     try {
@@ -81,13 +88,15 @@ export function Dashboard() {
         team_name: teamName,
         is_superflex: isSuperflex,
         is_active: true,
+        platform: platform,
+        platform_settings: platformSettings || {},
       });
 
       if (error) throw error;
 
       await loadLeagues();
       setShowAddLeague(false);
-      showToast('League added successfully!', 'success');
+      showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} league added successfully!`, 'success');
     } catch (error: any) {
       console.error('Error adding league:', error);
       if (error.message?.includes('duplicate')) {
@@ -350,14 +359,25 @@ function NavButton({ icon: Icon, label, shortLabel, tab, activeTab, onClick }: N
 
 interface AddLeagueModalProps {
   onClose: () => void;
-  onAdd: (leagueId: string, leagueName: string, teamName: string, isSuperflex: boolean) => void;
+  onAdd: (
+    leagueId: string,
+    leagueName: string,
+    teamName: string,
+    isSuperflex: boolean,
+    platform: 'sleeper' | 'espn' | 'yahoo' | 'nfl',
+    platformSettings?: { espn_s2?: string; swid?: string; yahoo_access_token?: string }
+  ) => void;
 }
 
 function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
+  const [platform, setPlatform] = useState<'sleeper' | 'espn' | 'yahoo' | 'nfl'>('sleeper');
   const [leagueId, setLeagueId] = useState('');
   const [leagueName, setLeagueName] = useState('');
   const [teamName, setTeamName] = useState('');
   const [isSuperflex, setIsSuperflex] = useState(false);
+  const [espnS2, setEspnS2] = useState('');
+  const [swid, setSwid] = useState('');
+  const [showInstructions, setShowInstructions] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -365,28 +385,114 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
       alert('Please enter a League ID');
       return;
     }
-    onAdd(leagueId.trim(), leagueName.trim(), teamName.trim(), isSuperflex);
+    if (platform === 'espn' && (!espnS2.trim() || !swid.trim())) {
+      alert('ESPN leagues require both espn_s2 and SWID cookies');
+      return;
+    }
+    onAdd(leagueId.trim(), leagueName.trim(), teamName.trim(), isSuperflex, platform, {
+      espn_s2: espnS2.trim(),
+      swid: swid.trim(),
+    });
+  };
+
+  const platformInstructions: Record<string, string> = {
+    sleeper: 'Open your Sleeper league → Copy the League ID from the URL (e.g., sleeper.com/leagues/123456789)',
+    espn: 'Open ESPN Fantasy → F12 Developer Tools → Application → Cookies → Copy espn_s2 and SWID values',
+    yahoo: 'Yahoo integration coming soon! For now, public league IDs may work with limited features.',
+    nfl: 'NFL.com integration is coming soon! Use Sleeper or ESPN in the meantime.',
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-w-md w-full p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-w-md w-full p-6 my-8">
         <h3 className="text-xl font-bold text-fdp-text-1 mb-4">Add New League</h3>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label className="block text-sm font-medium text-fdp-text-2 mb-2">
+              Fantasy Platform *
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['sleeper', 'espn', 'yahoo', 'nfl'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPlatform(p)}
+                  disabled={p === 'yahoo' || p === 'nfl'}
+                  className={`py-2 px-4 rounded-lg font-medium transition-all ${
+                    platform === p
+                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0'
+                      : p === 'yahoo' || p === 'nfl'
+                      ? 'bg-fdp-surface-2 text-fdp-text-3 cursor-not-allowed opacity-50'
+                      : 'bg-fdp-surface-2 text-fdp-text-1 hover:bg-fdp-border-1'
+                  }`}
+                >
+                  {p === 'sleeper' && '🛌 Sleeper'}
+                  {p === 'espn' && '🏈 ESPN'}
+                  {p === 'yahoo' && '🟣 Yahoo'}
+                  {p === 'nfl' && '🏆 NFL.com'}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowInstructions(!showInstructions)}
+              className="mt-2 text-xs text-fdp-accent-1 hover:underline"
+            >
+              {showInstructions ? 'Hide' : 'Show'} instructions
+            </button>
+            {showInstructions && (
+              <div className="mt-2 p-3 bg-fdp-surface-2 rounded-lg text-xs text-fdp-text-2">
+                {platformInstructions[platform]}
+              </div>
+            )}
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-fdp-text-2 mb-1">
-              Sleeper League ID *
+              {platform === 'sleeper' ? 'Sleeper ' : platform === 'espn' ? 'ESPN ' : platform === 'yahoo' ? 'Yahoo ' : 'NFL.com '}
+              League ID *
             </label>
             <input
               type="text"
               value={leagueId}
               onChange={(e) => setLeagueId(e.target.value)}
               className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
-              placeholder="e.g., 123456789"
+              placeholder={platform === 'sleeper' ? 'e.g., 123456789' : platform === 'espn' ? 'e.g., 987654' : 'League ID'}
               required
             />
           </div>
+
+          {platform === 'espn' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                  espn_s2 Cookie *
+                </label>
+                <input
+                  type="text"
+                  value={espnS2}
+                  onChange={(e) => setEspnS2(e.target.value)}
+                  className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none font-mono text-xs"
+                  placeholder="Long alphanumeric string"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                  SWID Cookie *
+                </label>
+                <input
+                  type="text"
+                  value={swid}
+                  onChange={(e) => setSwid(e.target.value)}
+                  className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none font-mono text-xs"
+                  placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
+                  required
+                />
+              </div>
+            </>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-fdp-text-2 mb-1">
