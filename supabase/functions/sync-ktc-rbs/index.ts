@@ -86,7 +86,7 @@ async function scrapeKTCRBs(format: string = 'dynasty-superflex'): Promise<Scrap
 
     const players = Array.from(playersMap.values());
 
-    if (players.length < 50) {
+    if (players.length < 150) {
       return {
         blocked: false,
         ok: false,

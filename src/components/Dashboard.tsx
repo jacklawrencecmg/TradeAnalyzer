@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
@@ -29,13 +29,14 @@ import { Contact } from './Contact';
 import Footer from './Footer';
 import KTCAdminSync from './KTCAdminSync';
 import KTCQBRankings from './KTCQBRankings';
+import KTCRBRankings from './KTCRBRankings';
 import KTCMultiPositionSync from './KTCMultiPositionSync';
 import UnifiedRankings from './UnifiedRankings';
 import PlayerSearch from './PlayerSearch';
 import PlayerDetail from './PlayerDetail';
 import SleeperLeagueAnalysis from './SleeperLeagueAnalysis';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -319,6 +320,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="Admin" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Award} label="RB Rankings" shortLabel="RBs" tab="ktcRBRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={RefreshCw} label="Multi-Position Sync" shortLabel="Multi" tab="ktcMultiSync" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={TrendingUp} label="All Rankings" shortLabel="Rankings" tab="unifiedRankings" activeTab={activeTab} onClick={setActiveTab} />
                   </div>
@@ -361,6 +363,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'contact' && <Contact />}
               {activeTab === 'ktcAdmin' && <KTCAdminSync />}
               {activeTab === 'ktcRankings' && <KTCQBRankings />}
+              {activeTab === 'ktcRBRankings' && <KTCRBRankings />}
               {activeTab === 'ktcMultiSync' && <KTCMultiPositionSync />}
               {activeTab === 'unifiedRankings' && <UnifiedRankings />}
               {activeTab === 'sleeperAnalysis' && <SleeperLeagueAnalysis />}
