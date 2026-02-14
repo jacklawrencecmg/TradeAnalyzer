@@ -1,4 +1,5 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { resolvePlayerId, addPlayerAlias } from '../_shared/playerResolver.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,6 +133,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const url = new URL(req.url);
+    const format = url.searchParams.get('format') || 'dynasty-superflex';
+
     const authHeader = req.headers.get('Authorization');
     const adminSecret = Deno.env.get('ADMIN_SYNC_SECRET');
 
@@ -180,51 +184,33 @@ Deno.serve(async (req: Request) => {
     const qbs = scrapeResult.qbs;
 
     let successCount = 0;
+    let quarantinedCount = 0;
+    let aliasesCreated = 0;
     const capturedAt = new Date().toISOString();
     const formatKey = format.replace(/-/g, '_');
 
     for (const qb of qbs) {
-      const { data: existingPlayer } = await supabase
-        .from('player_values')
-        .select('player_id')
-        .eq('player_name', qb.full_name)
-        .eq('position', 'QB')
-        .maybeSingle();
+      const resolveResult = await resolvePlayerId(supabase, {
+        name: qb.full_name,
+        position: 'QB',
+        team: qb.team || undefined,
+        source: 'ktc',
+        autoQuarantine: true,
+      });
 
-      let playerId = existingPlayer?.player_id;
-
-      if (!playerId) {
-        playerId = `ktc_${qb.full_name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
-
-        const { error: insertError } = await supabase
-          .from('player_values')
-          .insert({
-            player_id: playerId,
-            player_name: qb.full_name,
-            position: 'QB',
-            team: qb.team,
-            ktc_value: qb.value,
-            fdp_value: qb.value,
-            last_updated: capturedAt,
-          });
-
-        if (insertError) {
-          console.error('Error inserting player:', insertError);
-          continue;
+      if (!resolveResult.success) {
+        console.warn(`Could not resolve QB: ${qb.full_name} (quarantined: ${resolveResult.quarantined})`);
+        if (resolveResult.quarantined) {
+          quarantinedCount++;
         }
-      } else {
-        const { error: updateError } = await supabase
-          .from('player_values')
-          .update({
-            team: qb.team,
-            ktc_value: qb.value,
-            last_updated: capturedAt,
-          })
-          .eq('player_id', playerId);
+        continue;
+      }
 
-        if (updateError) {
-          console.error('Error updating player:', updateError);
-        }
+      const playerId = resolveResult.player_id!;
+
+      const aliasAdded = await addPlayerAlias(supabase, playerId, qb.full_name, 'ktc');
+      if (aliasAdded) {
+        aliasesCreated++;
       }
 
       const fdpValue = calcFdpValue(qb.value, 'QB', format);
@@ -237,7 +223,7 @@ Deno.serve(async (req: Request) => {
           position: 'QB',
           team: qb.team,
           position_rank: qb.position_rank,
-          ktc_value: qb.value,
+          base_value: qb.value,
           fdp_value: fdpValue,
           format: formatKey,
           source: 'KTC',
@@ -254,8 +240,11 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         ok: true,
+        position: 'QB',
         count: successCount,
         total: qbs.length,
+        quarantined: quarantinedCount,
+        aliases_created: aliasesCreated,
         minRank: scrapeResult.minRank,
         maxRank: scrapeResult.maxRank,
         timestamp: capturedAt,
