@@ -44,8 +44,11 @@ import TeamAdvice from './TeamAdvice';
 import MarketTrends from './MarketTrends';
 import WatchlistPanel from './WatchlistPanel';
 import AlertsDropdown from './AlertsDropdown';
+import DynastyReportsIndex from './DynastyReportsIndex';
+import DynastyReportPage from './DynastyReportPage';
+import LatestReportWidget from './LatestReportWidget';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -61,6 +64,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('trade');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [selectedReportSlug, setSelectedReportSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -243,6 +247,16 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           )}
         </div>
 
+        {/* Latest Market Report Widget */}
+        <div className="mb-6">
+          <LatestReportWidget
+            onSelectReport={(slug) => {
+              setSelectedReportSlug(slug);
+              setActiveTab('reportDetail');
+            }}
+          />
+        </div>
+
         {/* Player Search */}
         <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-8 mb-6">
           <div className="text-center mb-4">
@@ -286,6 +300,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Target} label="Team Advice" shortLabel="Advice" tab="teamAdvice" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Award} label="Watchlist" shortLabel="Watch" tab="watchlist" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={FileText} label="Market Reports" shortLabel="Reports" tab="reports" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Activity} label="Market Trends" shortLabel="Market" tab="market" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={DollarSign} label="Player Values" shortLabel="Values" tab="values" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Search} label="Waiver Assistant" shortLabel="Waiver" tab="waiver" activeTab={activeTab} onClick={setActiveTab} />
@@ -395,6 +410,21 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'ktcMultiSync' && <KTCMultiPositionSync />}
               {activeTab === 'unifiedRankings' && <UnifiedRankings />}
               {activeTab === 'sleeperAnalysis' && <SleeperLeagueAnalysis />}
+              {activeTab === 'reports' && (
+                <DynastyReportsIndex
+                  onSelectReport={(slug) => {
+                    setSelectedReportSlug(slug);
+                    setActiveTab('reportDetail');
+                  }}
+                />
+              )}
+              {activeTab === 'reportDetail' && selectedReportSlug && (
+                <DynastyReportPage
+                  slug={selectedReportSlug}
+                  onBack={() => setActiveTab('reports')}
+                  onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)}
+                />
+              )}
             </div>
           </div>
         )}
