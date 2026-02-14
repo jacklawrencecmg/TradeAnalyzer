@@ -214,6 +214,14 @@ let fdpValues: Record<string, number> = {};
 let fdpSuperflexValues: Record<string, number> = {};
 let dbPlayerValues: Map<string, PlayerValue> = new Map();
 
+const KNOWN_BACKUP_QBS = [
+  'joe milton', 'joe milton iii', 'trey lance', 'sam howell', 'tyler huntley',
+  'jake browning', 'easton stick', 'cooper rush', 'taylor heinicke',
+  'jarrett stidham', 'mitch trubisky', 'tyson bagent', 'joshua dobbs',
+  'clayton tune', 'davis mills', 'aidan oconnell', 'jaren hall',
+  'stetson bennett', 'dorian thompson-robinson', 'malik willis'
+];
+
 export async function fetchPlayerValues(
   isSuperflex: boolean = false,
   leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
@@ -447,6 +455,29 @@ export function getPlayerValue(
     const rawFdpValue = typeof dbValue.fdp_value === 'string' ? parseFloat(dbValue.fdp_value) : dbValue.fdp_value;
     let value = rawFdpValue;
 
+    // Apply backup QB penalty if not already applied in metadata
+    if (player.position === 'QB' && !dbValue.metadata?.backup_qb_applied) {
+      const playerNameLower = (player.full_name || '').toLowerCase();
+      const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+
+      // Get all QB values from database to calculate relative value
+      const allQBValues = Array.from(dbPlayerValues.values())
+        .map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : v.fdp_value)
+        .filter(v => v > 100)
+        .sort((a, b) => b - a);
+
+      const topQBValue = allQBValues[0] || 10000;
+      const relativeValue = value / topQBValue;
+
+      if (isKnownBackup || relativeValue < 0.05) {
+        value *= 0.02;
+      } else if (relativeValue < 0.10) {
+        value *= 0.05;
+      } else if (relativeValue < 0.20) {
+        value *= 0.15;
+      }
+    }
+
     if (player.position === 'TE' && finalSettings.isTEPremium && !dbValue.metadata?.te_premium_applied) {
       value *= 1.15;
     }
@@ -462,6 +493,46 @@ export function getPlayerValue(
 
   if (ktcValueSource[player.player_id]) {
     let value = ktcValueSource[player.player_id];
+
+    // Apply backup QB penalty
+    if (player.position === 'QB') {
+      const playerNameLower = (player.full_name || '').toLowerCase();
+      const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+
+      // Get all QB values to calculate relative value
+      const allQBValues = Object.keys(ktcValueSource)
+        .map(playerId => ktcValueSource[playerId])
+        .filter(v => v > 100)
+        .sort((a, b) => b - a);
+
+      const topQBValue = allQBValues[0] || 10000;
+      const relativeValue = value / topQBValue;
+
+      if (isKnownBackup || relativeValue < 0.05) {
+        value *= 0.02; // Known backups get 2% of their value
+      } else if (relativeValue < 0.10) {
+        value *= 0.05; // Very low value QBs get 5%
+      } else if (relativeValue < 0.20) {
+        value *= 0.15; // Low value QBs get 15%
+      }
+    }
+
+    // Apply rookie penalty for non-elite rookies
+    if (player.years_exp === 0 && player.position !== 'QB') {
+      // Get position-specific values to determine if this is an elite rookie
+      const positionValues = Object.keys(ktcValueSource)
+        .map(playerId => ktcValueSource[playerId])
+        .filter(v => v > 100)
+        .sort((a, b) => b - a);
+
+      const topValue = positionValues[0] || 10000;
+      const relativeValue = value / topValue;
+
+      // If rookie is not in top 20% of their position, apply penalty
+      if (relativeValue < 0.20) {
+        value *= 0.85;
+      }
+    }
 
     if (player.position === 'TE' && finalSettings.isTEPremium) {
       value *= 1.15;
