@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, Info } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, Info, Share2, Check, Copy } from 'lucide-react';
 import {
   fetchAllPlayers,
   analyzeTrade,
@@ -47,6 +47,9 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [leagueSettings, setLeagueSettings] = useState<Partial<LeagueSettings>>({
     isSuperflex: false,
     isTEPremium: false,
@@ -453,6 +456,109 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     setTeamAGivesFAAB(0);
     setTeamAGetsFAAB(0);
     setAnalysis(null);
+    setShareUrl(null);
+    setCopied(false);
+  }
+
+  async function shareTrade() {
+    if (!analysis) return;
+
+    try {
+      setSharing(true);
+
+      const format = leagueSettings.isSuperflex ? 'dynasty_sf' : 'dynasty_1qb';
+
+      const sideAPlayers = analysis.teamAItems
+        .filter(item => item.type === 'player')
+        .map(item => ({
+          id: item.id,
+          name: item.name,
+          position: item.position || '',
+          value: item.value,
+        }));
+
+      const sideBPlayers = analysis.teamBItems
+        .filter(item => item.type === 'player')
+        .map(item => ({
+          id: item.id,
+          name: item.name,
+          position: item.position || '',
+          value: item.value,
+        }));
+
+      const sideAPicks = analysis.teamAItems
+        .filter(item => item.type === 'pick')
+        .map(item => ({
+          round: item.round || 1,
+          year: item.year || new Date().getFullYear(),
+          value: item.value,
+        }));
+
+      const sideBPicks = analysis.teamBItems
+        .filter(item => item.type === 'pick')
+        .map(item => ({
+          round: item.round || 1,
+          year: item.year || new Date().getFullYear(),
+          value: item.value,
+        }));
+
+      const fairnessPercentage = Math.max(analysis.teamAValue, analysis.teamBValue) > 0
+        ? Math.round(100 - (Math.abs(analysis.teamAValue - analysis.teamBValue) / Math.max(analysis.teamAValue, analysis.teamBValue) * 100))
+        : 100;
+
+      const winner = analysis.winner === 'Fair' ? 'even' : analysis.winner === 'A' ? 'side_a' : 'side_b';
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trade-share`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({
+          format,
+          sideA: {
+            players: sideAPlayers,
+            picks: sideAPicks.length > 0 ? sideAPicks : undefined,
+            faab: teamAGivesFAAB > 0 ? teamAGivesFAAB : undefined,
+          },
+          sideB: {
+            players: sideBPlayers,
+            picks: sideBPicks.length > 0 ? sideBPicks : undefined,
+            faab: teamAGetsFAAB > 0 ? teamAGetsFAAB : undefined,
+          },
+          sideATotal: analysis.teamAValue,
+          sideBTotal: analysis.teamBValue,
+          fairnessPercentage,
+          winner,
+          recommendation: analysis.fairness,
+          hideValues: false,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.ok && data.url) {
+        setShareUrl(data.url);
+        showToast('Trade link created!', 'success');
+      } else {
+        throw new Error(data.error || 'Failed to create share link');
+      }
+    } catch (error) {
+      console.error('Failed to share trade:', error);
+      showToast('Failed to create share link', 'error');
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  function copyShareLink() {
+    if (shareUrl) {
+      navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      showToast('Link copied to clipboard!', 'success');
+      setTimeout(() => setCopied(false), 2000);
+    }
   }
 
   function getRosterPlayers(rosterId: string): string[] {
@@ -1656,6 +1762,47 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 this trade.
               </p>
             )}
+
+            {/* Share Trade Section */}
+            <div className="mt-6 pt-6 border-t border-gray-700">
+              <div className="text-center">
+                {!shareUrl ? (
+                  <button
+                    onClick={shareTrade}
+                    disabled={sharing}
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+                  >
+                    <Share2 className="w-5 h-5" />
+                    {sharing ? 'Creating Link...' : 'Share This Trade'}
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 justify-center">
+                      <Check className="w-5 h-5 text-green-400" />
+                      <span className="text-green-400 font-semibold">Share link created!</span>
+                    </div>
+                    <div className="flex items-center gap-2 max-w-2xl mx-auto">
+                      <input
+                        type="text"
+                        value={shareUrl}
+                        readOnly
+                        className="flex-1 px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-gray-300 text-sm"
+                      />
+                      <button
+                        onClick={copyShareLink}
+                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
+                      >
+                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        {copied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-400">
+                      Share this link on Discord, Twitter, Reddit, or any platform. Perfect for getting league opinions!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {user && (

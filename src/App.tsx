@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { AuthForm } from './components/AuthForm';
 import { Dashboard } from './components/Dashboard';
 import TradeAnalyzer from './components/TradeAnalyzer';
+import SharedTradePage from './components/SharedTradePage';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Footer from './components/Footer';
@@ -16,6 +17,15 @@ function AppContent() {
   const { user, loading } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [tradeSlug, setTradeSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    const tradeMatch = path.match(/^\/trade\/([a-z0-9]+)$/);
+    if (tradeMatch) {
+      setTradeSlug(tradeMatch[1]);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -23,6 +33,10 @@ function AppContent() {
         <div className="text-fdp-text-1 text-xl">Loading...</div>
       </div>
     );
+  }
+
+  if (tradeSlug) {
+    return <SharedTradePage slug={tradeSlug} />;
   }
 
   if (user) {
