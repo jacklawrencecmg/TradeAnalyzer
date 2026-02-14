@@ -239,6 +239,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    try {
+      const recalcPickValuesUrl = `${supabaseUrl}/functions/v1/recalc-pick-values`;
+      fetch(recalcPickValuesUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(err => {
+        console.error('Background pick values recalc failed:', err);
+      });
+    } catch (err) {
+      console.error('Failed to trigger pick values recalc:', err);
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,

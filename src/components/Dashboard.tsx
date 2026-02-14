@@ -37,8 +37,9 @@ import PlayerDetail from './PlayerDetail';
 import SleeperLeagueAnalysis from './SleeperLeagueAnalysis';
 import RBContextEditor from './RBContextEditor';
 import RBContextSuggestions from './RBContextSuggestions';
+import RookiePickValues from './RookiePickValues';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -325,6 +326,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     <NavButton icon={Award} label="RB Rankings" shortLabel="RBs" tab="ktcRBRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Edit} label="RB Context" shortLabel="Context" tab="rbContext" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Sparkles} label="RB Suggestions" shortLabel="AI Suggest" tab="rbSuggestions" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Calendar} label="Rookie Pick Values" shortLabel="Picks" tab="pickValues" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={RefreshCw} label="Multi-Position Sync" shortLabel="Multi" tab="ktcMultiSync" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={TrendingUp} label="All Rankings" shortLabel="Rankings" tab="unifiedRankings" activeTab={activeTab} onClick={setActiveTab} />
                   </div>
@@ -370,6 +372,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'ktcRBRankings' && <KTCRBRankings />}
               {activeTab === 'rbContext' && <RBContextEditor />}
               {activeTab === 'rbSuggestions' && <RBContextSuggestions />}
+              {activeTab === 'pickValues' && <RookiePickValues />}
               {activeTab === 'ktcMultiSync' && <KTCMultiPositionSync />}
               {activeTab === 'unifiedRankings' && <UnifiedRankings />}
               {activeTab === 'sleeperAnalysis' && <SleeperLeagueAnalysis />}

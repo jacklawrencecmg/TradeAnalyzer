@@ -6,12 +6,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-const pickValueChart: Record<string, number> = {
+const staticPickValueChart: Record<string, number> = {
   '1.01': 9500, '1.02': 9200, '1.03': 8900, '1.04': 8600, '1.05': 8300,
   '1.06': 8000, '1.07': 7700, '1.08': 7400, '1.09': 7100, '1.10': 6800,
   '1.11': 6500, '1.12': 6200,
-  'early_1st': 8500, 'mid_1st': 6500, 'late_1st': 4800,
-  '2nd': 2500, 'early_2nd': 3000, 'mid_2nd': 2500, 'late_2nd': 2000,
+  'early_1st': 6500, 'mid_1st': 5500, 'late_1st': 4800,
+  '2nd': 2500, 'early_2nd': 3200, 'mid_2nd': 2500, 'late_2nd': 2600,
   '3rd': 1200, '4th': 500,
 };
 
@@ -31,9 +31,32 @@ function normalizePickName(pick: string): string {
   return lower;
 }
 
-function getPickValue(pick: string): number {
+async function getPickValue(pick: string, supabase: any): Promise<{ value: number; phase?: string; adjustment?: number; baseValue?: number }> {
   const normalized = normalizePickName(pick);
-  return pickValueChart[normalized] || 0;
+
+  const dynamicPickTypes = ['early_1st', 'mid_1st', 'late_1st', 'early_2nd', 'late_2nd', '3rd'];
+
+  if (dynamicPickTypes.includes(normalized)) {
+    const currentYear = new Date().getFullYear();
+    const { data: pickData } = await supabase
+      .from('rookie_pick_values')
+      .select('*')
+      .eq('pick', normalized)
+      .eq('season', currentYear + 1)
+      .maybeSingle();
+
+    if (pickData) {
+      const value = pickData.manual_override ? (pickData.override_value || pickData.adjusted_value) : pickData.adjusted_value;
+      return {
+        value,
+        phase: pickData.phase,
+        adjustment: pickData.adjusted_value - pickData.base_value,
+        baseValue: pickData.base_value
+      };
+    }
+  }
+
+  return { value: staticPickValueChart[normalized] || 0 };
 }
 
 function isPick(name: string): boolean {
@@ -120,19 +143,22 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const lookupPlayer = (item: TradePlayer | string) => {
+    const lookupPlayer = async (item: TradePlayer | string) => {
       const name = typeof item === 'string' ? item : item.name;
       const pos = typeof item === 'string' ? undefined : item.pos;
 
       if (isPick(name)) {
-        const pickValue = getPickValue(name);
-        if (pickValue > 0) {
+        const pickResult = await getPickValue(name, supabase);
+        if (pickResult.value > 0) {
           return {
             found: true,
-            value: pickValue,
+            value: pickResult.value,
             name: name,
             isPick: true,
-            pos: 'PICK'
+            pos: 'PICK',
+            pickPhase: pickResult.phase,
+            pickAdjustment: pickResult.adjustment,
+            baseValue: pickResult.baseValue
           };
         }
         return {
@@ -194,17 +220,27 @@ Deno.serve(async (req: Request) => {
     let sideATotal = 0;
     const sideADetails: any[] = [];
     const sideANotFound: any[] = [];
+    let pickPhaseInfo: any = null;
 
     for (const item of sideA) {
-      const result = lookupPlayer(item);
+      const result = await lookupPlayer(item);
       if (result.found) {
         sideATotal += result.value;
         sideADetails.push({
           name: result.name,
           pos: result.pos,
           value: result.value,
-          isPick: result.isPick || false
+          isPick: result.isPick || false,
+          pickPhase: result.pickPhase,
+          pickAdjustment: result.pickAdjustment,
+          baseValue: result.baseValue
         });
+        if (result.isPick && result.pickPhase && !pickPhaseInfo) {
+          pickPhaseInfo = {
+            phase: result.pickPhase,
+            adjustment: result.pickAdjustment
+          };
+        }
       } else {
         sideANotFound.push({
           name: result.searchedName,
@@ -219,15 +255,24 @@ Deno.serve(async (req: Request) => {
     const sideBNotFound: any[] = [];
 
     for (const item of sideB) {
-      const result = lookupPlayer(item);
+      const result = await lookupPlayer(item);
       if (result.found) {
         sideBTotal += result.value;
         sideBDetails.push({
           name: result.name,
           pos: result.pos,
           value: result.value,
-          isPick: result.isPick || false
+          isPick: result.isPick || false,
+          pickPhase: result.pickPhase,
+          pickAdjustment: result.pickAdjustment,
+          baseValue: result.baseValue
         });
+        if (result.isPick && result.pickPhase && !pickPhaseInfo) {
+          pickPhaseInfo = {
+            phase: result.pickPhase,
+            adjustment: result.pickAdjustment
+          };
+        }
       } else {
         sideBNotFound.push({
           name: result.searchedName,
@@ -270,6 +315,8 @@ Deno.serve(async (req: Request) => {
         sideB_details: sideBDetails,
         sideA_not_found: sideANotFound,
         sideB_not_found: sideBNotFound,
+        pick_phase: pickPhaseInfo?.phase,
+        pick_adjustment_applied: pickPhaseInfo ? true : false,
       }),
       {
         status: 200,

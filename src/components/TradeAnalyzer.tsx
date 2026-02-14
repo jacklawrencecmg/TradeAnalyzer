@@ -24,6 +24,8 @@ import { StatSparkline } from './StatSparkline';
 import { AchievementBadge } from './AchievementBadge';
 import { TradeGrade, calculateTradeGrade } from './TradeGrade';
 import { syncPlayerValuesToDatabase } from '../utils/syncPlayerValues';
+import { getCurrentPhaseInfo, getPhaseEmoji } from '../lib/picks/seasonPhase';
+import { getMultiplierPercentage } from '../lib/picks/phaseMultipliers';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -1597,6 +1599,23 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
           </div>
 
           <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border border-gray-700 shadow-lg">
+            {(teamAGivesPicks.length > 0 || teamAGetsPicks.length > 0) && (() => {
+              const phaseInfo = getCurrentPhaseInfo();
+              const adjustment = getMultiplierPercentage(phaseInfo.phase);
+              return (
+                <div className="mb-4 p-3 bg-blue-900/30 border border-blue-500/30 rounded-lg">
+                  <div className="flex items-center gap-2 text-sm text-blue-300">
+                    <span className="text-lg">{getPhaseEmoji(phaseInfo.phase)}</span>
+                    <span className="font-semibold">{phaseInfo.label}:</span>
+                    <span>Rookie picks currently {adjustment.startsWith('+') ? 'inflated' : adjustment.startsWith('-') ? 'discounted' : 'at baseline'} ({adjustment})</span>
+                  </div>
+                  <div className="text-xs text-blue-400 mt-1">
+                    {phaseInfo.description}
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="flex flex-col items-center gap-4 mb-4">
               <TradeGrade
                 grade={calculateTradeGrade(
