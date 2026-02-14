@@ -6,15 +6,53 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const pickValueChart: Record<string, number> = {
+  '1.01': 9500, '1.02': 9200, '1.03': 8900, '1.04': 8600, '1.05': 8300,
+  '1.06': 8000, '1.07': 7700, '1.08': 7400, '1.09': 7100, '1.10': 6800,
+  '1.11': 6500, '1.12': 6200,
+  'early_1st': 8500, 'mid_1st': 6500, 'late_1st': 4800,
+  '2nd': 2500, 'early_2nd': 3000, 'mid_2nd': 2500, 'late_2nd': 2000,
+  '3rd': 1200, '4th': 500,
+};
+
+function normalizePickName(pick: string): string {
+  const lower = pick.toLowerCase().trim();
+  if (lower.includes('early') && lower.includes('1')) return 'early_1st';
+  if (lower.includes('mid') && lower.includes('1')) return 'mid_1st';
+  if (lower.includes('late') && lower.includes('1')) return 'late_1st';
+  if (lower.includes('early') && lower.includes('2')) return 'early_2nd';
+  if (lower.includes('mid') && lower.includes('2')) return 'mid_2nd';
+  if (lower.includes('late') && lower.includes('2')) return 'late_2nd';
+  if (lower.match(/1\.0[1-9]|1\.1[0-2]/)) return lower.replace(/\s/g, '');
+  if (lower.includes('2nd') || lower.includes('2.')) return '2nd';
+  if (lower.includes('3rd') || lower.includes('3.')) return '3rd';
+  if (lower.includes('4th') || lower.includes('4.')) return '4th';
+  if (lower.includes('1st') || lower.includes('1.')) return 'mid_1st';
+  return lower;
+}
+
+function getPickValue(pick: string): number {
+  const normalized = normalizePickName(pick);
+  return pickValueChart[normalized] || 0;
+}
+
+function isPick(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.includes('1st') || lower.includes('2nd') || lower.includes('3rd') ||
+         lower.includes('4th') || lower.match(/\d\.\d{2}/) !== null ||
+         lower.includes('pick') || lower.includes('1.') || lower.includes('2.') ||
+         lower.includes('3.') || lower.includes('4.');
+}
+
 interface TradePlayer {
   name: string;
-  pos: string;
+  pos?: string;
 }
 
 interface TradeRequest {
   format: string;
-  sideA: TradePlayer[];
-  sideB: TradePlayer[];
+  sideA: (TradePlayer | string)[];
+  sideB: (TradePlayer | string)[];
 }
 
 interface PlayerValue {
@@ -22,21 +60,19 @@ interface PlayerValue {
   full_name: string;
   position: string;
   ktc_value: number;
+  fdp_value: number;
   captured_at: string;
 }
 
 function calculateSimilarity(str1: string, str2: string): number {
   const s1 = str1.toLowerCase().trim();
   const s2 = str2.toLowerCase().trim();
-
   if (s1 === s2) return 1;
   if (s1.includes(s2) || s2.includes(s1)) return 0.8;
-
   const words1 = s1.split(/\s+/);
   const words2 = s2.split(/\s+/);
   const commonWords = words1.filter(w => words2.includes(w)).length;
   const maxWords = Math.max(words1.length, words2.length);
-
   return commonWords / maxWords;
 }
 
@@ -68,7 +104,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: allSnapshots, error } = await supabase
       .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, ktc_value, captured_at')
+      .select('player_id, full_name, position, ktc_value, fdp_value, captured_at')
       .eq('format', format)
       .order('captured_at', { ascending: false });
 
@@ -84,16 +120,51 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    const lookupPlayer = (name: string, pos: string) => {
-      const key = `${name}_${pos}`;
-      const exact = latestByPlayer.get(key);
-      if (exact) return { found: true, value: exact.ktc_value, name: exact.full_name };
+    const lookupPlayer = (item: TradePlayer | string) => {
+      const name = typeof item === 'string' ? item : item.name;
+      const pos = typeof item === 'string' ? undefined : item.pos;
+
+      if (isPick(name)) {
+        const pickValue = getPickValue(name);
+        if (pickValue > 0) {
+          return {
+            found: true,
+            value: pickValue,
+            name: name,
+            isPick: true,
+            pos: 'PICK'
+          };
+        }
+        return {
+          found: false,
+          suggestions: ['Try: early 1st, mid 1st, late 1st, 1.01-1.12, 2nd, 3rd'],
+          searchedName: name,
+          searchedPos: 'PICK',
+          isPick: true
+        };
+      }
+
+      const searchPositions = pos ? [pos] : ['QB', 'RB', 'WR', 'TE'];
+
+      for (const searchPos of searchPositions) {
+        const key = `${name}_${searchPos}`;
+        const exact = latestByPlayer.get(key);
+        if (exact) {
+          return {
+            found: true,
+            value: exact.fdp_value || exact.ktc_value,
+            name: exact.full_name,
+            pos: exact.position,
+            isPick: false
+          };
+        }
+      }
 
       let bestMatch: PlayerValue | null = null;
       let bestScore = 0;
 
-      for (const [playerKey, player] of latestByPlayer.entries()) {
-        if (player.position === pos) {
+      for (const [_, player] of latestByPlayer.entries()) {
+        if (!pos || player.position === pos) {
           const score = calculateSimilarity(name, player.full_name);
           if (score > bestScore && score > 0.6) {
             bestScore = score;
@@ -104,7 +175,7 @@ Deno.serve(async (req: Request) => {
 
       if (bestMatch) {
         const suggestions = Array.from(latestByPlayer.values())
-          .filter(p => p.position === pos)
+          .filter(p => !pos || p.position === pos)
           .map(p => ({
             name: p.full_name,
             similarity: calculateSimilarity(name, p.full_name),
@@ -114,23 +185,32 @@ Deno.serve(async (req: Request) => {
           .slice(0, 5)
           .map(s => s.name);
 
-        return { found: false, suggestions, searchedName: name, searchedPos: pos };
+        return { found: false, suggestions, searchedName: name, searchedPos: pos || 'ANY' };
       }
 
-      return { found: false, suggestions: [], searchedName: name, searchedPos: pos };
+      return { found: false, suggestions: [], searchedName: name, searchedPos: pos || 'ANY' };
     };
 
     let sideATotal = 0;
     const sideADetails: any[] = [];
     const sideANotFound: any[] = [];
 
-    for (const player of sideA) {
-      const result = lookupPlayer(player.name, player.pos);
+    for (const item of sideA) {
+      const result = lookupPlayer(item);
       if (result.found) {
         sideATotal += result.value;
-        sideADetails.push({ name: result.name, pos: player.pos, value: result.value });
+        sideADetails.push({
+          name: result.name,
+          pos: result.pos,
+          value: result.value,
+          isPick: result.isPick || false
+        });
       } else {
-        sideANotFound.push({ name: player.name, pos: player.pos, suggestions: result.suggestions });
+        sideANotFound.push({
+          name: result.searchedName,
+          pos: result.searchedPos,
+          suggestions: result.suggestions
+        });
       }
     }
 
@@ -138,25 +218,44 @@ Deno.serve(async (req: Request) => {
     const sideBDetails: any[] = [];
     const sideBNotFound: any[] = [];
 
-    for (const player of sideB) {
-      const result = lookupPlayer(player.name, player.pos);
+    for (const item of sideB) {
+      const result = lookupPlayer(item);
       if (result.found) {
         sideBTotal += result.value;
-        sideBDetails.push({ name: result.name, pos: player.pos, value: result.value });
+        sideBDetails.push({
+          name: result.name,
+          pos: result.pos,
+          value: result.value,
+          isPick: result.isPick || false
+        });
       } else {
-        sideBNotFound.push({ name: player.name, pos: player.pos, suggestions: result.suggestions });
+        sideBNotFound.push({
+          name: result.searchedName,
+          pos: result.searchedPos,
+          suggestions: result.suggestions
+        });
       }
     }
 
     const difference = sideATotal - sideBTotal;
-    let recommendation = '';
+    const maxValue = Math.max(sideATotal, sideBTotal);
+    const fairnessPercentage = maxValue > 0
+      ? Math.round((Math.min(sideATotal, sideBTotal) / maxValue) * 100)
+      : 100;
 
+    let recommendation = '';
     if (Math.abs(difference) < 500) {
       recommendation = 'Fair trade - values are very close';
-    } else if (difference > 0) {
-      recommendation = `Side A is higher by ${difference} (add value to Side B)`;
+    } else if (fairnessPercentage >= 90) {
+      recommendation = 'Fair trade - slight value difference';
+    } else if (fairnessPercentage >= 75) {
+      recommendation = difference > 0
+        ? `Side A wins - consider adding ${Math.abs(difference)} value to Side B`
+        : `Side B wins - consider adding ${Math.abs(difference)} value to Side A`;
     } else {
-      recommendation = `Side B is higher by ${Math.abs(difference)} (add value to Side A)`;
+      recommendation = difference > 0
+        ? `Side A strongly favored - needs ${Math.abs(difference)} more value on Side B`
+        : `Side B strongly favored - needs ${Math.abs(difference)} more value on Side A`;
     }
 
     return new Response(
@@ -164,7 +263,8 @@ Deno.serve(async (req: Request) => {
         ok: true,
         sideA_total: sideATotal,
         sideB_total: sideBTotal,
-        difference,
+        difference: Math.abs(difference),
+        fairness_percentage: fairnessPercentage,
         recommendation,
         sideA_details: sideADetails,
         sideB_details: sideBDetails,

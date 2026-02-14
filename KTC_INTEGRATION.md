@@ -135,7 +135,31 @@ Multi-position sync endpoints for RB, WR, and TE rankings:
 }
 ```
 
-#### 5. ktc-rankings
+#### 5. sync-ktc-all
+**Endpoint:** `/functions/v1/sync-ktc-all?format=dynasty-superflex`
+**Method:** POST or GET (with `?secret=`)
+**Authentication:** Bearer token (ADMIN_SYNC_SECRET) or query param (CRON_SECRET)
+
+Unified sync endpoint that syncs all positions sequentially:
+- Calls all position sync endpoints (QB, RB, WR, TE)
+- Adds 1 second delay between positions to avoid rate limits
+- Returns aggregate results for all positions
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "QB": {"ok": true, "count": 150, "maxRank": 150},
+  "RB": {"ok": true, "count": 95, "maxRank": 95},
+  "WR": {"ok": true, "count": 120, "maxRank": 120},
+  "TE": {"ok": true, "count": 50, "maxRank": 50},
+  "captured_at": "2026-02-14T12:00:00Z",
+  "total_synced": 415,
+  "errors": []
+}
+```
+
+#### 6. ktc-rankings
 **Endpoint:** `/functions/v1/ktc-rankings?position=QB&format=dynasty_sf`
 **Method:** GET
 **Authentication:** None (public)
@@ -143,7 +167,7 @@ Multi-position sync endpoints for RB, WR, and TE rankings:
 
 Unified rankings endpoint for all positions:
 - Query params: `position` (QB/RB/WR/TE), `format` (dynasty_sf/dynasty_1qb/dynasty_tep)
-- Returns latest snapshot per player
+- Returns latest snapshot per player with both KTC and FDP values
 - Sorted by position_rank
 
 **Response Format:**
@@ -155,12 +179,13 @@ Unified rankings endpoint for all positions:
     "position": "QB",
     "team": "KC",
     "ktc_value": 9500,
+    "fdp_value": 12825,
     "captured_at": "2026-02-14T12:00:00Z"
   }
 ]
 ```
 
-#### 6. trade-eval
+#### 7. trade-eval
 **Endpoint:** `/functions/v1/trade-eval`
 **Method:** POST
 **Authentication:** None (public)
@@ -175,24 +200,33 @@ Evaluates trade value using latest snapshot values (all positions):
 ```json
 {
   "format": "dynasty_sf",
-  "sideA": [{"name": "Drake Maye", "pos": "QB"}],
-  "sideB": [{"name": "Joe Burrow", "pos": "QB"}]
+  "sideA": ["Drake Maye", {"name": "Bijan Robinson", "pos": "RB"}, "early 1st"],
+  "sideB": ["Joe Burrow", "2026 2nd"]
 }
 ```
+
+Supports:
+- String format: "Player Name" (searches all positions)
+- Object format: {"name": "Player Name", "pos": "QB"} (position-specific)
+- Draft picks: "early 1st", "mid 1st", "late 1st", "1.01-1.12", "2nd", "3rd", "4th"
 
 **Response Format:**
 ```json
 {
   "ok": true,
-  "sideA_total": 9895,
-  "sideB_total": 7234,
-  "difference": 2661,
-  "recommendation": "Side A is higher by 2661 (add value to Side B)",
+  "sideA_total": 22895,
+  "sideB_total": 9734,
+  "difference": 13161,
+  "fairness_percentage": 43,
+  "recommendation": "Side A strongly favored - needs 13161 more value on Side B",
   "sideA_details": [
-    {"name": "Drake Maye", "pos": "QB", "value": 9895}
+    {"name": "Drake Maye", "pos": "QB", "value": 9895, "isPick": false},
+    {"name": "Bijan Robinson", "pos": "RB", "value": 8500, "isPick": false},
+    {"name": "early 1st", "pos": "PICK", "value": 8500, "isPick": true}
   ],
   "sideB_details": [
-    {"name": "Joe Burrow", "pos": "QB", "value": 7234}
+    {"name": "Joe Burrow", "pos": "QB", "value": 7234, "isPick": false},
+    {"name": "2026 2nd", "pos": "PICK", "value": 2500, "isPick": true}
   ],
   "sideA_not_found": [],
   "sideB_not_found": []
@@ -501,39 +535,80 @@ Response (values + recommendation)
 - **Multi-position admin sync** - sync all positions in one click
 - Position-specific validation thresholds
 
+### FDP Value System
+FantasyDraftPros (FDP) values apply format-specific multipliers to KTC base values to better reflect positional scarcity in different league formats:
+
+**Multipliers by Format:**
+- **Superflex**: QB 1.35x, RB 1.15x, WR 1.0x, TE 1.10x
+- **1QB**: QB 1.0x, RB 1.18x, WR 1.0x, TE 1.10x
+- **TE Premium**: QB 1.35x, RB 1.15x, WR 1.0x, TE 1.25x
+
+**Why Adjust Values?**
+- In Superflex, QBs are more scarce → multiply by 1.35
+- In 1QB, RBs gain relative value → multiply by 1.18
+- In TEP, TEs are premium → multiply by 1.25
+
+**Storage:**
+- `ktc_value` - Raw KTC value (unchanged)
+- `fdp_value` - FDP adjusted value (stored in snapshots)
+
+**Trade Calculator:**
+- Uses FDP values by default for more accurate evaluations
+- Accounts for league format automatically
+
+### Draft Pick Values
+Built-in value chart for draft capital in trades:
+
+| Pick | Value | Pick | Value |
+|------|-------|------|-------|
+| 1.01 | 9500 | Early 1st | 8500 |
+| 1.02 | 9200 | Mid 1st | 6500 |
+| 1.03 | 8900 | Late 1st | 4800 |
+| 1.04-1.12 | 8600-6200 | 2nd | 2500 |
+| Early 2nd | 3000 | 3rd | 1200 |
+| Mid 2nd | 2500 | 4th | 500 |
+| Late 2nd | 2000 | | |
+
 ## Future Enhancements
 
 Potential improvements:
 - Historical trend charts and value change tracking
 - Value change alerts via notifications
-- Comparison with other ranking sources
+- Comparison with other ranking sources (FantasyPros, DLF, etc.)
 - Export rankings to CSV/JSON
 - Mobile app integration
 - Webhook notifications for sync failures
-- Pick/draft capital support
 - Redraft format support
+- Rookie-specific rankings and values
+- DFS (daily fantasy) player pricing
 
 ## Files Reference
 
 ### Database
-- `supabase/migrations/add_ktc_value_snapshots_table.sql` - Schema migration
+- `supabase/migrations/add_ktc_value_snapshots_table.sql` - Initial snapshot schema
+- `supabase/migrations/add_fdp_value_column.sql` - FDP value column addition
 
 ### Edge Functions
-- `supabase/functions/sync-ktc-qbs/index.ts` - QB sync function
-- `supabase/functions/sync-ktc-rbs/index.ts` - RB sync function
-- `supabase/functions/sync-ktc-wrs/index.ts` - WR sync function
-- `supabase/functions/sync-ktc-tes/index.ts` - TE sync function
+- `supabase/functions/sync-ktc-qbs/index.ts` - QB sync with FDP calculations
+- `supabase/functions/sync-ktc-rbs/index.ts` - RB sync with FDP calculations
+- `supabase/functions/sync-ktc-wrs/index.ts` - WR sync with FDP calculations
+- `supabase/functions/sync-ktc-tes/index.ts` - TE sync with FDP calculations
+- `supabase/functions/sync-ktc-all/index.ts` - Unified multi-position sync
 - `supabase/functions/cron-sync-ktc/index.ts` - Automated cron sync (QB only)
 - `supabase/functions/ktc-qb-values/index.ts` - Public QB values API (legacy)
-- `supabase/functions/ktc-rankings/index.ts` - Unified rankings API (all positions)
-- `supabase/functions/trade-eval/index.ts` - Trade evaluation API (all positions)
+- `supabase/functions/ktc-rankings/index.ts` - Unified rankings API with FDP values
+- `supabase/functions/trade-eval/index.ts` - Trade evaluation with picks & FDP values
 
 ### UI Components
 - `src/components/KTCAdminSync.tsx` - QB-only admin sync interface
 - `src/components/KTCMultiPositionSync.tsx` - Multi-position admin sync
 - `src/components/KTCQBRankings.tsx` - QB rankings viewer (legacy)
-- `src/components/UnifiedRankings.tsx` - All positions rankings with format toggles
+- `src/components/UnifiedRankings.tsx` - All positions with KTC/FDP toggle
 - `src/components/Dashboard.tsx` - Main navigation integration
+
+### Utility Libraries
+- `src/lib/fdp/formatMultipliers.ts` - Format multipliers and pick values
+- `src/lib/fdp/calcFdpValue.ts` - FDP value calculation utilities
 
 ### Documentation
 - `KTC_INTEGRATION.md` - This file

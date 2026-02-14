@@ -6,6 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
+const formatMultipliers: Record<string, Record<string, number>> = {
+  dynasty_superflex: { QB: 1.35, RB: 1.15, WR: 1.0, TE: 1.10 },
+  dynasty_1qb: { QB: 1.0, RB: 1.18, WR: 1.0, TE: 1.10 },
+  dynasty_tep: { QB: 1.35, RB: 1.15, WR: 1.0, TE: 1.25 },
+};
+
+function calcFdpValue(ktcValue: number, position: string, format: string): number {
+  const formatKey = format.replace(/-/g, '_');
+  const multiplier = formatMultipliers[formatKey]?.[position] ?? 1;
+  return Math.round(ktcValue * multiplier);
+}
+
 interface KTCPlayer {
   full_name: string;
   position: string;
@@ -223,6 +235,8 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      const fdpValue = calcFdpValue(player.value, 'TE', format);
+
       const { error: snapshotError } = await supabase
         .from('ktc_value_snapshots')
         .insert({
@@ -232,6 +246,7 @@ Deno.serve(async (req: Request) => {
           team: player.team,
           position_rank: player.position_rank,
           ktc_value: player.value,
+          fdp_value: fdpValue,
           format: formatKey,
           source: 'KTC',
           captured_at: capturedAt,

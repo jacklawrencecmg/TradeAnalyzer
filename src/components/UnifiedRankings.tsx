@@ -8,11 +8,13 @@ interface Player {
   position: string;
   team: string | null;
   ktc_value: number;
+  fdp_value: number;
   captured_at: string;
 }
 
 type Position = 'QB' | 'RB' | 'WR' | 'TE';
 type Format = 'dynasty_sf' | 'dynasty_1qb' | 'dynasty_tep';
+type ValueSource = 'fdp' | 'ktc';
 
 const POSITIONS: Position[] = ['QB', 'RB', 'WR', 'TE'];
 
@@ -22,9 +24,15 @@ const FORMAT_OPTIONS = [
   { value: 'dynasty_tep', label: 'TEP', abbr: 'TEP' },
 ];
 
+const VALUE_SOURCE_OPTIONS = [
+  { value: 'fdp', label: 'FDP Values' },
+  { value: 'ktc', label: 'KTC Values' },
+];
+
 export default function UnifiedRankings() {
   const [selectedPosition, setSelectedPosition] = useState<Position>('QB');
   const [selectedFormat, setSelectedFormat] = useState<Format>('dynasty_sf');
+  const [valueSource, setValueSource] = useState<ValueSource>('fdp');
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +142,27 @@ export default function UnifiedRankings() {
                       title={format.label}
                     >
                       {format.abbr}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Value Source
+                </label>
+                <div className="flex gap-2">
+                  {VALUE_SOURCE_OPTIONS.map((source) => (
+                    <button
+                      key={source.value}
+                      onClick={() => setValueSource(source.value as ValueSource)}
+                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                        valueSource === source.value
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {source.label}
                     </button>
                   ))}
                 </div>
@@ -263,10 +292,17 @@ export default function UnifiedRankings() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <TrendingUp className={`w-4 h-4 ${getValueColor(player.ktc_value)}`} />
-                              <span className={`text-lg font-bold ${getValueColor(player.ktc_value)}`}>
-                                {player.ktc_value.toLocaleString()}
-                              </span>
+                              {(() => {
+                                const displayValue = valueSource === 'fdp' ? player.fdp_value : player.ktc_value;
+                                return (
+                                  <>
+                                    <TrendingUp className={`w-4 h-4 ${getValueColor(displayValue)}`} />
+                                    <span className={`text-lg font-bold ${getValueColor(displayValue)}`}>
+                                      {displayValue.toLocaleString()}
+                                    </span>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </td>
                         </tr>
@@ -281,7 +317,7 @@ export default function UnifiedRankings() {
 
         <div className="mt-6 bg-white rounded-lg shadow p-6">
           <h3 className="font-semibold text-gray-900 mb-3">About These Rankings</h3>
-          <div className="grid md:grid-cols-3 gap-4 text-sm text-gray-600">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600 mb-4">
             <div>
               <p className="font-medium text-gray-700 mb-1">Data Source</p>
               <p>Rankings from KeepTradeCut dynasty values</p>
@@ -293,6 +329,30 @@ export default function UnifiedRankings() {
             <div>
               <p className="font-medium text-gray-700 mb-1">Format Support</p>
               <p>SF (Superflex), 1QB (Standard), TEP (TE Premium)</p>
+            </div>
+            <div>
+              <p className="font-medium text-gray-700 mb-1">Value Types</p>
+              <p>KTC (raw) and FDP (format-adjusted)</p>
+            </div>
+          </div>
+          <div className="border-t pt-4">
+            <p className="font-medium text-gray-700 mb-2">FDP Value Adjustments</p>
+            <p className="text-sm text-gray-600 mb-2">
+              FantasyDraftPros (FDP) values apply format-specific multipliers to KTC base values:
+            </p>
+            <div className="grid md:grid-cols-3 gap-3 text-xs text-gray-600">
+              <div className="bg-gray-50 p-2 rounded">
+                <p className="font-semibold text-gray-700">Superflex</p>
+                <p>QB: 1.35x | RB: 1.15x | WR: 1.0x | TE: 1.10x</p>
+              </div>
+              <div className="bg-gray-50 p-2 rounded">
+                <p className="font-semibold text-gray-700">1QB</p>
+                <p>QB: 1.0x | RB: 1.18x | WR: 1.0x | TE: 1.10x</p>
+              </div>
+              <div className="bg-gray-50 p-2 rounded">
+                <p className="font-semibold text-gray-700">TE Premium</p>
+                <p>QB: 1.35x | RB: 1.15x | WR: 1.0x | TE: 1.25x</p>
+              </div>
             </div>
           </div>
         </div>

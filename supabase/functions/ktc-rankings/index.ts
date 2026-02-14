@@ -12,6 +12,7 @@ interface PlayerRanking {
   position: string;
   team: string | null;
   ktc_value: number;
+  fdp_value: number;
   captured_at: string;
 }
 
@@ -34,7 +35,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: allSnapshots, error } = await supabase
       .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, team, position_rank, ktc_value, captured_at')
+      .select('player_id, full_name, position, team, position_rank, ktc_value, fdp_value, captured_at')
       .eq('position', position)
       .eq('format', format)
       .order('captured_at', { ascending: false });
@@ -53,6 +54,7 @@ Deno.serve(async (req: Request) => {
           position: snapshot.position,
           team: snapshot.team,
           ktc_value: snapshot.ktc_value,
+          fdp_value: snapshot.fdp_value || snapshot.ktc_value,
           captured_at: snapshot.captured_at,
         });
       }
