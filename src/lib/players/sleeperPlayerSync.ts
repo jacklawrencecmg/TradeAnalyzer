@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { normalizeName, generateAliases } from './normalizeName';
 
 interface SleeperPlayer {
   player_id: string;
@@ -29,6 +30,7 @@ interface SyncResult {
   skipped: number;
   errors: number;
   inactive_marked?: number;
+  aliases_created?: number;
 }
 
 const RELEVANT_STATUSES = [
@@ -136,12 +138,52 @@ function parseBirthdate(birthdate?: string): string | null {
   }
 }
 
+async function seedPlayerAliases(
+  playerId: string,
+  fullName: string,
+  firstName?: string,
+  lastName?: string
+): Promise<number> {
+  let aliasesCreated = 0;
+
+  try {
+    const aliases = generateAliases(fullName, firstName, lastName);
+
+    for (const alias of aliases) {
+      const normalized = normalizeName(alias);
+
+      if (!normalized || normalized.length < 2) {
+        continue;
+      }
+
+      try {
+        await supabase.rpc('add_player_alias', {
+          p_player_id: playerId,
+          p_alias: alias,
+          p_alias_normalized: normalized,
+          p_source: 'sleeper',
+        });
+
+        aliasesCreated++;
+      } catch (err) {
+        // Ignore duplicate alias errors
+      }
+    }
+
+    return aliasesCreated;
+  } catch (err) {
+    console.error('Error seeding player aliases:', err);
+    return aliasesCreated;
+  }
+}
+
 export async function syncSleeperPlayers(): Promise<SyncResult> {
   const result: SyncResult = {
     inserted: 0,
     updated: 0,
     skipped: 0,
     errors: 0,
+    aliases_created: 0,
   };
 
   try {
@@ -208,6 +250,18 @@ export async function syncSleeperPlayers(): Promise<SyncResult> {
           result.updated++;
         } else {
           result.inserted++;
+        }
+
+        const playerUuid = playerId || (await getPlayerIdByExternalId(player.player_id));
+
+        if (playerUuid) {
+          const aliasCount = await seedPlayerAliases(
+            playerUuid,
+            fullName,
+            player.first_name,
+            player.last_name
+          );
+          result.aliases_created = (result.aliases_created || 0) + aliasCount;
         }
 
         processed++;
@@ -293,11 +347,23 @@ export async function getPlayerIdByExternalId(externalId: string): Promise<strin
   }
 }
 
-export async function ensurePlayerExists(name: string, position?: string): Promise<string | null> {
-  let playerId = await getPlayerIdByName(name, position);
+export async function ensurePlayerExists(
+  name: string,
+  position?: string,
+  team?: string
+): Promise<string | null> {
+  const { resolvePlayerId } = await import('./resolvePlayerId');
 
-  if (playerId) {
-    return playerId.id;
+  const result = await resolvePlayerId({
+    name,
+    position,
+    team,
+    source: 'user',
+    autoQuarantine: false,
+  });
+
+  if (result.success && result.player_id) {
+    return result.player_id;
   }
 
   console.log(`Player not found: ${name}. Triggering sync...`);
@@ -305,10 +371,16 @@ export async function ensurePlayerExists(name: string, position?: string): Promi
   try {
     await syncSleeperPlayers();
 
-    playerId = await getPlayerIdByName(name, position);
+    const retryResult = await resolvePlayerId({
+      name,
+      position,
+      team,
+      source: 'user',
+      autoQuarantine: false,
+    });
 
-    if (playerId) {
-      return playerId.id;
+    if (retryResult.success && retryResult.player_id) {
+      return retryResult.player_id;
     }
 
     console.warn(`Player still not found after sync: ${name}`);
