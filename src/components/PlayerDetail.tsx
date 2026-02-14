@@ -3,6 +3,7 @@ import { ArrowLeft, TrendingUp, TrendingDown, Minus, AlertCircle, Trophy, Flame,
 import ValueChart from './ValueChart';
 import { ListSkeleton } from './LoadingSkeleton';
 import WatchlistButton from './WatchlistButton';
+import PlayerCareerTimeline from './PlayerCareerTimeline';
 
 interface PlayerDetailProps {
   playerId: string;
@@ -258,6 +259,10 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
           <div className="mt-4 text-sm text-gray-500">
             Last updated: {new Date(data.latest.updated_at).toLocaleString()}
           </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <PlayerCareerTimeline playerId={playerId} />
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">

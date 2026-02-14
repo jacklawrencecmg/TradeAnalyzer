@@ -262,6 +262,48 @@ export async function syncSleeperPlayers(): Promise<SyncResult> {
             player.last_name
           );
           result.aliases_created = (result.aliases_created || 0) + aliasCount;
+
+          if (player.team) {
+            try {
+              const { data: teamChangeResult, error: teamError } = await supabase.rpc('record_team_change', {
+                p_player_id: playerUuid,
+                p_new_team: player.team,
+                p_source: 'sleeper',
+                p_change_date: new Date().toISOString(),
+              });
+
+              if (teamError) {
+                console.error(`Error recording team change for ${fullName}:`, teamError);
+              } else if (teamChangeResult && teamChangeResult.changed) {
+                const oldTeam = teamChangeResult.old_team;
+                const newTeam = teamChangeResult.new_team;
+
+                await supabase.from('player_events').insert({
+                  player_id: playerUuid,
+                  event_type: 'team_changed',
+                  metadata: {
+                    old_team: oldTeam,
+                    new_team: newTeam,
+                    source: 'sleeper',
+                  },
+                });
+              }
+            } catch (teamErr) {
+              console.error(`Error handling team change for ${fullName}:`, teamErr);
+            }
+          } else {
+            try {
+              const { error: initError } = await supabase.rpc('initialize_team_history_for_player', {
+                p_player_id: playerUuid,
+              });
+
+              if (initError) {
+                console.error(`Error initializing team history for ${fullName}:`, initError);
+              }
+            } catch (initErr) {
+              console.error(`Error initializing team history for ${fullName}:`, initErr);
+            }
+          }
         }
 
         processed++;
