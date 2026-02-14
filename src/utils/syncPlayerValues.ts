@@ -129,7 +129,7 @@ const KNOWN_BACKUP_QBS = [
   'jake browning', 'easton stick', 'cooper rush', 'taylor heinicke',
   'jarrett stidham', 'mitch trubisky', 'tyson bagent', 'joshua dobbs',
   'clayton tune', 'davis mills', 'aidan oconnell', 'jaren hall',
-  'stetson bennett', 'dorian thompson-robinson'
+  'stetson bennett', 'dorian thompson-robinson', 'malik willis'
 ];
 
 function calculateAdjustedValue(
@@ -163,6 +163,20 @@ function calculateAdjustedValue(
     } else if (rawValue < medianQBValue * 0.30) {
       value *= 0.25;
       trend = 'down';
+    }
+  }
+
+  // Apply rookie penalty for non-elite rookies (non-QBs)
+  const yearsExp = playerData.years_exp || 0;
+  if (yearsExp === 0 && position !== 'QB') {
+    const allValues = allRawValues.filter(v => v > 0).sort((a, b) => b - a);
+    const topValue = allValues[0] || 1;
+    const relativeValue = rawValue / topValue;
+
+    // If rookie is not in top 20% of all players, apply penalty
+    if (relativeValue < 0.20) {
+      value *= 0.85;
+      if (trend === 'stable') trend = 'down';
     }
   }
 
@@ -253,6 +267,11 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
         qbRawValues
       );
 
+      // Check if backup QB or rookie penalty was applied
+      const playerNameLower = (playerData.full_name || '').toLowerCase();
+      const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+      const isRookie = (playerData.years_exp || 0) === 0;
+
       const playerValue = {
         player_id: playerId,
         player_name: playerData.full_name || `${playerData.first_name} ${playerData.last_name}`,
@@ -271,6 +290,8 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
           sleeper_status: playerData.status,
           sleeper_injury_status: playerData.injury_status,
           original_fdp_value: fdpData.value,
+          backup_qb_applied: playerData.position === 'QB' && isKnownBackup,
+          rookie_penalty_applied: isRookie && playerData.position !== 'QB',
         },
       };
 

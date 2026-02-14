@@ -1,6 +1,14 @@
 const API_KEY = import.meta.env.VITE_SPORTSDATA_API_KEY;
 const BASE_URL = 'https://api.sportsdata.io/v3/nfl';
 
+const KNOWN_BACKUP_QBS = [
+  'joe milton', 'joe milton iii', 'trey lance', 'sam howell', 'tyler huntley',
+  'jake browning', 'easton stick', 'cooper rush', 'taylor heinicke',
+  'jarrett stidham', 'mitch trubisky', 'tyson bagent', 'joshua dobbs',
+  'clayton tune', 'davis mills', 'aidan oconnell', 'jaren hall',
+  'stetson bennett', 'dorian thompson-robinson', 'malik willis'
+];
+
 interface PlayerInfo {
   PlayerID: number;
   Name: string;
@@ -181,14 +189,15 @@ class SportsDataAPI {
 
   async getPlayerValue(playerName: string): Promise<number> {
     try {
-      const [projection, stats, injuries] = await Promise.all([
+      const [projection, stats, injuries, playerInfo] = await Promise.all([
         this.getPlayerProjection(playerName),
         this.getPlayerStats().then(stats =>
           stats.find(s => s.Name.toLowerCase() === playerName.toLowerCase())
         ),
         this.getInjuries().then(injuries =>
           injuries.find(i => i.Name?.toLowerCase() === playerName.toLowerCase())
-        )
+        ),
+        this.getPlayerByName(playerName)
       ]);
 
       if (!projection) {
@@ -219,10 +228,30 @@ class SportsDataAPI {
         'DEF': 0.4
       };
 
-      const position = projection.Position || projection.FantasyPosition;
+      const position = projection.Position;
       const multiplier = positionMultipliers[position] || 1.0;
 
-      return Math.round(baseValue * multiplier * 10);
+      let finalValue = baseValue * multiplier * 10;
+
+      // Apply backup QB penalty
+      if (position === 'QB') {
+        const playerNameLower = playerName.toLowerCase();
+        const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+
+        if (isKnownBackup) {
+          finalValue *= 0.02; // 98% reduction
+        }
+      }
+
+      // Apply rookie penalty for non-elite rookies
+      if (playerInfo && playerInfo.Experience === 0 && position !== 'QB') {
+        // If value is relatively low (not a top prospect), apply penalty
+        if (finalValue < 500) {
+          finalValue *= 0.85;
+        }
+      }
+
+      return Math.round(finalValue);
     } catch (error) {
       console.error(`Error calculating value for ${playerName}:`, error);
       return 0;

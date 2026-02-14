@@ -1,6 +1,14 @@
 import { supabase } from '../lib/supabase';
 import { sportsDataAPI } from './sportsdataApi';
 
+const KNOWN_BACKUP_QBS = [
+  'joe milton', 'joe milton iii', 'trey lance', 'sam howell', 'tyler huntley',
+  'jake browning', 'easton stick', 'cooper rush', 'taylor heinicke',
+  'jarrett stidham', 'mitch trubisky', 'tyson bagent', 'joshua dobbs',
+  'clayton tune', 'davis mills', 'aidan oconnell', 'jaren hall',
+  'stetson bennett', 'dorian thompson-robinson', 'malik willis'
+];
+
 export interface PlayerValue {
   id: string;
   player_id: string;
@@ -211,7 +219,20 @@ class PlayerValuesApi {
         const projectedPoints = dfPlayer.ProjectedFantasyPoints || 0;
         const avgDfsSalary = (dfPlayer.FanDuelSalary + dfPlayer.DraftKingsSalary) / 2000;
 
-        const baseValue = ((projectedPoints * 12) + (avgDfsSalary * 50) + (lastGamePoints * 5)) * 0.01;
+        const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+        const isRookie = (info?.Experience || 0) === 0;
+
+        let baseValue = ((projectedPoints * 12) + (avgDfsSalary * 50) + (lastGamePoints * 5)) * 0.01;
+
+        // Apply backup QB penalty
+        if (dfPlayer.Position === 'QB' && isKnownBackup) {
+          baseValue *= 0.02; // 98% reduction
+        }
+
+        // Apply rookie penalty for non-elite rookies
+        if (isRookie && dfPlayer.Position !== 'QB' && baseValue < 50) {
+          baseValue *= 0.85;
+        }
 
         const factors: Partial<ValueAdjustmentFactors> = {
           superflex_boost: isSuperflex && dfPlayer.Position === 'QB' ? 0.5 : 0,
@@ -256,6 +277,8 @@ class PlayerValuesApi {
             opponent_rank: dfPlayer.OpponentRank,
             opponent_position_rank: dfPlayer.OpponentPositionRank,
             experience: info?.Experience || null,
+            backup_qb_applied: dfPlayer.Position === 'QB' && isKnownBackup,
+            rookie_penalty_applied: isRookie && dfPlayer.Position !== 'QB',
           },
         });
       });
