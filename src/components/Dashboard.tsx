@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
@@ -47,8 +47,13 @@ import AlertsDropdown from './AlertsDropdown';
 import DynastyReportsIndex from './DynastyReportsIndex';
 import DynastyReportPage from './DynastyReportPage';
 import LatestReportWidget from './LatestReportWidget';
+import PricingPage from './PricingPage';
+import UpgradeModal from './UpgradeModal';
+import SubscriptionBadge from './SubscriptionBadge';
+import UsageMeter from './UsageMeter';
+import { useSubscription } from '../hooks/useSubscription';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -57,6 +62,7 @@ interface DashboardProps {
 export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const { user, signOut } = useAuth();
   const { showToast } = useToast();
+  const { isPro } = useSubscription();
   const [leagues, setLeagues] = useState<UserLeague[]>([]);
   const [currentLeague, setCurrentLeague] = useState<UserLeague | null>(null);
   const [showAddLeague, setShowAddLeague] = useState(false);
@@ -65,6 +71,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [activeTab, setActiveTab] = useState<TabType>('trade');
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [selectedReportSlug, setSelectedReportSlug] = useState<string | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeFeature, setUpgradeFeature] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (user) {
@@ -164,6 +172,10 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <SubscriptionBadge onUpgrade={() => {
+                setUpgradeFeature(undefined);
+                setShowUpgradeModal(true);
+              }} />
               <AlertsDropdown onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)} />
               <button
                 onClick={signOut}
@@ -246,6 +258,26 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             </div>
           )}
         </div>
+
+        {/* Usage Meters (Free Users Only) */}
+        {!isPro && (
+          <div className="grid md:grid-cols-2 gap-4 mb-6">
+            <UsageMeter
+              feature="trade_calc"
+              onUpgrade={() => {
+                setUpgradeFeature('Unlimited Trade Calculations');
+                setShowUpgradeModal(true);
+              }}
+            />
+            <UsageMeter
+              feature="league_import"
+              onUpgrade={() => {
+                setUpgradeFeature('Unlimited League Imports');
+                setShowUpgradeModal(true);
+              }}
+            />
+          </div>
+        )}
 
         {/* Latest Market Report Widget */}
         <div className="mb-6">
@@ -366,6 +398,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Newspaper} label="Player News" shortLabel="News" tab="news" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Share2} label="Export & Share" shortLabel="Share" tab="export" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Sparkles} label="Upgrade to Pro" shortLabel="Upgrade" tab="pricing" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Mail} label="Contact Us" shortLabel="Contact" tab="contact" activeTab={activeTab} onClick={setActiveTab} />
                   </div>
                 </div>
@@ -425,6 +458,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)}
                 />
               )}
+              {activeTab === 'pricing' && (
+                <PricingPage onBack={() => setActiveTab('trade')} />
+              )}
             </div>
           </div>
         )}
@@ -444,6 +480,13 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             leagues={leagues}
             onClose={() => setShowManageLeagues(false)}
             onUpdate={loadLeagues}
+          />
+        )}
+
+        {showUpgradeModal && (
+          <UpgradeModal
+            onClose={() => setShowUpgradeModal(false)}
+            feature={upgradeFeature}
           />
         )}
       </div>
