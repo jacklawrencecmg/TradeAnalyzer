@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Shield, TrendingUp, Users, Search, Settings } from 'lucide-react';
-import { getIDPPositionLabel, getSubPositionLabel, getAllIDPPositions, getAllIDPFormats, getAllScoringStyles, getScoringStyleLabel, type IDPPosition, type IDPFormat, type ScoringStyle } from '../lib/idp/idpMultipliers';
+import { getIDPPositionLabel, getSubPositionLabel, getAllIDPPositions, type IDPPosition } from '../lib/idp/idpMultipliers';
 import { getIDPValueTier } from '../lib/idp/calculateIDPValue';
+import { getIdpPreset, getPresetLabel, getPresetDescription, getPresetIcon, getPresetColor, getFormatWithPreset, type IDPScoringPreset } from '../lib/idp/getIdpPreset';
+import { getPresetImpact } from '../lib/fdp/idpPresetMultipliers';
 import { ListSkeleton } from './LoadingSkeleton';
 import { PlayerAvatar } from './PlayerAvatar';
 
@@ -19,12 +21,14 @@ interface IDPPlayer {
 
 export default function IDPRankings() {
   const [position, setPosition] = useState<IDPPosition>('LB');
-  const [format, setFormat] = useState<IDPFormat>('dynasty_sf_idp');
-  const [scoringStyle, setScoringStyle] = useState<ScoringStyle>('balanced');
+  const [baseFormat, setBaseFormat] = useState<'dynasty_sf_idp' | 'dynasty_1qb_idp'>('dynasty_sf_idp');
+  const [scoringPreset, setScoringPreset] = useState<IDPScoringPreset>('balanced');
   const [players, setPlayers] = useState<IDPPlayer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+
+  const format = getFormatWithPreset(baseFormat, scoringPreset);
 
   useEffect(() => {
     fetchRankings();
@@ -100,40 +104,60 @@ export default function IDPRankings() {
 
       {showSettings && (
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Format
               </label>
               <select
-                value={format}
-                onChange={(e) => setFormat(e.target.value as IDPFormat)}
+                value={baseFormat}
+                onChange={(e) => setBaseFormat(e.target.value as any)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
               >
-                {getAllIDPFormats().map(fmt => (
-                  <option key={fmt} value={fmt}>
-                    {fmt === 'dynasty_sf_idp' ? 'Dynasty SF + IDP' :
-                     fmt === 'dynasty_1qb_idp' ? 'Dynasty 1QB + IDP' :
-                     'Dynasty SF + IDP (Tiered)'}
-                  </option>
-                ))}
+                <option value="dynasty_sf_idp">Dynasty Superflex + IDP</option>
+                <option value="dynasty_1qb_idp">Dynasty 1QB + IDP</option>
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Scoring Style
+                Scoring System
               </label>
               <select
-                value={scoringStyle}
-                onChange={(e) => setScoringStyle(e.target.value as ScoringStyle)}
+                value={scoringPreset}
+                onChange={(e) => setScoringPreset(e.target.value as IDPScoringPreset)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                style={{ borderLeft: `4px solid ${getPresetColor(scoringPreset)}` }}
               >
-                {getAllScoringStyles().map(style => (
-                  <option key={style} value={style}>
-                    {getScoringStyleLabel(style)}
-                  </option>
-                ))}
+                <option value="tackle_heavy">{getPresetIcon('tackle_heavy')} Tackle Heavy</option>
+                <option value="balanced">{getPresetIcon('balanced')} Balanced</option>
+                <option value="big_play">{getPresetIcon('big_play')} Big Play</option>
               </select>
+            </div>
+          </div>
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="text-sm text-gray-700">
+              <span className="font-semibold">Current Preset:</span> {getPresetLabel(scoringPreset)}
+            </div>
+            <div className="text-xs text-gray-600 mt-1">
+              {getPresetDescription(scoringPreset)}
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3">
+              {getAllIDPPositions().map(pos => {
+                const impact = getPresetImpact(pos, scoringPreset);
+                return (
+                  <div key={pos} className="bg-white rounded p-2 border border-gray-200">
+                    <div className="text-xs font-semibold text-gray-700">{pos}</div>
+                    <div
+                      className={`text-sm font-bold ${
+                        impact.change > 0 ? 'text-green-600' : impact.change < 0 ? 'text-red-600' : 'text-gray-600'
+                      }`}
+                    >
+                      {impact.change > 0 ? '+' : ''}{impact.change}%
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">{impact.multiplier.toFixed(2)}x</div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -285,20 +309,28 @@ export default function IDPRankings() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
           <Users className="w-4 h-4" />
-          About IDP Rankings
+          About IDP Rankings & Scoring Presets
         </h3>
         <div className="text-sm text-blue-800 space-y-1">
           <p>
-            <strong>FDP Value:</strong> FantasyDraftPros value calculated with IDP-specific multipliers and adjustments
+            <strong>FDP Value:</strong> FantasyDraftPros value calculated with IDP-specific multipliers, context adjustments, and scoring preset modifiers
           </p>
           <p>
             <strong>Position Groups:</strong> DL (Defensive Line), LB (Linebacker), DB (Defensive Back)
           </p>
           <p>
-            <strong>Scoring Styles:</strong> Tackle Heavy (LB premium), Balanced (neutral), Big Play (DL/DB premium)
+            <strong>Scoring Presets:</strong>
           </p>
+          <ul className="ml-6 space-y-1">
+            <li><span className="font-semibold">Tackle Heavy ({getPresetIcon('tackle_heavy')}):</span> LB +30%, DL -5%, DB +5% - Best for leagues with 1pt/tackle</li>
+            <li><span className="font-semibold">Balanced ({getPresetIcon('balanced')}):</span> LB +15%, DL +5%, DB ±0% - Standard IDP scoring</li>
+            <li><span className="font-semibold">Big Play ({getPresetIcon('big_play')}):</span> LB -5%, DL +25%, DB -10% - Best for heavy sack/INT bonuses</li>
+          </ul>
           <p>
             <strong>Tiers:</strong> Elite (4000+), Strong Starter (3000+), Solid Starter (2000+), Flex (1000+), Depth (500+)
+          </p>
+          <p className="text-xs text-blue-700 mt-2">
+            💡 <strong>Tip:</strong> Use the settings panel to toggle between presets and see how your league's scoring affects player values!
           </p>
         </div>
       </div>

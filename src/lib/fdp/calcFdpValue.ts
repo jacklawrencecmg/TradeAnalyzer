@@ -2,6 +2,8 @@ import { formatMultipliers, type LeagueFormat, type Position } from './formatMul
 import { rbAdjustmentPoints, type RbContext } from './rbAdjustments';
 import { getIDPMultiplier, isIDPPosition, type IDPPosition, type IDPFormat } from '../idp/idpMultipliers';
 import { calculateIDPAdjustments, clampIDPValue } from '../idp/idpAdjustments';
+import { applyIdpPreset } from './applyIdpPreset';
+import { getIdpPreset } from '../idp/getIdpPreset';
 
 export function calcFdpValue(
   ktcValue: number,
@@ -64,7 +66,9 @@ export function calcIDPFdpValue(
 
   base += adjustmentResult.total;
 
-  return clampIDPValue(base);
+  const withPreset = applyIdpPreset(base, position, format);
+
+  return clampIDPValue(withPreset);
 }
 
 export function convertFormatKey(format: string): LeagueFormat {

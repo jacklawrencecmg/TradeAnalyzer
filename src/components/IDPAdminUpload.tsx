@@ -3,6 +3,7 @@ import { Upload, CheckCircle, AlertCircle, FileText, Download } from 'lucide-rea
 import { supabase } from '../lib/supabase';
 import { calcIDPFdpValue } from '../lib/fdp/calcFdpValue';
 import { isIDPPosition, getIDPPositionLabel, getSubPositionLabel } from '../lib/idp/idpMultipliers';
+import { getFormatWithPreset, getPresetLabel, getPresetIcon, type IDPScoringPreset } from '../lib/idp/getIdpPreset';
 
 interface CSVRow {
   full_name: string;
@@ -23,7 +24,10 @@ export default function IDPAdminUpload() {
     snapshotsCreated: number;
     errors?: string[];
   } | null>(null);
-  const [selectedFormat, setSelectedFormat] = useState<'dynasty_sf_idp' | 'dynasty_1qb_idp'>('dynasty_sf_idp');
+  const [baseFormat, setBaseFormat] = useState<'dynasty_sf_idp' | 'dynasty_1qb_idp'>('dynasty_sf_idp');
+  const [scoringPreset, setScoringPreset] = useState<IDPScoringPreset>('balanced');
+
+  const selectedFormat = getFormatWithPreset(baseFormat, scoringPreset);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -211,18 +215,42 @@ Patrick Surtain II,DB,CB,DEN,3500,3`;
       </div>
 
       <div className="bg-white rounded-lg shadow p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Format
-          </label>
-          <select
-            value={selectedFormat}
-            onChange={(e) => setSelectedFormat(e.target.value as any)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="dynasty_sf_idp">Dynasty Superflex + IDP</option>
-            <option value="dynasty_1qb_idp">Dynasty 1QB + IDP</option>
-          </select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              League Format
+            </label>
+            <select
+              value={baseFormat}
+              onChange={(e) => setBaseFormat(e.target.value as any)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="dynasty_sf_idp">Dynasty Superflex + IDP</option>
+              <option value="dynasty_1qb_idp">Dynasty 1QB + IDP</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Scoring Preset
+            </label>
+            <select
+              value={scoringPreset}
+              onChange={(e) => setScoringPreset(e.target.value as IDPScoringPreset)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            >
+              <option value="tackle_heavy">{getPresetIcon('tackle_heavy')} Tackle Heavy</option>
+              <option value="balanced">{getPresetIcon('balanced')} Balanced</option>
+              <option value="big_play">{getPresetIcon('big_play')} Big Play</option>
+            </select>
+          </div>
+        </div>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="text-sm text-gray-700">
+            <span className="font-semibold">Format:</span> {selectedFormat}
+          </div>
+          <div className="text-xs text-gray-600 mt-1">
+            Values will be calculated using {getPresetLabel(scoringPreset)} scoring
+          </div>
         </div>
 
         <div>
