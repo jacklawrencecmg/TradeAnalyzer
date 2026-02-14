@@ -41,10 +41,12 @@ See [MULTI_PLATFORM_SUPPORT.md](MULTI_PLATFORM_SUPPORT.md) for detailed instruct
 - **Player Values** - Real-time player valuations and market trends
 - **Value Trend Tracker** - Historical player value charts
 
-### Data Management
-- **KTC Admin Sync** - Server-side scraping pipeline for KeepTradeCut dynasty QB rankings
+### Data Management & APIs
+- **KTC Admin Sync** - Server-side scraping pipeline with health monitoring (QB1-QB200+)
 - **QB Rankings** - Live dynasty superflex QB rankings with search and filtering
 - **Value Snapshots** - Historical value tracking for trend analysis
+- **Trade Evaluation API** - REST endpoint for programmatic trade value comparison
+- **Automated Syncs** - Cron-ready endpoint for scheduled data updates
 
 ### Draft & Keeper Tools
 - **Draft Kit** - Live draft assistant with rankings and recommendations

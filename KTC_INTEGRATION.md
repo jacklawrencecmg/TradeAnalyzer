@@ -4,7 +4,11 @@ This document describes the KeepTradeCut (KTC) dynasty QB value database and syn
 
 ## Overview
 
-The KTC integration adds a server-side scraping pipeline that fetches the latest dynasty superflex QB rankings from KeepTradeCut, stores them in Supabase, and provides both admin tools and public-facing rankings display.
+The KTC integration adds a server-side scraping pipeline that fetches the latest dynasty superflex QB rankings from KeepTradeCut, stores them in Supabase, and provides:
+- Admin sync tools with health monitoring
+- Automated cron-safe sync endpoint
+- Public QB rankings viewer
+- Trade evaluation API
 
 ## Architecture
 
@@ -42,8 +46,10 @@ Server-only function that:
 ```json
 {
   "ok": true,
-  "count": 50,
-  "total": 50,
+  "count": 150,
+  "total": 150,
+  "minRank": 1,
+  "maxRank": 150,
   "timestamp": "2026-02-14T12:00:00Z"
 }
 ```
@@ -51,9 +57,35 @@ Server-only function that:
 **Error Responses:**
 - 401: Unauthorized (invalid token)
 - 429: Rate limited / blocked by KTC
-- 500: Scraping error
+- 500: Scraping error (too_few_rows if < 80 QBs captured)
 
-#### 2. ktc-qb-values
+#### 2. cron-sync-ktc
+**Endpoint:** `/functions/v1/cron-sync-ktc?secret=YOUR_CRON_SECRET`
+**Method:** GET
+**Authentication:** Query parameter secret (CRON_SECRET)
+
+Cron-safe sync function for automated scheduling:
+- Same scraping logic as sync-ktc-qbs
+- GET method for easy cron integration
+- Query parameter authentication for simplicity
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "count": 150,
+  "minRank": 1,
+  "maxRank": 150,
+  "captured_at": "2026-02-14T12:00:00Z"
+}
+```
+
+**Error Responses:**
+- 401: Unauthorized (invalid secret)
+- 429: Blocked by KTC
+- 500: too_few_rows or scraping error
+
+#### 3. ktc-qb-values
 **Endpoint:** `/functions/v1/ktc-qb-values?format=dynasty_sf`
 **Method:** GET
 **Authentication:** None (public)
@@ -73,6 +105,59 @@ Public endpoint that returns the latest QB values:
 ]
 ```
 
+#### 4. trade-eval
+**Endpoint:** `/functions/v1/trade-eval`
+**Method:** POST
+**Authentication:** None (public)
+
+Evaluates trade value using latest QB snapshot values:
+- Looks up players by name and position
+- Returns total value for each side
+- Provides recommendation and difference
+- Suggests similar names if player not found
+
+**Request Format:**
+```json
+{
+  "format": "dynasty_sf",
+  "sideA": [{"name": "Drake Maye", "pos": "QB"}],
+  "sideB": [{"name": "Joe Burrow", "pos": "QB"}]
+}
+```
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "sideA_total": 9895,
+  "sideB_total": 7234,
+  "difference": 2661,
+  "recommendation": "Side A is higher by 2661 (add value to Side B)",
+  "sideA_details": [
+    {"name": "Drake Maye", "pos": "QB", "value": 9895}
+  ],
+  "sideB_details": [
+    {"name": "Joe Burrow", "pos": "QB", "value": 7234}
+  ],
+  "sideA_not_found": [],
+  "sideB_not_found": []
+}
+```
+
+If a player is not found, the response includes suggestions:
+```json
+{
+  "ok": true,
+  "sideA_not_found": [
+    {
+      "name": "J. Daniels",
+      "pos": "QB",
+      "suggestions": ["Jayden Daniels", "Jordan Travis", "Jake Haener"]
+    }
+  ]
+}
+```
+
 ## Environment Variables
 
 Add these to your `.env` file:
@@ -85,20 +170,28 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 # Required: Admin sync secret (SERVER-SIDE ONLY)
 # Generate a strong random secret for production
 ADMIN_SYNC_SECRET=your-secure-admin-secret-here
+
+# Required: Cron sync secret (SERVER-SIDE ONLY)
+# Generate a different strong secret for production
+CRON_SECRET=your-secure-cron-secret-here
 ```
 
-The `ADMIN_SYNC_SECRET` is automatically configured in Supabase Edge Functions and should match the token you use in the admin UI.
+Both secrets are automatically configured in Supabase Edge Functions. The `ADMIN_SYNC_SECRET` is used for manual syncs via the admin UI, while `CRON_SECRET` is used for automated cron jobs.
 
 ## UI Components
 
 ### KTC Admin Sync
 Located at: `src/components/KTCAdminSync.tsx`
 
-Admin interface for triggering manual syncs:
+Admin interface for triggering manual syncs with health monitoring:
 - Secure token input (stored only in memory)
 - One-click sync trigger
 - Success/error status display
-- Last sync timestamp tracking
+- **Health Metrics:**
+  - Last sync timestamp
+  - Total count pulled
+  - QB rank range (min-max)
+  - Warning banner if maxRank < 120
 - Informational help text
 
 **Access:** Dashboard → Data Management → KTC Admin Sync
@@ -173,53 +266,98 @@ const qbs = await response.json();
 console.log(`Loaded ${qbs.length} QB values`);
 ```
 
+### Evaluating Trades
+
+```typescript
+const response = await fetch(
+  `${SUPABASE_URL}/functions/v1/trade-eval`,
+  {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      format: 'dynasty_sf',
+      sideA: [
+        { name: 'Patrick Mahomes', pos: 'QB' },
+        { name: 'CeeDee Lamb', pos: 'WR' }
+      ],
+      sideB: [
+        { name: 'Josh Allen', pos: 'QB' },
+        { name: 'Ja\'Marr Chase', pos: 'WR' }
+      ]
+    })
+  }
+);
+
+const result = await response.json();
+console.log(`Side A: ${result.sideA_total}`);
+console.log(`Side B: ${result.sideB_total}`);
+console.log(`Recommendation: ${result.recommendation}`);
+```
+
 ## Automation Options
 
-### Cron Job Setup
+### Automated Sync Setup
 
-For automated daily syncs, set up a cron job or scheduled task:
+For automated daily syncs, use the **cron-sync-ktc** endpoint with a scheduled task:
 
 **Linux/macOS (crontab):**
 ```bash
 # Run daily at 3 AM
-0 3 * * * curl -X POST \
-  -H "Authorization: Bearer YOUR_ADMIN_SECRET" \
-  https://your-project.supabase.co/functions/v1/sync-ktc-qbs
-```
-
-**Supabase Cron (pg_cron extension):**
-```sql
-SELECT cron.schedule(
-  'sync-ktc-daily',
-  '0 3 * * *',
-  $$
-  SELECT net.http_post(
-    url:='https://your-project.supabase.co/functions/v1/sync-ktc-qbs',
-    headers:=jsonb_build_object(
-      'Authorization', 'Bearer ' || current_setting('app.admin_sync_secret')
-    )
-  );
-  $$
-);
+0 3 * * * curl "https://your-project.supabase.co/functions/v1/cron-sync-ktc?secret=YOUR_CRON_SECRET"
 ```
 
 **GitHub Actions:**
 ```yaml
-name: Sync KTC Values
+name: Sync KTC QB Values Daily
 on:
   schedule:
-    - cron: '0 3 * * *'
+    - cron: '0 3 * * *'  # Daily at 3 AM UTC
   workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger Sync
+      - name: Trigger KTC Sync
         run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.ADMIN_SYNC_SECRET }}" \
-            ${{ secrets.SUPABASE_URL }}/functions/v1/sync-ktc-qbs
+          response=$(curl -s "${{ secrets.SUPABASE_URL }}/functions/v1/cron-sync-ktc?secret=${{ secrets.CRON_SECRET }}")
+          echo "$response"
+          if echo "$response" | grep -q '"ok":true'; then
+            echo "Sync successful"
+          else
+            echo "Sync failed"
+            exit 1
+          fi
+```
+
+**Vercel Cron (vercel.json):**
+```json
+{
+  "crons": [
+    {
+      "path": "/api/trigger-sync",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
+```
+
+Then create `/api/trigger-sync/route.ts`:
+```typescript
+export async function GET(request: Request) {
+  const authHeader = request.headers.get('authorization');
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const response = await fetch(
+    `${process.env.VITE_SUPABASE_URL}/functions/v1/cron-sync-ktc?secret=${process.env.CRON_SECRET}`
+  );
+
+  return Response.json(await response.json());
+}
 ```
 
 ## Troubleshooting
@@ -263,16 +401,43 @@ If snapshots aren't saving:
 ## Data Flow
 
 ```
-KTC Website
-    ↓ (scrape)
-Edge Function (sync-ktc-qbs)
-    ↓ (validate & store)
-Supabase Database (ktc_value_snapshots)
-    ↓ (query)
+KTC API
+    ↓ (API request)
+Edge Function (sync-ktc-qbs or cron-sync-ktc)
+    ↓ (validate, deduplicate, sanity check)
+Supabase Database (player_values + ktc_value_snapshots)
+    ↓ (query latest snapshots)
 Edge Function (ktc-qb-values)
     ↓ (cache 5min)
 UI Components (KTCQBRankings)
+
+Trade Evaluation Flow:
+    ↓ (POST request with players)
+Edge Function (trade-eval)
+    ↓ (lookup in latest snapshots)
+Response (values + recommendation)
 ```
+
+## Key Features
+
+### Reliability Improvements
+- Uses KTC API directly (more reliable than HTML scraping)
+- Deduplication with Map-based key tracking
+- Sanity check: Rejects sync if < 80 QBs captured
+- Detailed error responses (blocked, too_few_rows, etc.)
+- Health metrics tracking (minRank, maxRank)
+
+### Automation Ready
+- Dedicated cron endpoint with GET method
+- Query parameter authentication for easy scheduling
+- Works with GitHub Actions, Vercel Cron, or standard crontab
+- Returns structured JSON for monitoring
+
+### Trade Evaluation
+- Fast fuzzy name matching with similarity scoring
+- Suggests alternative names if player not found
+- Supports multi-player trades
+- Returns detailed breakdown per side
 
 ## Future Enhancements
 
@@ -284,6 +449,7 @@ Potential improvements:
 - Comparison with other sources
 - Export to CSV/JSON
 - Mobile app integration
+- Webhook notifications for sync failures
 
 ## Files Reference
 
@@ -291,12 +457,14 @@ Potential improvements:
 - `supabase/migrations/add_ktc_value_snapshots_table.sql` - Schema migration
 
 ### Edge Functions
-- `supabase/functions/sync-ktc-qbs/index.ts` - Scraper function
-- `supabase/functions/ktc-qb-values/index.ts` - Public API function
+- `supabase/functions/sync-ktc-qbs/index.ts` - Manual sync function (admin UI)
+- `supabase/functions/cron-sync-ktc/index.ts` - Automated sync function (cron)
+- `supabase/functions/ktc-qb-values/index.ts` - Public QB values API
+- `supabase/functions/trade-eval/index.ts` - Trade evaluation API
 
 ### UI Components
-- `src/components/KTCAdminSync.tsx` - Admin sync interface
-- `src/components/KTCQBRankings.tsx` - Rankings viewer
+- `src/components/KTCAdminSync.tsx` - Admin sync interface with health metrics
+- `src/components/KTCQBRankings.tsx` - QB rankings viewer
 - `src/components/Dashboard.tsx` - Main navigation integration
 
 ### Documentation

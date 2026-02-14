@@ -2,7 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
@@ -120,10 +120,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    const adminSecret = Deno.env.get('ADMIN_SYNC_SECRET');
+    const url = new URL(req.url);
+    const secretParam = url.searchParams.get('secret');
+    const cronSecret = Deno.env.get('CRON_SECRET');
 
-    if (!authHeader || authHeader !== `Bearer ${adminSecret}`) {
+    if (!secretParam || secretParam !== cronSecret) {
       return new Response(
         JSON.stringify({ ok: false, error: 'Unauthorized' }),
         {
@@ -141,7 +142,11 @@ Deno.serve(async (req: Request) => {
 
     if (scrapeResult.blocked) {
       return new Response(
-        JSON.stringify({ ok: false, blocked: true, error: 'KTC blocked the request', reason: scrapeResult.reason }),
+        JSON.stringify({
+          ok: false,
+          blocked: true,
+          reason: scrapeResult.reason,
+        }),
         {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -153,7 +158,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           ok: false,
-          error: 'Failed to scrape QB data',
+          too_few_rows: scrapeResult.reason === 'too_few_rows',
           reason: scrapeResult.reason,
           count: scrapeResult.count,
           maxRank: scrapeResult.maxRank,
@@ -166,7 +171,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const qbs = scrapeResult.qbs;
-
     let successCount = 0;
     const capturedAt = new Date().toISOString();
 
@@ -239,10 +243,9 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         ok: true,
         count: successCount,
-        total: qbs.length,
         minRank: scrapeResult.minRank,
         maxRank: scrapeResult.maxRank,
-        timestamp: capturedAt,
+        captured_at: capturedAt,
       }),
       {
         status: 200,
@@ -250,7 +253,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error('Error in sync function:', error);
+    console.error('Error in cron sync function:', error);
     return new Response(
       JSON.stringify({
         ok: false,

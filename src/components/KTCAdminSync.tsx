@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { RefreshCw, Shield, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { RefreshCw, Shield, CheckCircle, XCircle, Clock, AlertTriangle, TrendingUp } from 'lucide-react';
 
 interface SyncResult {
   ok: boolean;
   count?: number;
   total?: number;
+  minRank?: number;
+  maxRank?: number;
   timestamp?: string;
   blocked?: boolean;
   error?: string;
+  reason?: string;
 }
 
 export default function KTCAdminSync() {
@@ -124,6 +127,14 @@ export default function KTCAdminSync() {
                     <p className="text-sm text-green-700 mt-1">
                       Successfully synced {result.count} of {result.total} QB values from KTC
                     </p>
+                    {result.maxRank !== undefined && (
+                      <div className="mt-2 flex items-center gap-4 text-sm">
+                        <span className="text-green-800">
+                          <TrendingUp className="w-4 h-4 inline mr-1" />
+                          QB{result.minRank || 1} - QB{result.maxRank}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : result.blocked ? (
                   <div>
@@ -139,6 +150,18 @@ export default function KTCAdminSync() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        )}
+
+        {result && result.ok && result.maxRank && result.maxRank < 120 && (
+          <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-orange-600 mt-0.5" />
+            <div>
+              <p className="font-semibold text-orange-900">Low QB Count Warning</p>
+              <p className="text-sm text-orange-700 mt-1">
+                Only {result.maxRank} QBs were captured. Expected at least 120 QBs for full coverage.
+              </p>
             </div>
           </div>
         )}
