@@ -798,14 +798,24 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                       : 'hover:bg-gray-800'
                                   }`}
                                 >
-                                  <img
-                                    src={getPlayerImageUrl(playerId)}
-                                    alt={player.full_name}
-                                    className="w-10 h-10 rounded-full object-cover bg-gray-700"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                    }}
-                                  />
+                                  <div className="relative w-10 h-10 flex-shrink-0">
+                                    <img
+                                      src={getPlayerImageUrl(playerId)}
+                                      alt={player.full_name}
+                                      className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                                      onError={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent && player) {
+                                          const fallback = document.createElement('div');
+                                          fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
+                                          fallback.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                          parent.appendChild(fallback);
+                                        }
+                                      }}
+                                    />
+                                  </div>
                                   <div className="flex-1">
                                     <div className="text-white text-sm font-medium">{player.full_name}</div>
                                     <div className="text-xs text-gray-400">
@@ -1007,14 +1017,24 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                             : 'hover:bg-gray-700'
                         }`}
                       >
-                        <img
-                          src={getPlayerImageUrl(result.player.player_id)}
-                          alt={result.player.full_name}
-                          className="w-12 h-12 rounded-full object-cover bg-gray-700"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
+                        <div className="relative w-12 h-12 flex-shrink-0">
+                          <img
+                            src={getPlayerImageUrl(result.player.player_id)}
+                            alt={result.player.full_name}
+                            className="w-12 h-12 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent && result.player) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-12 h-12 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold ring-2 ring-gray-700';
+                                fallback.textContent = result.player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-white font-medium">{result.player.full_name}</span>
@@ -1195,14 +1215,24 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                             : 'hover:bg-gray-700'
                         }`}
                       >
-                        <img
-                          src={getPlayerImageUrl(result.player.player_id)}
-                          alt={result.player.full_name}
-                          className="w-12 h-12 rounded-full object-cover bg-gray-700"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
+                        <div className="relative w-12 h-12 flex-shrink-0">
+                          <img
+                            src={getPlayerImageUrl(result.player.player_id)}
+                            alt={result.player.full_name}
+                            className="w-12 h-12 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent && result.player) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-12 h-12 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold ring-2 ring-gray-700';
+                                fallback.textContent = result.player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <span className="text-white font-medium">{result.player.full_name}</span>
@@ -1381,33 +1411,47 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 {analysis.teamAItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm"
+                    className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {item.type === 'player' && (
-                        <img
-                          src={getPlayerImageUrl(item.id)}
-                          alt={item.name}
-                          className="w-8 h-8 rounded-full object-cover bg-gray-700"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
+                        <div className="relative w-10 h-10 flex-shrink-0">
+                          <img
+                            src={getPlayerImageUrl(item.id)}
+                            alt={item.name}
+                            className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
+                                fallback.textContent = item.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
                       )}
                       {item.type === 'pick' && (
-                        <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                        <div className="w-10 h-10 rounded-full bg-[#00d4ff]/20 flex items-center justify-center ring-2 ring-[#00d4ff]/30">
+                          <Calendar className="w-5 h-5 text-[#00d4ff]" />
+                        </div>
                       )}
                       {item.type === 'faab' && (
-                        <DollarSign className="w-3 h-3 text-green-400" />
+                        <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center ring-2 ring-green-500/30">
+                          <DollarSign className="w-5 h-5 text-green-400" />
+                        </div>
                       )}
-                      <span className="text-gray-300">
-                        {item.name}
+                      <div>
+                        <span className="text-white font-medium block">{item.name}</span>
                         {item.position && (
-                          <span className="text-gray-500 ml-1">({item.position})</span>
+                          <span className="text-gray-400 text-xs">{item.position}</span>
                         )}
-                      </span>
+                      </div>
                     </div>
-                    <span className="text-white font-medium">{item.value}</span>
+                    <span className="text-[#00d4ff] font-bold text-base">{item.value}</span>
                   </div>
                 ))}
                 <div className="pt-2 mt-2 border-t border-gray-600 flex justify-between font-bold">
@@ -1423,33 +1467,47 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 {analysis.teamBItems.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between text-sm"
+                    className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-gray-700/50 transition-colors"
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
                       {item.type === 'player' && (
-                        <img
-                          src={getPlayerImageUrl(item.id)}
-                          alt={item.name}
-                          className="w-8 h-8 rounded-full object-cover bg-gray-700"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
-                        />
+                        <div className="relative w-10 h-10 flex-shrink-0">
+                          <img
+                            src={getPlayerImageUrl(item.id)}
+                            alt={item.name}
+                            className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                const fallback = document.createElement('div');
+                                fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
+                                fallback.textContent = item.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                parent.appendChild(fallback);
+                              }
+                            }}
+                          />
+                        </div>
                       )}
                       {item.type === 'pick' && (
-                        <Calendar className="w-3 h-3 text-[#00d4ff]" />
+                        <div className="w-10 h-10 rounded-full bg-[#00d4ff]/20 flex items-center justify-center ring-2 ring-[#00d4ff]/30">
+                          <Calendar className="w-5 h-5 text-[#00d4ff]" />
+                        </div>
                       )}
                       {item.type === 'faab' && (
-                        <DollarSign className="w-3 h-3 text-green-400" />
+                        <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center ring-2 ring-green-500/30">
+                          <DollarSign className="w-5 h-5 text-green-400" />
+                        </div>
                       )}
-                      <span className="text-gray-300">
-                        {item.name}
+                      <div>
+                        <span className="text-white font-medium block">{item.name}</span>
                         {item.position && (
-                          <span className="text-gray-500 ml-1">({item.position})</span>
+                          <span className="text-gray-400 text-xs">{item.position}</span>
                         )}
-                      </span>
+                      </div>
                     </div>
-                    <span className="text-white font-medium">{item.value}</span>
+                    <span className="text-[#00d4ff] font-bold text-base">{item.value}</span>
                   </div>
                 ))}
                 <div className="pt-2 mt-2 border-t border-gray-600 flex justify-between font-bold">
