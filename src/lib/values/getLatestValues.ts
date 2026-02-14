@@ -1,16 +1,23 @@
 import { supabase } from '../supabase';
+import { cache, cachedFetch, getCacheKey } from '../cache';
 
 export interface PlayerValue {
   player_id: string;
+  external_id: string;
   full_name: string;
   player_position: string;
   team: string | null;
+  status: string;
+  rookie_year: number | null;
   position_rank: number | null;
-  ktc_value: number;
+  ktc_value: number | null;
   fdp_value: number | null;
   captured_at: string;
   format: string;
+  snapshot_id: string;
 }
+
+const VALUE_CACHE_TTL = 5 * 60 * 1000;
 
 export interface ValuesSummary {
   format: string;
@@ -23,112 +30,142 @@ export interface ValuesSummary {
 }
 
 export async function getLatestValuesByPosition(
-  format: string = 'dynasty_sf',
+  format: string,
   position: string
 ): Promise<PlayerValue[]> {
-  try {
-    const { data, error } = await supabase.rpc('execute_sql', {
-      query: `
-        WITH latest_values AS (
-          SELECT DISTINCT ON (player_id)
-            player_id,
-            position_rank,
-            ktc_value,
-            fdp_value,
-            captured_at,
-            format
-          FROM ktc_value_snapshots
-          WHERE format = $1
-            AND player_position = $2
-          ORDER BY player_id, captured_at DESC
-        )
-        SELECT
-          lv.player_id,
-          np.full_name,
-          np.player_position,
-          np.team,
-          lv.position_rank,
-          lv.ktc_value,
-          lv.fdp_value,
-          lv.captured_at,
-          lv.format
-        FROM latest_values lv
-        JOIN nfl_players np ON np.id = lv.player_id
-        WHERE np.status IN ('Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR')
-        ORDER BY lv.position_rank ASC NULLS LAST, lv.ktc_value DESC
-      `,
-    });
+  const cacheKey = getCacheKey(['latest-values', format, position]);
 
-    if (error) {
-      console.error('Error fetching latest values by position:', error);
-      return [];
-    }
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      try {
+        const { data, error } = await supabase
+          .from('ktc_value_snapshots')
+          .select('id, player_id, position_rank, ktc_value, fdp_value, captured_at, position')
+          .eq('format', format)
+          .eq('position', position)
+          .order('captured_at', { ascending: false })
+          .limit(500);
 
-    return (data || []).map((row: any) => ({
-      player_id: row.player_id,
-      full_name: row.full_name,
-      player_position: row.player_position,
-      team: row.team,
-      position_rank: row.position_rank,
-      ktc_value: row.ktc_value || 0,
-      fdp_value: row.fdp_value,
-      captured_at: row.captured_at,
-      format,
-    }));
-  } catch (err) {
-    console.error('Error in getLatestValuesByPosition:', err);
-    return [];
-  }
+        if (error) {
+          console.error('Error fetching values:', error);
+          return [];
+        }
+
+        const uniquePlayers = new Map<string, any>();
+        data?.forEach(snapshot => {
+          if (!uniquePlayers.has(snapshot.player_id)) {
+            uniquePlayers.set(snapshot.player_id, snapshot);
+          }
+        });
+
+        const playerIds = Array.from(uniquePlayers.keys());
+        const { data: players, error: playersError } = await supabase
+          .from('nfl_players')
+          .select('external_id, full_name, player_position, team, status, rookie_year')
+          .in('external_id', playerIds)
+          .in('status', ['Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR']);
+
+        if (playersError || !players) {
+          return [];
+        }
+
+        const playerMap = new Map(players.map(p => [p.external_id, p]));
+
+        const results: PlayerValue[] = [];
+        uniquePlayers.forEach((snapshot, playerId) => {
+          const player = playerMap.get(playerId);
+          if (player) {
+            results.push({
+              player_id: snapshot.player_id,
+              external_id: player.external_id,
+              full_name: player.full_name,
+              player_position: player.player_position,
+              team: player.team,
+              status: player.status,
+              rookie_year: player.rookie_year,
+              position_rank: snapshot.position_rank,
+              ktc_value: snapshot.ktc_value,
+              fdp_value: snapshot.fdp_value,
+              captured_at: snapshot.captured_at,
+              format,
+              snapshot_id: snapshot.id,
+            });
+          }
+        });
+
+        return results.sort((a, b) => {
+          if (a.position_rank !== null && b.position_rank !== null) {
+            return a.position_rank - b.position_rank;
+          }
+          if (a.position_rank !== null) return -1;
+          if (b.position_rank !== null) return 1;
+          return (b.ktc_value || 0) - (a.ktc_value || 0);
+        });
+      } catch (err) {
+        console.error('Error in getLatestValuesByPosition:', err);
+        return [];
+      }
+    },
+    VALUE_CACHE_TTL
+  );
 }
 
 export async function getLatestValueForPlayer(
   playerId: string,
-  format: string = 'dynasty_sf'
+  format: string
 ): Promise<PlayerValue | null> {
-  try {
-    const { data, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select(`
-        player_id,
-        position_rank,
-        ktc_value,
-        fdp_value,
-        captured_at,
-        format,
-        nfl_players!inner (
-          full_name,
-          player_position,
-          team,
-          status
-        )
-      `)
-      .eq('player_id', playerId)
-      .eq('format', format)
-      .order('captured_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+  const cacheKey = getCacheKey(['player-value', playerId, format]);
 
-    if (error || !data) {
-      return null;
-    }
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      try {
+        const { data: snapshot, error: snapshotError } = await supabase
+          .from('ktc_value_snapshots')
+          .select('id, player_id, position_rank, ktc_value, fdp_value, captured_at, position')
+          .eq('player_id', playerId)
+          .eq('format', format)
+          .order('captured_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-    const player = data.nfl_players as any;
+        if (snapshotError || !snapshot) {
+          return null;
+        }
 
-    return {
-      player_id: data.player_id,
-      full_name: player.full_name,
-      player_position: player.player_position,
-      team: player.team,
-      position_rank: data.position_rank,
-      ktc_value: data.ktc_value || 0,
-      fdp_value: data.fdp_value,
-      captured_at: data.captured_at,
-      format: data.format,
-    };
-  } catch (err) {
-    console.error('Error in getLatestValueForPlayer:', err);
-    return null;
-  }
+        const { data: player, error: playerError } = await supabase
+          .from('nfl_players')
+          .select('external_id, full_name, player_position, team, status, rookie_year')
+          .eq('external_id', snapshot.player_id)
+          .maybeSingle();
+
+        if (playerError || !player) {
+          return null;
+        }
+
+        return {
+          player_id: snapshot.player_id,
+          external_id: player.external_id,
+          full_name: player.full_name,
+          player_position: player.player_position,
+          team: player.team,
+          status: player.status,
+          rookie_year: player.rookie_year,
+          position_rank: snapshot.position_rank,
+          ktc_value: snapshot.ktc_value,
+          fdp_value: snapshot.fdp_value,
+          captured_at: snapshot.captured_at,
+          format,
+          snapshot_id: snapshot.id,
+        };
+      } catch (err) {
+        console.error('Error in getLatestValueForPlayer:', err);
+        return null;
+      }
+    },
+    VALUE_CACHE_TTL
+  );
 }
 
 export async function getPlayerValueHistory(
@@ -415,4 +452,93 @@ export function calculateValueDifference(currentValue: number, previousValue: nu
     percentChange,
     trend,
   };
+}
+
+export async function getMultiplePlayerValues(
+  playerIds: string[],
+  format: string
+): Promise<Map<string, PlayerValue>> {
+  if (playerIds.length === 0) {
+    return new Map();
+  }
+
+  const values = await Promise.all(
+    playerIds.map(id => getLatestValueForPlayer(id, format))
+  );
+
+  const valueMap = new Map<string, PlayerValue>();
+  values.forEach((value, index) => {
+    if (value) {
+      valueMap.set(playerIds[index], value);
+    }
+  });
+
+  return valueMap;
+}
+
+export function invalidateValueCaches(pattern?: string): void {
+  if (pattern) {
+    cache.invalidatePattern(pattern);
+  } else {
+    cache.invalidatePattern('latest-values.*');
+    cache.invalidatePattern('player-value.*');
+    cache.invalidatePattern('player-history.*');
+  }
+}
+
+export const SUPPORTED_FORMATS = [
+  'dynasty_sf',
+  'dynasty_1qb',
+  'dynasty_tep',
+  'dynasty_sf_idp_tackle',
+  'dynasty_sf_idp_balanced',
+  'dynasty_sf_idp_big_play',
+] as const;
+
+export type ValueFormat = typeof SUPPORTED_FORMATS[number];
+
+export const SUPPORTED_POSITIONS = [
+  'QB',
+  'RB',
+  'WR',
+  'TE',
+  'K',
+  'DL',
+  'LB',
+  'DB',
+] as const;
+
+export type PlayerPosition = typeof SUPPORTED_POSITIONS[number];
+
+export function isValidFormat(format: string): format is ValueFormat {
+  return SUPPORTED_FORMATS.includes(format as ValueFormat);
+}
+
+export function isValidPosition(position: string): position is PlayerPosition {
+  return SUPPORTED_POSITIONS.includes(position as PlayerPosition);
+}
+
+export function ensureValidValue(value: number | null | undefined): number | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return value;
+}
+
+export function calculateTradeValue(playerValues: PlayerValue[]): {
+  total: number | null;
+  breakdown: Array<{ player_id: string; full_name: string; value: number | null }>;
+} {
+  const breakdown = playerValues.map(pv => ({
+    player_id: pv.player_id,
+    full_name: pv.full_name,
+    value: pv.fdp_value || pv.ktc_value,
+  }));
+
+  const hasAnyNull = breakdown.some(b => b.value === null);
+  const total = hasAnyNull
+    ? null
+    : breakdown.reduce((sum, b) => sum + (b.value || 0), 0);
+
+  return { total, breakdown };
 }
