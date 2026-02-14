@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Users, X, ChevronLeft, ChevronRight, Calendar, DollarSign, RefreshCw } from 'lucide-react';
 import { calculatePowerRankings, type TeamRanking } from '../services/sleeperApi';
-import { playerValuesApi } from '../services/playerValuesApi';
+import { syncPlayerValuesToDatabase } from '../utils/syncPlayerValues';
 
 interface PowerRankingsProps {
   leagueId: string;
@@ -36,12 +36,12 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
     setSyncing(true);
     setError(null);
     try {
-      const count = await playerValuesApi.syncPlayerValuesFromSportsData(false);
-      console.log(`Synced ${count} player values from SportsData.io`);
+      const count = await syncPlayerValuesToDatabase(false);
+      console.log(`Synced ${count} player values from FDP`);
       await loadRankings();
     } catch (err) {
       console.error('Failed to sync player values:', err);
-      setError('Failed to sync player values from SportsData.io. Please try again.');
+      setError('Failed to sync player values from FDP. Please try again.');
     } finally {
       setSyncing(false);
     }

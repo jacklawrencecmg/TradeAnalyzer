@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Search, TrendingUp, TrendingDown, Minus, Info, DollarSign, Filter, RefreshCw, Calendar, AlertCircle, Award, BarChart3, Star, Settings } from 'lucide-react';
 import { playerValuesApi, PlayerValue, PlayerValueChange, DynastyDraftPick } from '../services/playerValuesApi';
+import { syncPlayerValuesToDatabase } from '../utils/syncPlayerValues';
 import { useAuth } from '../hooks/useAuth';
 import { ListSkeleton } from './LoadingSkeleton';
 import { useToast } from './Toast';
@@ -144,8 +145,8 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
 
     setSyncing(true);
     try {
-      const count = await playerValuesApi.syncPlayerValuesFromSportsData(isSuperflex);
-      showToast(`Successfully synced ${count} players from SportsData.io`, 'success');
+      const count = await syncPlayerValuesToDatabase(isSuperflex);
+      showToast(`Successfully synced ${count} players from FDP`, 'success');
       await loadPlayerValues();
     } catch (error) {
       console.error('Error syncing player values:', error);

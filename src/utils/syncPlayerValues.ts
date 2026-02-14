@@ -16,10 +16,10 @@ interface PlayerValueData {
 }
 
 function normalizeValue(rawValue: number, minValue: number, maxValue: number): number {
-  if (maxValue === minValue) return 50;
+  if (maxValue === minValue) return 5000;
 
-  const normalized = ((rawValue - minValue) / (maxValue - minValue)) * 100;
-  return Math.max(0, Math.min(100, normalized));
+  const normalized = ((rawValue - minValue) / (maxValue - minValue)) * 10000;
+  return Math.max(0, Math.min(10000, normalized));
 }
 
 async function fetchFDPValues(isSuperflex: boolean = false): Promise<Record<string, PlayerValueData>> {
@@ -67,7 +67,7 @@ async function fetchFDPValues(isSuperflex: boolean = false): Promise<Record<stri
         };
       });
 
-      console.log(`FDP: Normalized ${rawValues.length} values from range ${minValue}-${maxValue} to 0-100`);
+      console.log(`FDP: Normalized ${rawValues.length} values from range ${minValue}-${maxValue} to 0-10000`);
       return normalizedValues;
     }
   } catch (error) {
@@ -114,7 +114,7 @@ async function fetchFDPValues(isSuperflex: boolean = false): Promise<Record<stri
         };
       });
 
-      console.log(`KTC: Normalized ${rawValues.length} values from range ${minValue}-${maxValue} to 0-100`);
+      console.log(`KTC: Normalized ${rawValues.length} values from range ${minValue}-${maxValue} to 0-10000`);
       return normalizedValues;
     }
   } catch (error) {
@@ -258,8 +258,8 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
         player_name: playerData.full_name || `${playerData.first_name} ${playerData.last_name}`,
         position: playerData.position,
         team: playerData.team || null,
-        base_value: parseFloat((adjustedValue * 0.9).toFixed(1)),
-        fdp_value: parseFloat(adjustedValue.toFixed(1)),
+        base_value: parseFloat((adjustedValue * 0.95).toFixed(0)),
+        fdp_value: parseFloat(adjustedValue.toFixed(0)),
         trend: trend,
         last_updated: new Date().toISOString(),
         injury_status: playerData.injury_status?.toLowerCase() || null,
@@ -294,8 +294,8 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
 
       group.forEach((player, index) => {
         const tierBonus = index < 5 ? 1.15 : index < 12 ? 1.1 : index < 24 ? 1.05 : 1.0;
-        player.fdp_value = parseFloat((player.fdp_value * multiplier * tierBonus).toFixed(1));
-        player.base_value = parseFloat((player.fdp_value * 0.9).toFixed(1));
+        player.fdp_value = parseFloat((player.fdp_value * multiplier * tierBonus).toFixed(0));
+        player.base_value = parseFloat((player.fdp_value * 0.95).toFixed(0));
         playerValues.push(player);
       });
     });
