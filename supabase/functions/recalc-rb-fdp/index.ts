@@ -96,9 +96,14 @@ Deno.serve(async (req: Request) => {
     const capturedAt = new Date().toISOString();
     let successCount = 0;
     let updatedCount = 0;
+    let manualContextCount = 0;
+    let suggestedContextCount = 0;
+    let multiplierOnlyCount = 0;
 
     for (const player of players) {
-      const ctx = {
+      const hasManualContext = player.depth_role || player.workload_tier || player.contract_security;
+
+      let ctx = {
         age: player.age,
         depth_role: player.depth_role,
         workload_tier: player.workload_tier,
@@ -106,11 +111,37 @@ Deno.serve(async (req: Request) => {
         contract_security: player.contract_security,
       };
 
+      if (!hasManualContext) {
+        const { data: suggestion } = await supabase
+          .from('player_context_suggestions')
+          .select('suggested_depth_role, suggested_workload_tier, suggested_contract_security, confidence')
+          .eq('player_id', player.player_id)
+          .eq('status', 'pending')
+          .gte('confidence', 0.75)
+          .gt('expires_at', capturedAt)
+          .maybeSingle();
+
+        if (suggestion) {
+          ctx = {
+            age: player.age,
+            depth_role: suggestion.suggested_depth_role,
+            workload_tier: suggestion.suggested_workload_tier,
+            injury_risk: player.injury_risk,
+            contract_security: suggestion.suggested_contract_security,
+          };
+          suggestedContextCount++;
+        }
+      } else {
+        manualContextCount++;
+      }
+
       const mult = formatMultipliers[formatKey]?.RB ?? 1;
       let baseFdpValue = Math.round(player.ktc_value * mult);
 
       if (ctx.age || ctx.depth_role || ctx.workload_tier || ctx.injury_risk || ctx.contract_security) {
         baseFdpValue += calcFdpAdjustments(ctx);
+      } else {
+        multiplierOnlyCount++;
       }
 
       const fdpValue = Math.max(0, Math.min(10000, baseFdpValue));
@@ -169,6 +200,11 @@ Deno.serve(async (req: Request) => {
         players_updated: updatedCount,
         snapshots_created: successCount,
         total_players: players.length,
+        context_sources: {
+          manual: manualContextCount,
+          suggested: suggestedContextCount,
+          multiplier_only: multiplierOnlyCount,
+        },
         format: formatKey,
         timestamp: capturedAt,
       }),

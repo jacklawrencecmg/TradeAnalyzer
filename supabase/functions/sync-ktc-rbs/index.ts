@@ -301,6 +301,21 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    try {
+      const generateSuggestionsUrl = `${supabaseUrl}/functions/v1/generate-rb-context-suggestions`;
+      fetch(generateSuggestionsUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`,
+          'Content-Type': 'application/json',
+        },
+      }).catch(err => {
+        console.error('Background suggestion generation failed:', err);
+      });
+    } catch (err) {
+      console.error('Failed to trigger suggestion generation:', err);
+    }
+
     return new Response(
       JSON.stringify({
         ok: true,

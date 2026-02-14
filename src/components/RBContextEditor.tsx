@@ -15,6 +15,8 @@ interface RBPlayer {
   workload_tier: string | null;
   injury_risk: string | null;
   contract_security: string | null;
+  has_suggestion?: boolean;
+  suggestion_confidence?: number;
 }
 
 export default function RBContextEditor() {
@@ -46,7 +48,29 @@ export default function RBContextEditor() {
 
       if (error) throw error;
 
-      setRbs(data || []);
+      const playerIds = data?.map(rb => rb.player_id) || [];
+      const { data: suggestions } = await supabase
+        .from('player_context_suggestions')
+        .select('player_id, confidence')
+        .in('player_id', playerIds)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString());
+
+      const suggestionsMap = new Map(
+        suggestions?.map(s => [s.player_id, s.confidence]) || []
+      );
+
+      const enrichedData = data?.map(rb => {
+        const hasManualContext = !!(rb.depth_role || rb.workload_tier || rb.contract_security);
+        const suggestionConfidence = suggestionsMap.get(rb.player_id);
+        return {
+          ...rb,
+          has_suggestion: !hasManualContext && !!suggestionConfidence,
+          suggestion_confidence: suggestionConfidence,
+        };
+      }) || [];
+
+      setRbs(enrichedData);
     } catch (err) {
       console.error('Error fetching RBs:', err);
       showMessage('error', 'Failed to load RB data');
@@ -228,6 +252,9 @@ export default function RBContextEditor() {
                   Player
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
+                  Source
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
                   Age
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
@@ -263,6 +290,21 @@ export default function RBContextEditor() {
                         <div className="font-medium text-gray-900">{rb.player_name}</div>
                         <div className="text-sm text-gray-500">{rb.team || 'FA'}</div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {rb.depth_role || rb.workload_tier || rb.contract_security ? (
+                        <span className="inline-flex px-2 py-1 rounded text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-300">
+                          Manual
+                        </span>
+                      ) : rb.has_suggestion ? (
+                        <span className="inline-flex px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-800 border border-green-300">
+                          Auto ({Math.round((rb.suggestion_confidence || 0) * 100)}%)
+                        </span>
+                      ) : (
+                        <span className="inline-flex px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600 border border-gray-300">
+                          Default
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {isEditing ? (
@@ -430,6 +472,14 @@ export default function RBContextEditor() {
 
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <h3 className="font-semibold text-blue-900 mb-2">Adjustment Guide</h3>
+        <div className="mb-4 pb-4 border-b border-blue-200">
+          <p className="font-medium mb-2 text-blue-900">Context Data Sources:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm text-blue-800">
+            <li><strong>Manual:</strong> Data you've entered directly (always used)</li>
+            <li><strong>Auto (XX%):</strong> AI-generated suggestions based on depth charts and value trends (used if confidence ≥75%)</li>
+            <li><strong>Default:</strong> No context data, only format multiplier applied</li>
+          </ul>
+        </div>
         <div className="grid md:grid-cols-2 gap-4 text-sm text-blue-800">
           <div>
             <p className="font-medium mb-1">Age Adjustments:</p>
