@@ -510,11 +510,15 @@ class PlayerValuesApi {
       const { data, error } = await supabase
         .from('player_values')
         .select('*')
-        .ilike('player_name', `%${searchTerm}%`)
-        .order('fdp_value', { ascending: false })
+        .or(`player_name.ilike.%${searchTerm}%,team.ilike.%${searchTerm}%`)
+        .order('fdp_value', { ascending: false, nullsLast: true })
         .limit(limit);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase search error:', error);
+        throw error;
+      }
+
       return data || [];
     } catch (error) {
       console.error('Error searching players:', error);

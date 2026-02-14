@@ -168,10 +168,17 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
 
       searchTimeoutRef.current = setTimeout(async () => {
         try {
+          console.log('Searching for:', value.trim());
           const results = await playerValuesApi.searchPlayers(value.trim(), searchMaxResults);
+          console.log('Search results:', results.length, 'players found');
           setSuggestions(results);
+
+          if (results.length === 0) {
+            console.log('No results found. Database may be empty.');
+          }
         } catch (error) {
           console.error('Error searching players:', error);
+          showToast('Error searching players. Please try again.', 'error');
           setSuggestions([]);
         } finally {
           setSearchLoading(false);
@@ -600,10 +607,17 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                       </div>
                     </button>
                   ))
+                ) : searchTerm.trim().length >= searchMinChars && players.length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <AlertCircle className="w-8 h-8 text-orange-400 mx-auto mb-2" />
+                    <p className="text-fdp-text-1 text-sm font-medium mb-2">No player data available</p>
+                    <p className="text-fdp-text-3 text-xs mb-3">Click "Sync Player Values" to load data from SportsData.io</p>
+                  </div>
                 ) : (
                   <div className="px-4 py-6 text-center">
                     <Search className="w-8 h-8 text-fdp-text-3 mx-auto mb-2 opacity-50" />
-                    <p className="text-fdp-text-3 text-sm">No players found</p>
+                    <p className="text-fdp-text-3 text-sm">No players found matching "{searchTerm}"</p>
+                    <p className="text-fdp-text-3 text-xs mt-1">Try a different search term</p>
                   </div>
                 )}
               </div>
