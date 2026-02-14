@@ -180,6 +180,16 @@ export default function SharedTradePage({ slug }: SharedTradePageProps) {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-xl p-6 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <img
+              src="/FDP2.png"
+              alt="Fantasy Draft Pros"
+              className="h-12 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">Trade Analysis</h1>

@@ -76,6 +76,16 @@ export default function PricingPage({ onBack }: PricingPageProps) {
         </button>
 
         <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <img
+              src="/FDP2.png"
+              alt="Fantasy Draft Pros"
+              className="h-20 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Choose Your Plan
           </h1>

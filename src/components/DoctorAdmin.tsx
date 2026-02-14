@@ -148,12 +148,22 @@ export default function DoctorAdmin() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-gray-800 rounded-xl shadow-2xl p-8 border border-gray-700">
-          <div className="flex items-center justify-center mb-6">
-            <Shield className="w-12 h-12 text-blue-500" />
+          <div className="flex items-center justify-center mb-4">
+            <img
+              src="/FDP2.png"
+              alt="Fantasy Draft Pros"
+              className="h-24 w-auto object-contain drop-shadow-lg"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           </div>
-          <h1 className="text-2xl font-bold text-white text-center mb-2">
-            Doctor Admin
-          </h1>
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <Shield className="w-6 h-6 text-blue-500" />
+            <h1 className="text-2xl font-bold text-white text-center">
+              Doctor Admin
+            </h1>
+          </div>
           <p className="text-gray-400 text-center mb-6">
             Enter ADMIN_SYNC_SECRET to access
           </p>
@@ -183,6 +193,16 @@ export default function DoctorAdmin() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <img
+              src="/FDP3.png"
+              alt="Fantasy Draft Pros"
+              className="h-10 w-auto object-contain"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
           <div className="flex items-center gap-3 mb-2">
             <Activity className="w-8 h-8 text-blue-500" />
             <h1 className="text-3xl font-bold text-white">Doctor Admin</h1>
