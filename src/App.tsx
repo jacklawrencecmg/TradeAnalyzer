@@ -4,6 +4,7 @@ import { AuthForm } from './components/AuthForm';
 import { Dashboard } from './components/Dashboard';
 import TradeAnalyzer from './components/TradeAnalyzer';
 import SharedTradePage from './components/SharedTradePage';
+import PublicLeagueRankings from './components/PublicLeagueRankings';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Footer from './components/Footer';
@@ -18,12 +19,21 @@ function AppContent() {
   const [showAuth, setShowAuth] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [tradeSlug, setTradeSlug] = useState<string | null>(null);
+  const [leagueSlug, setLeagueSlug] = useState<string | null>(null);
 
   useEffect(() => {
     const path = window.location.pathname;
+
     const tradeMatch = path.match(/^\/trade\/([a-z0-9]+)$/);
     if (tradeMatch) {
       setTradeSlug(tradeMatch[1]);
+      return;
+    }
+
+    const leagueMatch = path.match(/^\/league\/public\/([a-z0-9-]+)$/);
+    if (leagueMatch) {
+      setLeagueSlug(leagueMatch[1]);
+      return;
     }
   }, []);
 
@@ -37,6 +47,10 @@ function AppContent() {
 
   if (tradeSlug) {
     return <SharedTradePage slug={tradeSlug} />;
+  }
+
+  if (leagueSlug) {
+    return <PublicLeagueRankings slug={leagueSlug} />;
   }
 
   if (user) {
