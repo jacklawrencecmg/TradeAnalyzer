@@ -8,7 +8,7 @@ export default defineConfig({
     exclude: ['lucide-react'],
   },
   base: './',
-  publicDir: false,
+  publicDir: 'public',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
