@@ -170,18 +170,20 @@ Deno.serve(async (req: Request) => {
         };
       }
 
-      const searchPositions = pos ? [pos] : ['QB', 'RB', 'WR', 'TE'];
+      const searchPositions = pos ? [pos] : ['QB', 'RB', 'WR', 'TE', 'DL', 'LB', 'DB'];
 
       for (const searchPos of searchPositions) {
         const key = `${name}_${searchPos}`;
         const exact = latestByPlayer.get(key);
         if (exact) {
+          const isIDP = ['DL', 'LB', 'DB'].includes(exact.position);
           return {
             found: true,
             value: exact.fdp_value || exact.ktc_value,
             name: exact.full_name,
             pos: exact.position,
-            isPick: false
+            isPick: false,
+            positionGroup: isIDP ? 'IDP' : 'OFF'
           };
         }
       }
@@ -218,6 +220,8 @@ Deno.serve(async (req: Request) => {
     };
 
     let sideATotal = 0;
+    let sideAOffenseTotal = 0;
+    let sideAIDPTotal = 0;
     const sideADetails: any[] = [];
     const sideANotFound: any[] = [];
     let pickPhaseInfo: any = null;
@@ -226,11 +230,17 @@ Deno.serve(async (req: Request) => {
       const result = await lookupPlayer(item);
       if (result.found) {
         sideATotal += result.value;
+        if (result.positionGroup === 'IDP') {
+          sideAIDPTotal += result.value;
+        } else if (!result.isPick) {
+          sideAOffenseTotal += result.value;
+        }
         sideADetails.push({
           name: result.name,
           pos: result.pos,
           value: result.value,
           isPick: result.isPick || false,
+          positionGroup: result.positionGroup,
           pickPhase: result.pickPhase,
           pickAdjustment: result.pickAdjustment,
           baseValue: result.baseValue
@@ -251,6 +261,8 @@ Deno.serve(async (req: Request) => {
     }
 
     let sideBTotal = 0;
+    let sideBOffenseTotal = 0;
+    let sideBIDPTotal = 0;
     const sideBDetails: any[] = [];
     const sideBNotFound: any[] = [];
 
@@ -258,11 +270,17 @@ Deno.serve(async (req: Request) => {
       const result = await lookupPlayer(item);
       if (result.found) {
         sideBTotal += result.value;
+        if (result.positionGroup === 'IDP') {
+          sideBIDPTotal += result.value;
+        } else if (!result.isPick) {
+          sideBOffenseTotal += result.value;
+        }
         sideBDetails.push({
           name: result.name,
           pos: result.pos,
           value: result.value,
           isPick: result.isPick || false,
+          positionGroup: result.positionGroup,
           pickPhase: result.pickPhase,
           pickAdjustment: result.pickAdjustment,
           baseValue: result.baseValue
@@ -308,6 +326,10 @@ Deno.serve(async (req: Request) => {
         ok: true,
         sideA_total: sideATotal,
         sideB_total: sideBTotal,
+        sideA_offense_total: sideAOffenseTotal,
+        sideA_idp_total: sideAIDPTotal,
+        sideB_offense_total: sideBOffenseTotal,
+        sideB_idp_total: sideBIDPTotal,
         difference: Math.abs(difference),
         fairness_percentage: fairnessPercentage,
         recommendation,
