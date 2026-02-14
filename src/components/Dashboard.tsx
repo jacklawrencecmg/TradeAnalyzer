@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload, Radio, Zap } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
@@ -30,6 +30,8 @@ import Footer from './Footer';
 import KTCAdminSync from './KTCAdminSync';
 import KTCQBRankings from './KTCQBRankings';
 import KTCRBRankings from './KTCRBRankings';
+import KTCWRRankings from './KTCWRRankings';
+import KTCTERankings from './KTCTERankings';
 import KTCMultiPositionSync from './KTCMultiPositionSync';
 import UnifiedRankings from './UnifiedRankings';
 import PlayerSearch from './PlayerSearch';
@@ -53,7 +55,7 @@ import SubscriptionBadge from './SubscriptionBadge';
 import UsageMeter from './UsageMeter';
 import { useSubscription } from '../hooks/useSubscription';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'ktcWRRankings' | 'ktcTERankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -383,6 +385,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="Admin" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Award} label="RB Rankings" shortLabel="RBs" tab="ktcRBRankings" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Radio} label="WR Rankings" shortLabel="WRs" tab="ktcWRRankings" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Zap} label="TE Rankings" shortLabel="TEs" tab="ktcTERankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Edit} label="RB Context" shortLabel="Context" tab="rbContext" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Sparkles} label="RB Suggestions" shortLabel="AI Suggest" tab="rbSuggestions" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Calendar} label="Rookie Pick Values" shortLabel="Picks" tab="pickValues" activeTab={activeTab} onClick={setActiveTab} />
@@ -435,6 +439,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'ktcAdmin' && <KTCAdminSync />}
               {activeTab === 'ktcRankings' && <KTCQBRankings />}
               {activeTab === 'ktcRBRankings' && <KTCRBRankings />}
+              {activeTab === 'ktcWRRankings' && <KTCWRRankings />}
+              {activeTab === 'ktcTERankings' && <KTCTERankings />}
               {activeTab === 'rbContext' && <RBContextEditor />}
               {activeTab === 'rbSuggestions' && <RBContextSuggestions />}
               {activeTab === 'pickValues' && <RookiePickValues />}
