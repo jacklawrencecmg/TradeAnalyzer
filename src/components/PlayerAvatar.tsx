@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User } from 'lucide-react';
 
 interface PlayerAvatarProps {
+  playerId?: string;
   playerName: string;
   team?: string;
   position?: string;
@@ -69,6 +70,7 @@ const teamLogoSize = {
 };
 
 export function PlayerAvatar({
+  playerId,
   playerName,
   team,
   position,
@@ -78,6 +80,8 @@ export function PlayerAvatar({
   badgeContent,
   className = '',
 }: PlayerAvatarProps) {
+  const [imageError, setImageError] = useState(false);
+
   const initials = playerName
     .split(' ')
     .map(n => n[0])
@@ -86,13 +90,21 @@ export function PlayerAvatar({
     .slice(0, 2);
 
   const teamColor = team ? teamColors[team] || 'bg-gray-600' : 'bg-gray-600';
+  const playerImageUrl = playerId ? `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg` : null;
 
   return (
     <div className={`relative inline-block ${className}`}>
       <div
-        className={`${sizeClasses[size]} rounded-full ${teamColor} flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-gray-700/50 transition-all duration-300 hover:ring-cyan-500/50 hover:shadow-cyan-500/20 hover:shadow-xl`}
+        className={`${sizeClasses[size]} rounded-full ${!imageError && playerImageUrl ? 'bg-gray-800' : teamColor} flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-gray-700/50 transition-all duration-300 hover:ring-cyan-500/50 hover:shadow-cyan-500/20 hover:shadow-xl overflow-hidden`}
       >
-        {playerName ? (
+        {!imageError && playerImageUrl ? (
+          <img
+            src={playerImageUrl}
+            alt={playerName}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : playerName ? (
           <span className={size === 'sm' ? 'text-xs' : size === 'lg' || size === 'xl' ? 'text-lg' : 'text-sm'}>
             {initials}
           </span>

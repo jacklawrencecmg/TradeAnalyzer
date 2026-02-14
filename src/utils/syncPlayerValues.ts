@@ -124,13 +124,47 @@ async function fetchFDPValues(isSuperflex: boolean = false): Promise<Record<stri
   return {};
 }
 
+const KNOWN_BACKUP_QBS = [
+  'joe milton', 'joe milton iii', 'trey lance', 'sam howell', 'tyler huntley',
+  'jake browning', 'easton stick', 'cooper rush', 'taylor heinicke',
+  'jarrett stidham', 'mitch trubisky', 'tyson bagent', 'joshua dobbs',
+  'clayton tune', 'davis mills', 'aidan oconnell', 'jaren hall',
+  'stetson bennett', 'dorian thompson-robinson'
+];
+
 function calculateAdjustedValue(
   baseValue: number,
   playerData: any,
-  position: string
+  position: string,
+  rawValue: number,
+  allRawValues: number[]
 ): { adjustedValue: number; trend: 'up' | 'down' | 'stable' } {
   let value = baseValue;
   let trend: 'up' | 'down' | 'stable' = 'stable';
+
+  if (position === 'QB') {
+    const qbValues = allRawValues.filter(v => v > 0).sort((a, b) => b - a);
+    const topQBValue = qbValues[0] || 1;
+    const medianQBValue = qbValues[Math.floor(qbValues.length / 2)] || 1;
+    const relativeValue = rawValue / topQBValue;
+
+    const playerNameLower = (playerData.full_name || '').toLowerCase();
+    const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+
+    if (isKnownBackup || relativeValue < 0.05) {
+      value *= 0.02;
+      trend = 'down';
+    } else if (relativeValue < 0.10) {
+      value *= 0.05;
+      trend = 'down';
+    } else if (relativeValue < 0.20) {
+      value *= 0.15;
+      trend = 'down';
+    } else if (rawValue < medianQBValue * 0.30) {
+      value *= 0.25;
+      trend = 'down';
+    }
+  }
 
   if (playerData.injury_status) {
     const injuryMultipliers: Record<string, number> = {
@@ -193,6 +227,16 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
     const playerValues: any[] = [];
     const positionGroups: Record<string, any[]> = { QB: [], RB: [], WR: [], TE: [] };
 
+    const qbRawValues: number[] = [];
+    Object.entries(sleeperPlayers).forEach(([playerId, playerData]: [string, any]) => {
+      if (playerData.position === 'QB') {
+        const fdpData = fdpValues[playerId];
+        if (fdpData && fdpData.value > 0) {
+          qbRawValues.push(fdpData.value);
+        }
+      }
+    });
+
     Object.entries(sleeperPlayers).forEach(([playerId, playerData]: [string, any]) => {
       if (!playerData.position || !['QB', 'RB', 'WR', 'TE'].includes(playerData.position)) {
         return;
@@ -204,7 +248,9 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
       const { adjustedValue, trend } = calculateAdjustedValue(
         fdpData.value,
         playerData,
-        playerData.position
+        playerData.position,
+        fdpData.value,
+        qbRawValues
       );
 
       const playerValue = {
