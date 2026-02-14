@@ -44,17 +44,37 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    const playerIds = Array.from(latestByPlayer.values()).map(s => s.player_id);
+
+    const { data: playerContext } = await supabase
+      .from('player_values')
+      .select('player_id, age, depth_role, workload_tier, injury_risk, contract_security')
+      .in('player_id', playerIds);
+
+    const contextMap = new Map();
+    for (const ctx of playerContext || []) {
+      contextMap.set(ctx.player_id, ctx);
+    }
+
     const results = Array.from(latestByPlayer.values())
       .sort((a, b) => a.position_rank - b.position_rank)
-      .map(snapshot => ({
-        position_rank: snapshot.position_rank,
-        full_name: snapshot.full_name,
-        team: snapshot.team,
-        ktc_value: snapshot.ktc_value,
-        fdp_value: snapshot.fdp_value,
-        value: snapshot.ktc_value,
-        captured_at: snapshot.captured_at,
-      }));
+      .map(snapshot => {
+        const ctx = contextMap.get(snapshot.player_id) || {};
+        return {
+          position_rank: snapshot.position_rank,
+          full_name: snapshot.full_name,
+          team: snapshot.team,
+          ktc_value: snapshot.ktc_value,
+          fdp_value: snapshot.fdp_value,
+          value: snapshot.ktc_value,
+          captured_at: snapshot.captured_at,
+          age: ctx.age,
+          depth_role: ctx.depth_role,
+          workload_tier: ctx.workload_tier,
+          injury_risk: ctx.injury_risk,
+          contract_security: ctx.contract_security,
+        };
+      });
 
     return new Response(
       JSON.stringify(results),

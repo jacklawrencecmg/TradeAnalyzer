@@ -1,4 +1,5 @@
 import { formatMultipliers, type LeagueFormat, type Position } from './formatMultipliers';
+import { rbAdjustmentPoints, type RbContext } from './rbAdjustments';
 
 export function calcFdpValue(
   ktcValue: number,
@@ -7,6 +8,28 @@ export function calcFdpValue(
 ): number {
   const multiplier = formatMultipliers[format]?.[position] ?? 1;
   return Math.round(ktcValue * multiplier);
+}
+
+export function calcFdpValueFromKtc({
+  ktcValue,
+  position,
+  format,
+  ctx,
+}: {
+  ktcValue: number;
+  position: string;
+  format: string;
+  ctx?: any;
+}): number {
+  const normalizedFormat = convertFormatKey(format);
+  const mult = formatMultipliers[normalizedFormat]?.[position as Position] ?? 1;
+  let base = Math.round(ktcValue * mult);
+
+  if (position === 'RB' && ctx) {
+    base += rbAdjustmentPoints(ctx);
+  }
+
+  return Math.max(0, Math.min(10000, base));
 }
 
 export function convertFormatKey(format: string): LeagueFormat {

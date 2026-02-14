@@ -8,14 +8,40 @@ const corsHeaders = {
 
 const formatMultipliers: Record<string, Record<string, number>> = {
   dynasty_superflex: { QB: 1.35, RB: 1.15, WR: 1.0, TE: 1.10 },
+  dynasty_sf: { QB: 1.35, RB: 1.15, WR: 1.0, TE: 1.10 },
   dynasty_1qb: { QB: 1.0, RB: 1.18, WR: 1.0, TE: 1.10 },
   dynasty_tep: { QB: 1.35, RB: 1.15, WR: 1.0, TE: 1.25 },
 };
 
-function calcFdpValue(ktcValue: number, position: string, format: string): number {
-  const formatKey = format.replace(/-/g, '_');
-  const multiplier = formatMultipliers[formatKey]?.[position] ?? 1;
-  return Math.round(ktcValue * multiplier);
+function calcFdpAdjustments(ctx: any): number {
+  let adj = 0;
+
+  if (ctx.age != null) {
+    if (ctx.age <= 22) adj += 250;
+    else if (ctx.age <= 24) adj += 150;
+    else if (ctx.age <= 25) adj += 0;
+    else if (ctx.age === 26) adj -= 300;
+    else if (ctx.age === 27) adj -= 650;
+    else if (ctx.age >= 28) adj -= 1100;
+  }
+
+  if (ctx.depth_role === 'feature') adj += 500;
+  if (ctx.depth_role === 'lead_committee') adj += 200;
+  if (ctx.depth_role === 'committee') adj -= 250;
+  if (ctx.depth_role === 'handcuff') adj -= 450;
+  if (ctx.depth_role === 'backup') adj -= 700;
+
+  if (ctx.workload_tier === 'elite') adj += 350;
+  if (ctx.workload_tier === 'solid') adj += 150;
+  if (ctx.workload_tier === 'light') adj -= 250;
+
+  if (ctx.injury_risk === 'medium') adj -= 150;
+  if (ctx.injury_risk === 'high') adj -= 450;
+
+  if (ctx.contract_security === 'high') adj += 200;
+  if (ctx.contract_security === 'low') adj -= 250;
+
+  return adj;
 }
 
 interface KTCPlayer {
@@ -194,12 +220,29 @@ Deno.serve(async (req: Request) => {
     for (const player of players) {
       const { data: existingPlayer } = await supabase
         .from('player_values')
-        .select('player_id')
+        .select('player_id, age, depth_role, workload_tier, injury_risk, contract_security')
         .eq('player_name', player.full_name)
         .eq('position', 'RB')
         .maybeSingle();
 
       let playerId = existingPlayer?.player_id;
+
+      const ctx = existingPlayer ? {
+        age: existingPlayer.age,
+        depth_role: existingPlayer.depth_role,
+        workload_tier: existingPlayer.workload_tier,
+        injury_risk: existingPlayer.injury_risk,
+        contract_security: existingPlayer.contract_security,
+      } : {};
+
+      const mult = formatMultipliers[formatKey]?.RB ?? 1;
+      let baseFdpValue = Math.round(player.value * mult);
+
+      if (ctx.age || ctx.depth_role || ctx.workload_tier || ctx.injury_risk || ctx.contract_security) {
+        baseFdpValue += calcFdpAdjustments(ctx);
+      }
+
+      const fdpValue = Math.max(0, Math.min(10000, baseFdpValue));
 
       if (!playerId) {
         playerId = `ktc_${player.full_name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`;
@@ -212,7 +255,7 @@ Deno.serve(async (req: Request) => {
             position: 'RB',
             team: player.team,
             ktc_value: player.value,
-            fdp_value: player.value,
+            fdp_value: fdpValue,
             last_updated: capturedAt,
           });
 
@@ -226,6 +269,7 @@ Deno.serve(async (req: Request) => {
           .update({
             team: player.team,
             ktc_value: player.value,
+            fdp_value: fdpValue,
             last_updated: capturedAt,
           })
           .eq('player_id', playerId);
@@ -234,8 +278,6 @@ Deno.serve(async (req: Request) => {
           console.error('Error updating player:', updateError);
         }
       }
-
-      const fdpValue = calcFdpValue(player.value, 'RB', format);
 
       const { error: snapshotError } = await supabase
         .from('ktc_value_snapshots')
