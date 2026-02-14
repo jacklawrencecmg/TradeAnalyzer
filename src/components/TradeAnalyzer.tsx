@@ -660,13 +660,24 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                       : 'hover:bg-gray-800'
                                   }`}
                                 >
-                                  <PlayerAvatar
-                                    playerName={player.full_name}
-                                    team={player.team}
-                                    position={player.position}
-                                    size="sm"
-                                    showTeamLogo={true}
-                                  />
+                                  <div className="relative w-10 h-10 flex-shrink-0">
+                                    <img
+                                      src={getPlayerImageUrl(playerId)}
+                                      alt={player.full_name}
+                                      className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                                      onError={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent && player) {
+                                          const fallback = document.createElement('div');
+                                          fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
+                                          fallback.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                          parent.appendChild(fallback);
+                                        }
+                                      }}
+                                    />
+                                  </div>
                                   <div className="flex-1">
                                     <div className="text-white text-sm font-medium">{player.full_name}</div>
                                     <div className="text-xs text-gray-400">
@@ -798,13 +809,24 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                       : 'hover:bg-gray-800'
                                   }`}
                                 >
-                                  <PlayerAvatar
-                                    playerName={player.full_name}
-                                    team={player.team}
-                                    position={player.position}
-                                    size="sm"
-                                    showTeamLogo={true}
-                                  />
+                                  <div className="relative w-10 h-10 flex-shrink-0">
+                                    <img
+                                      src={getPlayerImageUrl(playerId)}
+                                      alt={player.full_name}
+                                      className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                                      onError={(e) => {
+                                        const target = e.currentTarget;
+                                        target.style.display = 'none';
+                                        const parent = target.parentElement;
+                                        if (parent && player) {
+                                          const fallback = document.createElement('div');
+                                          fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
+                                          fallback.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                          parent.appendChild(fallback);
+                                        }
+                                      }}
+                                    />
+                                  </div>
                                   <div className="flex-1">
                                     <div className="text-white text-sm font-medium">{player.full_name}</div>
                                     <div className="text-xs text-gray-400">
