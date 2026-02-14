@@ -33,8 +33,9 @@ import KTCMultiPositionSync from './KTCMultiPositionSync';
 import UnifiedRankings from './UnifiedRankings';
 import PlayerSearch from './PlayerSearch';
 import PlayerDetail from './PlayerDetail';
+import SleeperLeagueAnalysis from './SleeperLeagueAnalysis';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcMultiSync' | 'unifiedRankings';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -279,6 +280,13 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 </div>
 
                 <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">League Analysis</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={Users} label="Sleeper Import" shortLabel="Sleeper" tab="sleeperAnalysis" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
                   <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Trading Tools</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={ArrowLeftRight} label="Trade Finder" shortLabel="Finder" tab="tradeFinder" activeTab={activeTab} onClick={setActiveTab} />
@@ -355,6 +363,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'ktcRankings' && <KTCQBRankings />}
               {activeTab === 'ktcMultiSync' && <KTCMultiPositionSync />}
               {activeTab === 'unifiedRankings' && <UnifiedRankings />}
+              {activeTab === 'sleeperAnalysis' && <SleeperLeagueAnalysis />}
             </div>
           </div>
         )}
