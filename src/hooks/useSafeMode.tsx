@@ -25,12 +25,16 @@ export function useSafeMode() {
         {
           event: '*',
           schema: 'public',
-          table: 'system_config',
-          filter: 'key=eq.safe_mode',
+          table: 'system_safe_mode',
+          filter: 'id=eq.00000000-0000-0000-0000-000000000001',
         },
         (payload) => {
-          if (payload.new && payload.new.value) {
-            setSafeMode(payload.new.value as SafeModeConfig);
+          if (payload.new) {
+            setSafeMode({
+              enabled: payload.new.enabled,
+              reason: payload.new.reason,
+              since: payload.new.enabled_at,
+            });
           }
         }
       )
@@ -44,9 +48,9 @@ export function useSafeMode() {
   async function checkSafeMode() {
     try {
       const { data, error } = await supabase
-        .from('system_config')
-        .select('value')
-        .eq('key', 'safe_mode')
+        .from('system_safe_mode')
+        .select('enabled, reason, enabled_at')
+        .eq('id', '00000000-0000-0000-0000-000000000001')
         .maybeSingle();
 
       if (error) {
@@ -54,8 +58,12 @@ export function useSafeMode() {
         return;
       }
 
-      if (data?.value) {
-        setSafeMode(data.value as SafeModeConfig);
+      if (data) {
+        setSafeMode({
+          enabled: data.enabled,
+          reason: data.reason,
+          since: data.enabled_at,
+        });
       }
     } catch (err) {
       console.error('Error checking safe mode:', err);
