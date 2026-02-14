@@ -1,14 +1,15 @@
-# KTC QB Value Database Integration
+# KTC Multi-Position Rankings Integration
 
-This document describes the KeepTradeCut (KTC) dynasty QB value database and sync pipeline integrated into FantasyDraftPros.
+This document describes the KeepTradeCut (KTC) dynasty rankings database and sync pipeline integrated into FantasyDraftPros.
 
 ## Overview
 
-The KTC integration adds a server-side scraping pipeline that fetches the latest dynasty superflex QB rankings from KeepTradeCut, stores them in Supabase, and provides:
-- Admin sync tools with health monitoring
-- Automated cron-safe sync endpoint
-- Public QB rankings viewer
-- Trade evaluation API
+The KTC integration provides a complete multi-position ranking system that fetches the latest dynasty rankings (QB, RB, WR, TE) from KeepTradeCut with support for multiple formats (Superflex, 1QB, TEP):
+- **Multi-position sync** - Sync QB, RB, WR, and TE rankings in one click
+- **Admin sync tools** with health monitoring and format selection
+- **Automated cron-safe** sync endpoints for scheduled updates
+- **Unified rankings viewer** with position and format toggles
+- **Trade evaluation API** for programmatic value comparison
 
 ## Architecture
 
@@ -105,12 +106,66 @@ Public endpoint that returns the latest QB values:
 ]
 ```
 
-#### 4. trade-eval
+#### 4. sync-ktc-rbs / sync-ktc-wrs / sync-ktc-tes
+**Endpoints:**
+- `/functions/v1/sync-ktc-rbs?format=dynasty-superflex`
+- `/functions/v1/sync-ktc-wrs?format=dynasty-superflex`
+- `/functions/v1/sync-ktc-tes?format=dynasty-superflex`
+
+**Method:** POST or GET (with `?secret=`)
+**Authentication:** Bearer token (ADMIN_SYNC_SECRET) or query param (CRON_SECRET)
+
+Multi-position sync endpoints for RB, WR, and TE rankings:
+- Same architecture as QB sync
+- Format parameter supports: dynasty-superflex, dynasty-1qb, dynasty-tep
+- Minimum thresholds: RB (50+), WR (60+), TE (30+)
+- Returns position-specific health metrics
+
+**Response Format:**
+```json
+{
+  "ok": true,
+  "position": "RB",
+  "count": 95,
+  "total": 95,
+  "minRank": 1,
+  "maxRank": 95,
+  "format": "dynasty_superflex",
+  "captured_at": "2026-02-14T12:00:00Z"
+}
+```
+
+#### 5. ktc-rankings
+**Endpoint:** `/functions/v1/ktc-rankings?position=QB&format=dynasty_sf`
+**Method:** GET
+**Authentication:** None (public)
+**Cache:** 5 minutes
+
+Unified rankings endpoint for all positions:
+- Query params: `position` (QB/RB/WR/TE), `format` (dynasty_sf/dynasty_1qb/dynasty_tep)
+- Returns latest snapshot per player
+- Sorted by position_rank
+
+**Response Format:**
+```json
+[
+  {
+    "position_rank": 1,
+    "full_name": "Patrick Mahomes",
+    "position": "QB",
+    "team": "KC",
+    "ktc_value": 9500,
+    "captured_at": "2026-02-14T12:00:00Z"
+  }
+]
+```
+
+#### 6. trade-eval
 **Endpoint:** `/functions/v1/trade-eval`
 **Method:** POST
 **Authentication:** None (public)
 
-Evaluates trade value using latest QB snapshot values:
+Evaluates trade value using latest snapshot values (all positions):
 - Looks up players by name and position
 - Returns total value for each side
 - Provides recommendation and difference
@@ -436,20 +491,27 @@ Response (values + recommendation)
 ### Trade Evaluation
 - Fast fuzzy name matching with similarity scoring
 - Suggests alternative names if player not found
-- Supports multi-player trades
+- Supports multi-player trades (all positions)
 - Returns detailed breakdown per side
+
+### Multi-Position Support
+- **QB, RB, WR, TE rankings** all supported
+- **Format toggles**: Superflex, 1QB, TE Premium
+- **Unified rankings UI** with position and format filters
+- **Multi-position admin sync** - sync all positions in one click
+- Position-specific validation thresholds
 
 ## Future Enhancements
 
 Potential improvements:
-- Support for other positions (RB, WR, TE)
-- Dynasty 1QB format support
-- Historical trend charts
-- Value change alerts
-- Comparison with other sources
-- Export to CSV/JSON
+- Historical trend charts and value change tracking
+- Value change alerts via notifications
+- Comparison with other ranking sources
+- Export rankings to CSV/JSON
 - Mobile app integration
 - Webhook notifications for sync failures
+- Pick/draft capital support
+- Redraft format support
 
 ## Files Reference
 
@@ -457,14 +519,20 @@ Potential improvements:
 - `supabase/migrations/add_ktc_value_snapshots_table.sql` - Schema migration
 
 ### Edge Functions
-- `supabase/functions/sync-ktc-qbs/index.ts` - Manual sync function (admin UI)
-- `supabase/functions/cron-sync-ktc/index.ts` - Automated sync function (cron)
-- `supabase/functions/ktc-qb-values/index.ts` - Public QB values API
-- `supabase/functions/trade-eval/index.ts` - Trade evaluation API
+- `supabase/functions/sync-ktc-qbs/index.ts` - QB sync function
+- `supabase/functions/sync-ktc-rbs/index.ts` - RB sync function
+- `supabase/functions/sync-ktc-wrs/index.ts` - WR sync function
+- `supabase/functions/sync-ktc-tes/index.ts` - TE sync function
+- `supabase/functions/cron-sync-ktc/index.ts` - Automated cron sync (QB only)
+- `supabase/functions/ktc-qb-values/index.ts` - Public QB values API (legacy)
+- `supabase/functions/ktc-rankings/index.ts` - Unified rankings API (all positions)
+- `supabase/functions/trade-eval/index.ts` - Trade evaluation API (all positions)
 
 ### UI Components
-- `src/components/KTCAdminSync.tsx` - Admin sync interface with health metrics
-- `src/components/KTCQBRankings.tsx` - QB rankings viewer
+- `src/components/KTCAdminSync.tsx` - QB-only admin sync interface
+- `src/components/KTCMultiPositionSync.tsx` - Multi-position admin sync
+- `src/components/KTCQBRankings.tsx` - QB rankings viewer (legacy)
+- `src/components/UnifiedRankings.tsx` - All positions rankings with format toggles
 - `src/components/Dashboard.tsx` - Main navigation integration
 
 ### Documentation

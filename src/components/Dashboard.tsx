@@ -29,8 +29,10 @@ import { Contact } from './Contact';
 import Footer from './Footer';
 import KTCAdminSync from './KTCAdminSync';
 import KTCQBRankings from './KTCQBRankings';
+import KTCMultiPositionSync from './KTCMultiPositionSync';
+import UnifiedRankings from './UnifiedRankings';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcMultiSync' | 'unifiedRankings';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -284,6 +286,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="Admin" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={RefreshCw} label="Multi-Position Sync" shortLabel="Multi" tab="ktcMultiSync" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={TrendingUp} label="All Rankings" shortLabel="Rankings" tab="unifiedRankings" activeTab={activeTab} onClick={setActiveTab} />
                   </div>
                 </div>
 
@@ -324,6 +328,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'contact' && <Contact />}
               {activeTab === 'ktcAdmin' && <KTCAdminSync />}
               {activeTab === 'ktcRankings' && <KTCQBRankings />}
+              {activeTab === 'ktcMultiSync' && <KTCMultiPositionSync />}
+              {activeTab === 'unifiedRankings' && <UnifiedRankings />}
             </div>
           </div>
         )}
