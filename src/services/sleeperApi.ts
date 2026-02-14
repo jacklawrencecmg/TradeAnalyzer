@@ -242,11 +242,13 @@ export async function fetchPlayerValues(
   }
 
   try {
-    const dbValues = await playerValuesApi.getPlayerValues(undefined, 5000, leagueFormat, scoringFormat);
+    const dbValues = await playerValuesApi.getPlayerValues(undefined, 10000, leagueFormat, scoringFormat);
     if (dbValues && dbValues.length > 0) {
       dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
       setCachedData(dbCacheKey, dbPlayerValues);
-      console.log(`Loaded ${dbValues.length} player values from database (SportsData.io enhanced)`);
+      console.log(`Loaded ${dbValues.length} player values from database (SportsData.io enhanced) - values range from ${Math.min(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : v.fdp_value))} to ${Math.max(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : v.fdp_value))}`);
+    } else {
+      console.warn('No player values found in database, falling back to FDP API values');
     }
   } catch (error) {
     console.warn('Failed to fetch player values from database:', error);
@@ -442,7 +444,8 @@ export function getPlayerValue(
 
   const dbValue = dbPlayerValues.get(player.player_id);
   if (dbValue) {
-    let value = dbValue.fdp_value * VALUE_SCALE_FACTOR;
+    const rawFdpValue = typeof dbValue.fdp_value === 'string' ? parseFloat(dbValue.fdp_value) : dbValue.fdp_value;
+    let value = rawFdpValue;
 
     if (player.position === 'TE' && finalSettings.isTEPremium && !dbValue.metadata?.te_premium_applied) {
       value *= 1.15;

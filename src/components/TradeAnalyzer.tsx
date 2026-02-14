@@ -23,6 +23,7 @@ import { PlayerAvatar } from './PlayerAvatar';
 import { StatSparkline } from './StatSparkline';
 import { AchievementBadge } from './AchievementBadge';
 import { TradeGrade, calculateTradeGrade } from './TradeGrade';
+import { syncPlayerValuesToDatabase } from '../utils/syncPlayerValues';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -62,9 +63,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [enhancedPlayerData, setEnhancedPlayerData] = useState<Record<string, any>>({});
   const [leagueFormat, setLeagueFormat] = useState<'dynasty' | 'redraft'>('dynasty');
   const [scoringFormat, setScoringFormat] = useState<'ppr' | 'half' | 'standard'>('ppr');
+  const [syncingValues, setSyncingValues] = useState(false);
 
   useEffect(() => {
     loadPlayers();
+    checkAndSyncPlayerValues();
   }, []);
 
   useEffect(() => {
@@ -81,6 +84,34 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       console.error('Failed to load players:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function checkAndSyncPlayerValues() {
+    try {
+      const { count, error } = await supabase
+        .from('player_values')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) throw error;
+
+      if (!count || count === 0) {
+        console.log('No player values found in database, syncing from FDP API...');
+        setSyncingValues(true);
+        showToast('Initializing player values...', 'info');
+
+        const synced = await syncPlayerValuesToDatabase(leagueSettings.isSuperflex);
+
+        if (synced > 0) {
+          showToast(`Successfully loaded ${synced} player values!`, 'success');
+        } else {
+          showToast('Failed to load player values, using fallback values', 'warning');
+        }
+        setSyncingValues(false);
+      }
+    } catch (error) {
+      console.error('Error checking player values:', error);
+      setSyncingValues(false);
     }
   }
 
@@ -961,6 +992,27 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <button
+              onClick={async () => {
+                setSyncingValues(true);
+                showToast('Refreshing player values...', 'info');
+                const synced = await syncPlayerValuesToDatabase(leagueSettings.isSuperflex);
+                setSyncingValues(false);
+                if (synced > 0) {
+                  showToast(`Successfully refreshed ${synced} player values!`, 'success');
+                } else {
+                  showToast('Failed to refresh player values', 'error');
+                }
+              }}
+              disabled={syncingValues}
+              className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Settings className="w-4 h-4" />
+              {syncingValues ? 'Refreshing Player Values...' : 'Refresh Player Values'}
+            </button>
           </div>
 
           {!leagueId && (
