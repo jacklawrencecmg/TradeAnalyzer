@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, TrendingUp, Search, Filter, Users, AlertCircle } from 'lucide-react';
+import { Trophy, TrendingUp, TrendingDown, Minus, Search, Filter, Users, AlertCircle } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
+import PlayerDetail from './PlayerDetail';
 
 interface Player {
+  player_id: string;
   position_rank: number;
   full_name: string;
   position: string;
@@ -10,6 +12,7 @@ interface Player {
   ktc_value: number;
   fdp_value: number;
   captured_at: string;
+  trend?: 'up' | 'down' | 'stable';
 }
 
 type Position = 'QB' | 'RB' | 'WR' | 'TE';
@@ -38,6 +41,11 @@ export default function UnifiedRankings() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [teamFilter, setTeamFilter] = useState('');
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+
+  if (selectedPlayer) {
+    return <PlayerDetail playerId={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
+  }
 
   useEffect(() => {
     loadRankings();
@@ -79,6 +87,18 @@ export default function UnifiedRankings() {
     if (value >= 5000) return 'text-blue-600';
     if (value >= 3000) return 'text-yellow-600';
     return 'text-gray-600';
+  };
+
+  const getTrendIcon = (trend?: 'up' | 'down' | 'stable') => {
+    if (!trend) return null;
+    switch (trend) {
+      case 'up':
+        return <TrendingUp className="w-4 h-4 text-green-600" title="Rising (last 7 days)" />;
+      case 'down':
+        return <TrendingDown className="w-4 h-4 text-red-600" title="Falling (last 7 days)" />;
+      case 'stable':
+        return <Minus className="w-4 h-4 text-gray-400" title="Stable (last 7 days)" />;
+    }
   };
 
   const getRankBadgeColor = (rank: number): string => {
@@ -276,9 +296,15 @@ export default function UnifiedRankings() {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <span className="font-semibold text-gray-900">
-                              {player.full_name}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => setSelectedPlayer(player.player_id)}
+                                className="font-semibold text-gray-900 hover:text-blue-600 hover:underline transition-colors text-left"
+                              >
+                                {player.full_name}
+                              </button>
+                              {getTrendIcon(player.trend)}
+                            </div>
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-gray-600 font-medium">

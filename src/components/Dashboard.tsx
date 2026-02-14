@@ -31,6 +31,8 @@ import KTCAdminSync from './KTCAdminSync';
 import KTCQBRankings from './KTCQBRankings';
 import KTCMultiPositionSync from './KTCMultiPositionSync';
 import UnifiedRankings from './UnifiedRankings';
+import PlayerSearch from './PlayerSearch';
+import PlayerDetail from './PlayerDetail';
 
 type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcMultiSync' | 'unifiedRankings';
 
@@ -47,6 +49,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const [showManageLeagues, setShowManageLeagues] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('trade');
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -226,8 +229,30 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
           )}
         </div>
 
-        {/* Main Content */}
-        {currentLeague && (
+        {/* Player Search */}
+        <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-8 mb-6">
+          <div className="text-center mb-4">
+            <h2 className="text-2xl font-bold text-fdp-text-1 mb-2">Search Dynasty Player Values</h2>
+            <p className="text-fdp-text-3">Find any player to see their value history and trends</p>
+          </div>
+          <div className="flex justify-center">
+            <PlayerSearch
+              onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)}
+              placeholder="Search for a player (e.g., Patrick Mahomes, Drake Maye)..."
+              autoFocus={false}
+            />
+          </div>
+        </div>
+
+        {selectedPlayerId ? (
+          <PlayerDetail
+            playerId={selectedPlayerId}
+            onBack={() => setSelectedPlayerId(null)}
+          />
+        ) : (
+          <>
+            {/* Main Content */}
+            {currentLeague && (
           <div className="space-y-6">
             {/* Tab Navigation */}
             <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-4">
@@ -332,6 +357,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'unifiedRankings' && <UnifiedRankings />}
             </div>
           </div>
+        )}
+          </>
         )}
 
         {/* Modals */}

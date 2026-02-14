@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 interface PlayerRanking {
+  player_id: string;
   position_rank: number;
   full_name: string;
   position: string;
@@ -14,6 +15,40 @@ interface PlayerRanking {
   ktc_value: number;
   fdp_value: number;
   captured_at: string;
+  trend?: 'up' | 'down' | 'stable';
+}
+
+function calculateTrend(allSnapshots: any[], playerId: string): 'up' | 'down' | 'stable' {
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const playerSnapshots = allSnapshots
+    .filter(s => s.player_id === playerId)
+    .sort((a, b) => new Date(a.captured_at).getTime() - new Date(b.captured_at).getTime());
+
+  if (playerSnapshots.length < 2) return 'stable';
+
+  const recentSnapshots = playerSnapshots.filter(
+    s => new Date(s.captured_at) >= sevenDaysAgo
+  );
+
+  if (recentSnapshots.length < 2) {
+    const oldest = playerSnapshots[0];
+    const newest = playerSnapshots[playerSnapshots.length - 1];
+    const diff = newest.fdp_value - oldest.fdp_value;
+
+    if (diff > 200) return 'up';
+    if (diff < -200) return 'down';
+    return 'stable';
+  }
+
+  const oldest = recentSnapshots[0];
+  const newest = recentSnapshots[recentSnapshots.length - 1];
+  const diff = newest.fdp_value - oldest.fdp_value;
+
+  if (diff > 200) return 'up';
+  if (diff < -200) return 'down';
+  return 'stable';
 }
 
 Deno.serve(async (req: Request) => {
@@ -48,7 +83,9 @@ Deno.serve(async (req: Request) => {
     for (const snapshot of allSnapshots || []) {
       const key = `${snapshot.player_id}`;
       if (!latestByPlayer.has(key)) {
+        const trend = calculateTrend(allSnapshots || [], snapshot.player_id);
         latestByPlayer.set(key, {
+          player_id: snapshot.player_id,
           position_rank: snapshot.position_rank,
           full_name: snapshot.full_name,
           position: snapshot.position,
@@ -56,6 +93,7 @@ Deno.serve(async (req: Request) => {
           ktc_value: snapshot.ktc_value,
           fdp_value: snapshot.fdp_value || snapshot.ktc_value,
           captured_at: snapshot.captured_at,
+          trend,
         });
       }
     }
