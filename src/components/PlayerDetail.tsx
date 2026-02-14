@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, AlertCircle, Trophy, Flame, Activity } from 'lucide-react';
 import ValueChart from './ValueChart';
 import { ListSkeleton } from './LoadingSkeleton';
+import WatchlistButton from './WatchlistButton';
 
 interface PlayerDetailProps {
   playerId: string;
@@ -167,6 +168,7 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
             </div>
 
             <div className="flex items-center gap-3">
+              <WatchlistButton playerId={playerId} playerName={data.player.name} variant="small" />
               {getTrendIcon(data.trend)}
               <span className="text-lg font-medium text-gray-700">{getTrendText(data.trend)}</span>
             </div>

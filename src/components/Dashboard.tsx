@@ -42,8 +42,10 @@ import IDPRankings from './IDPRankings';
 import IDPAdminUpload from './IDPAdminUpload';
 import TeamAdvice from './TeamAdvice';
 import MarketTrends from './MarketTrends';
+import WatchlistPanel from './WatchlistPanel';
+import AlertsDropdown from './AlertsDropdown';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -157,13 +159,16 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <p className="text-fdp-text-3 text-sm">{user?.email}</p>
               </div>
             </div>
-            <button
-              onClick={signOut}
-              className="flex items-center gap-2 px-4 py-2 bg-fdp-neg hover:bg-opacity-90 text-white rounded-lg transition-all transform hover:-translate-y-0.5"
-            >
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </button>
+            <div className="flex items-center gap-3">
+              <AlertsDropdown onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)} />
+              <button
+                onClick={signOut}
+                className="flex items-center gap-2 px-4 py-2 bg-fdp-neg hover:bg-opacity-90 text-white rounded-lg transition-all transform hover:-translate-y-0.5"
+              >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -280,6 +285,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Analytics & Insights</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Target} label="Team Advice" shortLabel="Advice" tab="teamAdvice" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Award} label="Watchlist" shortLabel="Watch" tab="watchlist" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Activity} label="Market Trends" shortLabel="Market" tab="market" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={DollarSign} label="Player Values" shortLabel="Values" tab="values" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Search} label="Waiver Assistant" shortLabel="Waiver" tab="waiver" activeTab={activeTab} onClick={setActiveTab} />
@@ -355,6 +361,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             <div>
               {activeTab === 'trade' && <TradeAnalyzer leagueId={currentLeague.league_id} onTradeSaved={() => setActiveTab('history')} />}
               {activeTab === 'teamAdvice' && <TeamAdvice sleeperLeagueId={currentLeague.league_id} />}
+              {activeTab === 'watchlist' && <WatchlistPanel onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)} />}
               {activeTab === 'market' && <MarketTrends onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)} />}
               {activeTab === 'rankings' && <PowerRankings leagueId={currentLeague.league_id} />}
               {activeTab === 'playoffs' && <PlayoffSimulator leagueId={currentLeague.league_id} />}
