@@ -193,22 +193,22 @@ export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> 
 }
 
 const POSITION_BASE_VALUES: Record<string, number> = {
-  QB: 35.0,
-  RB: 40.0,
-  WR: 38.0,
-  TE: 25.0,
-  K: 1.0,
-  DEF: 2.0,
-  DL: 8.0,
-  LB: 12.0,
-  DB: 9.0,
-  DE: 9.0,
-  DT: 7.0,
-  CB: 8.5,
-  S: 8.5,
+  QB: 3500,
+  RB: 4000,
+  WR: 3800,
+  TE: 2500,
+  K: 100,
+  DEF: 200,
+  DL: 800,
+  LB: 1200,
+  DB: 900,
+  DE: 900,
+  DT: 700,
+  CB: 850,
+  S: 850,
 };
 
-const VALUE_SCALE_FACTOR = 100.0 / 10000.0;
+const VALUE_SCALE_FACTOR = 1.0;
 
 let fdpValues: Record<string, number> = {};
 let fdpSuperflexValues: Record<string, number> = {};
@@ -271,7 +271,7 @@ export async function fetchPlayerValues(
         data.forEach((item: any) => {
           if (item.sleeperId && item.value) {
             const rawValue = parseInt(item.value, 10);
-            values[item.sleeperId] = parseFloat((rawValue * VALUE_SCALE_FACTOR).toFixed(1));
+            values[item.sleeperId] = parseFloat((rawValue * VALUE_SCALE_FACTOR).toFixed(0));
           }
         });
       }
@@ -300,7 +300,7 @@ export async function fetchPlayerValues(
           data.forEach((item: any) => {
             if (item.sleeperId && item.value) {
               const rawValue = parseInt(item.value, 10);
-              values[item.sleeperId] = parseFloat((rawValue * VALUE_SCALE_FACTOR).toFixed(1));
+              values[item.sleeperId] = parseFloat((rawValue * VALUE_SCALE_FACTOR).toFixed(0));
             }
           });
         }
@@ -346,14 +346,14 @@ export function getDraftPickValue(
   const totalRounds = settings?.totalRounds || 4;
 
   const baseValues: Record<number, number> = {
-    1: 68.0,
-    2: 34.0,
-    3: 15.0,
-    4: 6.0,
-    5: 3.5,
+    1: 6800,
+    2: 3400,
+    3: 1500,
+    4: 600,
+    5: 350,
   };
 
-  let value = baseValues[round] || Math.max(1.0, 6.0 * Math.pow(0.5, round - 4));
+  let value = baseValues[round] || Math.max(100, 600 * Math.pow(0.5, round - 4));
 
   if (round > totalRounds) {
     value *= 0.5;
@@ -373,13 +373,13 @@ export function getDraftPickValue(
     value *= 1.15;
   }
 
-  return parseFloat(value.toFixed(1));
+  return parseFloat(value.toFixed(0));
 }
 
 export function getFAABValue(amount: number, maxBudget: number = 100): number {
-  if (maxBudget === 0) return 0.0;
+  if (maxBudget === 0) return 0;
   const percentage = amount / maxBudget;
-  return parseFloat((percentage * 100.0).toFixed(1));
+  return parseFloat((percentage * 2500).toFixed(0));
 }
 
 export function getLeagueSettings(league: SleeperLeague): LeagueSettings {
@@ -455,7 +455,7 @@ export function getPlayerValue(
       value *= 0.15;
     }
 
-    return parseFloat(value.toFixed(1));
+    return parseFloat(value.toFixed(0));
   }
 
   const ktcValueSource = finalSettings.isSuperflex ? fdpSuperflexValues : fdpValues;
@@ -484,11 +484,11 @@ export function getPlayerValue(
       value *= 0.15;
     }
 
-    return parseFloat(value.toFixed(1));
+    return parseFloat(value.toFixed(0));
   }
 
   if (!player.position || !POSITION_BASE_VALUES[player.position]) {
-    return 0.0;
+    return 0;
   }
 
   let baseValue = POSITION_BASE_VALUES[player.position];
@@ -591,7 +591,7 @@ export function getPlayerValue(
     baseValue *= 0.15;
   }
 
-  return parseFloat(baseValue.toFixed(1));
+  return parseFloat(baseValue.toFixed(0));
 }
 
 export async function analyzeTrade(
