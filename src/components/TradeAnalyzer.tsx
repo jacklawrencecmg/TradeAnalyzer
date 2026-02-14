@@ -673,8 +673,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                       {player.position} - {player.team || 'FA'}
                                     </div>
                                   </div>
-                                  {alreadyAdded && (
-                                    <span className="text-xs text-gray-500">Added</span>
+                                  {isSelected && (
+                                    <span className="text-xs text-green-400 font-medium">✓ Added</span>
                                   )}
                                 </button>
                               );
@@ -822,8 +822,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
                                       {player.position} - {player.team || 'FA'}
                                     </div>
                                   </div>
-                                  {alreadyAdded && (
-                                    <span className="text-xs text-gray-500">Added</span>
+                                  {isSelected && (
+                                    <span className="text-xs text-green-400 font-medium">✓ Added</span>
                                   )}
                                 </button>
                               );
