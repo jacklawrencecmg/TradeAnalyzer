@@ -92,7 +92,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
         .filter(p => {
           if (!['QB', 'RB', 'WR', 'TE'].includes(p.position)) return false;
           if (!p.team || p.team === 'FA') return false;
-          if (p.status === 'Inactive' || p.status === 'Retired') return false;
+          if ((p.status === 'Inactive' && p.injury_status !== 'IR') || p.status === 'Retired') return false;
           return true;
         });
 

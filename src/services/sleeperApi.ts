@@ -448,7 +448,7 @@ export function getPlayerValue(
       value *= 1.15;
     }
 
-    if (player.status === 'Inactive' || player.status === 'Retired') {
+    if ((player.status === 'Inactive' && player.injury_status !== 'IR') || player.status === 'Retired') {
       value *= 0.15;
     }
 
@@ -477,7 +477,7 @@ export function getPlayerValue(
       value *= multiplier;
     }
 
-    if (player.status === 'Inactive' || player.status === 'Retired') {
+    if ((player.status === 'Inactive' && player.injury_status !== 'IR') || player.status === 'Retired') {
       value *= 0.15;
     }
 
@@ -584,7 +584,7 @@ export function getPlayerValue(
     baseValue *= multiplier;
   }
 
-  if (player.status === 'Inactive' || player.status === 'Retired') {
+  if ((player.status === 'Inactive' && player.injury_status !== 'IR') || player.status === 'Retired') {
     baseValue *= 0.15;
   }
 
