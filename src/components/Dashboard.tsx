@@ -27,8 +27,10 @@ import ExportShare from './ExportShare';
 import { PlayerValues } from './PlayerValues';
 import { Contact } from './Contact';
 import Footer from './Footer';
+import KTCAdminSync from './KTCAdminSync';
+import KTCQBRankings from './KTCQBRankings';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help') => void;
@@ -278,6 +280,14 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 </div>
 
                 <div>
+                  <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Data Management</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="Admin" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
+                  </div>
+                </div>
+
+                <div>
                   <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">News & Support</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={Newspaper} label="Player News" shortLabel="News" tab="news" activeTab={activeTab} onClick={setActiveTab} />
@@ -312,6 +322,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'news' && <PlayerNewsFeed />}
               {activeTab === 'export' && <ExportShare leagueId={currentLeague.league_id} rosterId="1" />}
               {activeTab === 'contact' && <Contact />}
+              {activeTab === 'ktcAdmin' && <KTCAdminSync />}
+              {activeTab === 'ktcRankings' && <KTCQBRankings />}
             </div>
           </div>
         )}
