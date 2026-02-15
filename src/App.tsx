@@ -13,6 +13,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import Footer from './components/Footer';
 import { FAQ } from './components/FAQ';
 import { Help } from './components/Help';
+import { FeedbackButton } from './components/FeedbackButton';
 import { LogIn } from 'lucide-react';
 
 type Page = 'home' | 'faq' | 'help' | 'top1000';
@@ -60,7 +61,12 @@ function AppContent() {
   }
 
   if (showDoctorAdmin) {
-    return <DoctorAdmin />;
+    return (
+      <>
+        <DoctorAdmin />
+        <FeedbackButton context={{ page: 'admin/doctor' }} />
+      </>
+    );
   }
 
   if (tradeSlug) {
@@ -68,6 +74,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <SharedTradePage slug={tradeSlug} />
+        <FeedbackButton context={{ page: `trade/${tradeSlug}` }} />
       </>
     );
   }
@@ -77,6 +84,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <PublicLeagueRankings slug={leagueSlug} />
+        <FeedbackButton context={{ page: `league/${leagueSlug}` }} />
       </>
     );
   }
@@ -87,6 +95,7 @@ function AppContent() {
         <SafeModeBanner />
         <Top1000Rankings />
         <Footer />
+        <FeedbackButton context={{ page: 'top1000' }} />
       </>
     );
   }
@@ -97,6 +106,7 @@ function AppContent() {
         <>
           <SafeModeBanner />
           <FAQ onClose={() => setCurrentPage('home')} />
+          <FeedbackButton context={{ page: 'faq' }} />
         </>
       );
     }
@@ -105,6 +115,7 @@ function AppContent() {
         <>
           <SafeModeBanner />
           <Help onClose={() => setCurrentPage('home')} />
+          <FeedbackButton context={{ page: 'help' }} />
         </>
       );
     }
@@ -112,6 +123,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <Dashboard onNavigate={setCurrentPage} />
+        <FeedbackButton context={{ page: 'dashboard' }} />
       </>
     );
   }
@@ -121,6 +133,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <FAQ onClose={() => setCurrentPage('home')} />
+        <FeedbackButton context={{ page: 'faq' }} />
       </>
     );
   }
@@ -130,6 +143,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <Help onClose={() => setCurrentPage('home')} />
+        <FeedbackButton context={{ page: 'help' }} />
       </>
     );
   }
@@ -145,6 +159,7 @@ function AppContent() {
           ← Back to Trade Analyzer
         </button>
         <AuthForm />
+        <FeedbackButton context={{ page: 'auth' }} />
       </div>
     );
   }
@@ -196,6 +211,7 @@ function AppContent() {
       </div>
 
       <Footer onNavigate={setCurrentPage} />
+      <FeedbackButton context={{ page: 'home' }} />
     </div>
   );
 }
