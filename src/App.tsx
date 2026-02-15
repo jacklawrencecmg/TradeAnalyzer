@@ -5,6 +5,8 @@ import { Dashboard } from './components/Dashboard';
 import TradeAnalyzer from './components/TradeAnalyzer';
 import SharedTradePage from './components/SharedTradePage';
 import PublicLeagueRankings from './components/PublicLeagueRankings';
+import DoctorAdmin from './components/DoctorAdmin';
+import SafeModeBanner from './components/SafeModeBanner';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Footer from './components/Footer';
@@ -20,9 +22,15 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [tradeSlug, setTradeSlug] = useState<string | null>(null);
   const [leagueSlug, setLeagueSlug] = useState<string | null>(null);
+  const [showDoctorAdmin, setShowDoctorAdmin] = useState(false);
 
   useEffect(() => {
     const path = window.location.pathname;
+
+    if (path === '/admin/doctor') {
+      setShowDoctorAdmin(true);
+      return;
+    }
 
     const tradeMatch = path.match(/^\/trade\/([a-z0-9]+)$/);
     if (tradeMatch) {
@@ -45,35 +53,75 @@ function AppContent() {
     );
   }
 
+  if (showDoctorAdmin) {
+    return <DoctorAdmin />;
+  }
+
   if (tradeSlug) {
-    return <SharedTradePage slug={tradeSlug} />;
+    return (
+      <>
+        <SafeModeBanner />
+        <SharedTradePage slug={tradeSlug} />
+      </>
+    );
   }
 
   if (leagueSlug) {
-    return <PublicLeagueRankings slug={leagueSlug} />;
+    return (
+      <>
+        <SafeModeBanner />
+        <PublicLeagueRankings slug={leagueSlug} />
+      </>
+    );
   }
 
   if (user) {
     if (currentPage === 'faq') {
-      return <FAQ onClose={() => setCurrentPage('home')} />;
+      return (
+        <>
+          <SafeModeBanner />
+          <FAQ onClose={() => setCurrentPage('home')} />
+        </>
+      );
     }
     if (currentPage === 'help') {
-      return <Help onClose={() => setCurrentPage('home')} />;
+      return (
+        <>
+          <SafeModeBanner />
+          <Help onClose={() => setCurrentPage('home')} />
+        </>
+      );
     }
-    return <Dashboard onNavigate={setCurrentPage} />;
+    return (
+      <>
+        <SafeModeBanner />
+        <Dashboard onNavigate={setCurrentPage} />
+      </>
+    );
   }
 
   if (currentPage === 'faq') {
-    return <FAQ onClose={() => setCurrentPage('home')} />;
+    return (
+      <>
+        <SafeModeBanner />
+        <FAQ onClose={() => setCurrentPage('home')} />
+      </>
+    );
   }
 
   if (currentPage === 'help') {
-    return <Help onClose={() => setCurrentPage('home')} />;
+    return (
+      <>
+        <SafeModeBanner />
+        <Help onClose={() => setCurrentPage('home')} />
+      </>
+    );
   }
 
   if (showAuth) {
     return (
       <div>
+        <SafeModeBanner />
         <button
           onClick={() => setShowAuth(false)}
           className="absolute top-4 left-4 text-fdp-text-2 hover:text-fdp-text-1 transition-colors"
@@ -87,6 +135,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 flex flex-col">
+      <SafeModeBanner />
       {/* Header */}
       <div className="bg-gradient-to-r from-fdp-surface-1 to-fdp-bg-1 border-b border-fdp-border-1">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
