@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload, Radio, Zap } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload, Radio, Zap, ChevronRight, AlertCircle, X } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
@@ -542,15 +542,78 @@ interface AddLeagueModalProps {
 
 function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
   const [platform, setPlatform] = useState<'sleeper' | 'espn' | 'yahoo' | 'nfl'>('sleeper');
+  const [step, setStep] = useState<'platform' | 'username' | 'leagues' | 'manual'>('platform');
+  const [username, setUsername] = useState('');
+  const [leagues, setLeagues] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [leagueId, setLeagueId] = useState('');
   const [leagueName, setLeagueName] = useState('');
   const [teamName, setTeamName] = useState('');
   const [isSuperflex, setIsSuperflex] = useState(false);
   const [espnS2, setEspnS2] = useState('');
   const [swid, setSwid] = useState('');
-  const [showInstructions, setShowInstructions] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePlatformSelect = (selectedPlatform: 'sleeper' | 'espn' | 'yahoo' | 'nfl') => {
+    setPlatform(selectedPlatform);
+    if (selectedPlatform === 'sleeper') {
+      setStep('username');
+    } else {
+      setStep('manual');
+    }
+  };
+
+  const handleUsernameSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim()) {
+      setError('Please enter a Sleeper username');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const userRes = await fetch(`https://api.sleeper.app/v1/user/${username.trim()}`);
+      if (!userRes.ok) {
+        setError('Sleeper user not found. Please check the username.');
+        setLoading(false);
+        return;
+      }
+
+      const userData = await userRes.json();
+      const userId = userData.user_id;
+
+      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/2024`);
+      if (!leaguesRes.ok) {
+        setError('Failed to fetch leagues');
+        setLoading(false);
+        return;
+      }
+
+      const leaguesData = await leaguesRes.json();
+      setLeagues(leaguesData);
+      setStep('leagues');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch leagues');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLeagueSelect = async (league: any) => {
+    const isSuperflex = league.roster_positions?.filter((pos: string) => pos === 'SUPER_FLEX').length > 0;
+
+    const userRoster = await fetch(`https://api.sleeper.app/v1/league/${league.league_id}/users`)
+      .then(res => res.json())
+      .then(users => users.find((u: any) => u.display_name?.toLowerCase() === username.toLowerCase() || u.username?.toLowerCase() === username.toLowerCase()));
+
+    const teamName = userRoster?.metadata?.team_name || userRoster?.display_name || username;
+
+    onAdd(league.league_id, league.name, teamName, isSuperflex, 'sleeper');
+  };
+
+  const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!leagueId.trim()) {
       alert('Please enter a League ID');
@@ -566,160 +629,287 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
     });
   };
 
-  const platformInstructions: Record<string, string> = {
-    sleeper: 'Open your Sleeper league → Copy the League ID from the URL (e.g., sleeper.com/leagues/123456789)',
-    espn: 'Open ESPN Fantasy → F12 Developer Tools → Application → Cookies → Copy espn_s2 and SWID values',
-    yahoo: 'Yahoo integration coming soon! For now, public league IDs may work with limited features.',
-    nfl: 'NFL.com integration is coming soon! Use Sleeper or ESPN in the meantime.',
-  };
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-w-md w-full p-6 my-8">
-        <h3 className="text-xl font-bold text-fdp-text-1 mb-4">Add New League</h3>
+      <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-w-2xl w-full p-6 my-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-bold text-fdp-text-1">Add New League</h3>
+          <button onClick={onClose} className="text-fdp-text-3 hover:text-fdp-text-1">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-fdp-text-2 mb-2">
-              Fantasy Platform *
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {(['sleeper', 'espn', 'yahoo', 'nfl'] as const).map((p) => (
+        {step === 'platform' && (
+          <div className="space-y-4">
+            <p className="text-fdp-text-2 mb-4">Choose your fantasy platform:</p>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => handlePlatformSelect('sleeper')}
+                className="p-6 border-2 border-fdp-border-1 rounded-lg hover:border-fdp-accent-1 hover:bg-fdp-surface-2 transition-all"
+              >
+                <div className="text-4xl mb-2">🛌</div>
+                <div className="font-bold text-fdp-text-1">Sleeper</div>
+                <div className="text-xs text-fdp-text-3 mt-1">Find by username</div>
+              </button>
+              <button
+                onClick={() => handlePlatformSelect('espn')}
+                className="p-6 border-2 border-fdp-border-1 rounded-lg hover:border-fdp-accent-1 hover:bg-fdp-surface-2 transition-all"
+              >
+                <div className="text-4xl mb-2">🏈</div>
+                <div className="font-bold text-fdp-text-1">ESPN</div>
+                <div className="text-xs text-fdp-text-3 mt-1">Manual setup</div>
+              </button>
+              <button
+                disabled
+                className="p-6 border-2 border-fdp-border-1 rounded-lg opacity-50 cursor-not-allowed"
+              >
+                <div className="text-4xl mb-2">🟣</div>
+                <div className="font-bold text-fdp-text-1">Yahoo</div>
+                <div className="text-xs text-fdp-text-3 mt-1">Coming soon</div>
+              </button>
+              <button
+                disabled
+                className="p-6 border-2 border-fdp-border-1 rounded-lg opacity-50 cursor-not-allowed"
+              >
+                <div className="text-4xl mb-2">🏆</div>
+                <div className="font-bold text-fdp-text-1">NFL.com</div>
+                <div className="text-xs text-fdp-text-3 mt-1">Coming soon</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {step === 'username' && (
+          <form onSubmit={handleUsernameSubmit} className="space-y-4">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-fdp-surface-2 rounded-full mb-3">
+                <Search className="w-8 h-8 text-fdp-accent-1" />
+              </div>
+              <h4 className="text-lg font-semibold text-fdp-text-1 mb-2">Find Your Sleeper Leagues</h4>
+              <p className="text-sm text-fdp-text-3">Enter your Sleeper username to view all your leagues</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-fdp-text-2 mb-2">
+                Sleeper Username
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-fdp-text-3 w-5 h-5" />
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter your Sleeper username"
+                  className="w-full pl-10 pr-4 py-3 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+                  disabled={loading}
+                />
+              </div>
+              <p className="mt-2 text-xs text-fdp-text-3">
+                Your Sleeper username (not email). No authentication required.
+              </p>
+            </div>
+
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-900 bg-opacity-20 border border-red-500 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={loading || !username.trim()}
+                className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-semibold py-3 px-4 rounded-lg hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    Find My Leagues
+                    <ChevronRight className="w-5 h-5" />
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('platform')}
+                className="px-4 py-2 bg-fdp-surface-2 hover:bg-fdp-border-1 text-fdp-text-1 rounded-lg transition-all"
+              >
+                Back
+              </button>
+            </div>
+          </form>
+        )}
+
+        {step === 'leagues' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="text-lg font-semibold text-fdp-text-1">Select a League</h4>
+                <p className="text-sm text-fdp-text-3">Found {leagues.length} league(s) for {username}</p>
+              </div>
+              <button
+                onClick={() => {
+                  setStep('username');
+                  setLeagues([]);
+                  setError(null);
+                }}
+                className="text-sm text-fdp-accent-1 hover:underline"
+              >
+                Change Username
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              {leagues.map((league) => (
                 <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPlatform(p)}
-                  disabled={p === 'yahoo' || p === 'nfl'}
-                  className={`py-2 px-4 rounded-lg font-medium transition-all ${
-                    platform === p
-                      ? 'bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0'
-                      : p === 'yahoo' || p === 'nfl'
-                      ? 'bg-fdp-surface-2 text-fdp-text-3 cursor-not-allowed opacity-50'
-                      : 'bg-fdp-surface-2 text-fdp-text-1 hover:bg-fdp-border-1'
-                  }`}
+                  key={league.league_id}
+                  onClick={() => handleLeagueSelect(league)}
+                  className="w-full p-4 border border-fdp-border-1 rounded-lg hover:border-fdp-accent-1 hover:bg-fdp-surface-2 transition-all text-left"
                 >
-                  {p === 'sleeper' && '🛌 Sleeper'}
-                  {p === 'espn' && '🏈 ESPN'}
-                  {p === 'yahoo' && '🟣 Yahoo'}
-                  {p === 'nfl' && '🏆 NFL.com'}
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h5 className="font-semibold text-fdp-text-1">{league.name}</h5>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        <span className="text-xs px-2 py-1 bg-fdp-surface-2 text-fdp-text-3 rounded-full">
+                          {league.total_rosters} Teams
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-fdp-surface-2 text-fdp-text-3 rounded-full">
+                          {league.season}
+                        </span>
+                        {league.roster_positions?.includes('SUPER_FLEX') && (
+                          <span className="text-xs px-2 py-1 bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2 rounded-full">
+                            Superflex
+                          </span>
+                        )}
+                        <span className="text-xs px-2 py-1 bg-fdp-surface-2 text-fdp-text-3 rounded-full capitalize">
+                          {league.status}
+                        </span>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-fdp-text-3 flex-shrink-0" />
+                  </div>
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => setShowInstructions(!showInstructions)}
-              className="mt-2 text-xs text-fdp-accent-1 hover:underline"
-            >
-              {showInstructions ? 'Hide' : 'Show'} instructions
-            </button>
-            {showInstructions && (
-              <div className="mt-2 p-3 bg-fdp-surface-2 rounded-lg text-xs text-fdp-text-2">
-                {platformInstructions[platform]}
-              </div>
+          </div>
+        )}
+
+        {step === 'manual' && (
+          <form onSubmit={handleManualSubmit} className="space-y-4">
+            <div className="p-3 bg-fdp-surface-2 rounded-lg mb-4">
+              <p className="text-sm text-fdp-text-2">
+                {platform === 'espn' && 'ESPN leagues require authentication cookies. Follow the instructions below.'}
+                {platform === 'yahoo' && 'Yahoo integration is coming soon.'}
+                {platform === 'nfl' && 'NFL.com integration is coming soon.'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                League ID *
+              </label>
+              <input
+                type="text"
+                value={leagueId}
+                onChange={(e) => setLeagueId(e.target.value)}
+                className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+                placeholder="Enter league ID"
+                required
+              />
+            </div>
+
+            {platform === 'espn' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                    espn_s2 Cookie *
+                  </label>
+                  <input
+                    type="text"
+                    value={espnS2}
+                    onChange={(e) => setEspnS2(e.target.value)}
+                    className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none font-mono text-xs"
+                    placeholder="Long alphanumeric string"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                    SWID Cookie *
+                  </label>
+                  <input
+                    type="text"
+                    value={swid}
+                    onChange={(e) => setSwid(e.target.value)}
+                    className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none font-mono text-xs"
+                    placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
+                    required
+                  />
+                </div>
+              </>
             )}
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-fdp-text-2 mb-1">
-              {platform === 'sleeper' ? 'Sleeper ' : platform === 'espn' ? 'ESPN ' : platform === 'yahoo' ? 'Yahoo ' : 'NFL.com '}
-              League ID *
-            </label>
-            <input
-              type="text"
-              value={leagueId}
-              onChange={(e) => setLeagueId(e.target.value)}
-              className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
-              placeholder={platform === 'sleeper' ? 'e.g., 123456789' : platform === 'espn' ? 'e.g., 987654' : 'League ID'}
-              required
-            />
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                League Name (optional)
+              </label>
+              <input
+                type="text"
+                value={leagueName}
+                onChange={(e) => setLeagueName(e.target.value)}
+                className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+                placeholder="My League"
+              />
+            </div>
 
-          {platform === 'espn' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-fdp-text-2 mb-1">
-                  espn_s2 Cookie *
-                </label>
-                <input
-                  type="text"
-                  value={espnS2}
-                  onChange={(e) => setEspnS2(e.target.value)}
-                  className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none font-mono text-xs"
-                  placeholder="Long alphanumeric string"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-fdp-text-2 mb-1">
-                  SWID Cookie *
-                </label>
-                <input
-                  type="text"
-                  value={swid}
-                  onChange={(e) => setSwid(e.target.value)}
-                  className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none font-mono text-xs"
-                  placeholder="{XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}"
-                  required
-                />
-              </div>
-            </>
-          )}
+            <div>
+              <label className="block text-sm font-medium text-fdp-text-2 mb-1">
+                Your Team Name (optional)
+              </label>
+              <input
+                type="text"
+                value={teamName}
+                onChange={(e) => setTeamName(e.target.value)}
+                className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
+                placeholder="My Team"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-fdp-text-2 mb-1">
-              League Name (optional)
-            </label>
-            <input
-              type="text"
-              value={leagueName}
-              onChange={(e) => setLeagueName(e.target.value)}
-              className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
-              placeholder="My Dynasty League"
-            />
-          </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isSuperflex"
+                checked={isSuperflex}
+                onChange={(e) => setIsSuperflex(e.target.checked)}
+                className="w-4 h-4 text-fdp-accent-1 border-fdp-border-1 rounded focus:ring-fdp-accent-1"
+              />
+              <label htmlFor="isSuperflex" className="text-sm font-medium text-fdp-text-2">
+                Superflex League?
+              </label>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-fdp-text-2 mb-1">
-              Your Team Name (optional)
-            </label>
-            <input
-              type="text"
-              value={teamName}
-              onChange={(e) => setTeamName(e.target.value)}
-              className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none"
-              placeholder="My Team"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isSuperflex"
-              checked={isSuperflex}
-              onChange={(e) => setIsSuperflex(e.target.checked)}
-              className="w-4 h-4 text-fdp-accent-1 border-fdp-border-1 rounded focus:ring-fdp-accent-1"
-            />
-            <label htmlFor="isSuperflex" className="text-sm font-medium text-fdp-text-2">
-              Superflex League?
-            </label>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="submit"
-              className="flex-1 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-semibold py-2 px-4 rounded-lg hover:shadow-lg transition-all transform hover:-translate-y-0.5"
-            >
-              Add League
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-fdp-surface-2 hover:bg-fdp-border-1 text-fdp-text-1 font-semibold py-2 px-4 rounded-lg transition-all"
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="flex-1 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-semibold py-2 px-4 rounded-lg hover:shadow-lg transition-all"
+              >
+                Add League
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep('platform')}
+                className="px-4 py-2 bg-fdp-surface-2 hover:bg-fdp-border-1 text-fdp-text-1 rounded-lg transition-all"
+              >
+                Back
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
