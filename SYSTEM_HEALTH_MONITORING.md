@@ -1,53 +1,111 @@
-# System Health Monitoring & Auto-Recovery
+# System Health Monitoring & Auto Recovery
 
-A comprehensive system that continuously monitors platform health, detects data integrity issues, and automatically recovers from failures before users notice.
+## Overview
 
----
+Comprehensive health monitoring and automatic rollback system that **ensures users never see bad data**. Continuously validates player values, rankings integrity, and data freshness. Automatically stops bad data from reaching users and reverts to last good state when failures occur.
 
-## 🎯 **Problem Solved**
-
-### **Before: Silent Failures**
-```typescript
-// Scraper fails at 3am
-❌ No one notices for 12 hours
-❌ Users see stale player values
-❌ Trade suggestions use bad data
-❌ Rankings become incorrect
-❌ Manual intervention required
-```
-
-### **After: Proactive Detection & Recovery**
-```typescript
-// Scraper fails at 3am
-✅ Health check detects issue within 1 hour
-✅ Auto-recovery triggers backup sync
-✅ Alert created for admin review
-✅ Safe mode prevents bad data propagation
-✅ Users never see corrupted data
-```
+**Core Principle:** Never show broken numbers. Always maintain system integrity.
 
 ---
 
-## 📊 **Architecture**
+## 🎯 Problem Solved
 
-### **1. Database Tables**
+### Before: Silent Failures
+```
+❌ Users see broken data
+❌ No validation after rebuilds
+❌ Corrupted data goes undetected
+❌ No rollback capability
+❌ Can't detect market drift
+❌ No rebuild monitoring
+❌ Manual recovery only
+❌ Downtime during issues
+```
 
-#### **`system_health_checks`**
-Historical log of all health check results (append-only).
+### After: Full Monitoring
+```
+✅ Users never see bad data
+✅ Automatic validation after rebuilds
+✅ Corruption detected immediately
+✅ Automatic rollback to last good state
+✅ Market drift alerts
+✅ Rebuild watchdog with auto-trigger
+✅ Automatic recovery
+✅ Zero user-facing downtime
+```
+
+---
+
+## Architecture
+
+### Database Tables
+
+#### `system_health_checks`
+Historical log of all health check results
 
 ```sql
 CREATE TABLE system_health_checks (
   id uuid PRIMARY KEY,
-  check_name text NOT NULL,              -- Check identifier
-  status text NOT NULL,                  -- ok/warning/critical
-  message text NOT NULL,                 -- Human-readable status
-  meta jsonb DEFAULT '{}',               -- Additional context
-  checked_at timestamptz DEFAULT now(),  -- When check ran
+  check_name text NOT NULL,
+  status text NOT NULL,  -- ok/warning/critical
+  meta jsonb DEFAULT '{}',
+  checked_at timestamptz DEFAULT now(),
   created_at timestamptz DEFAULT now()
 );
 ```
 
-**Example Records:**
+#### `rebuild_status`
+Tracks rebuild attempts and success
+
+```sql
+CREATE TABLE rebuild_status (
+  id uuid PRIMARY KEY,
+  last_successful_rebuild timestamptz,
+  last_attempt timestamptz NOT NULL,
+  status text NOT NULL,  -- success/failed/in_progress
+  duration_ms int,
+  error_message text,
+  created_at timestamptz DEFAULT now()
+);
+```
+
+#### `validation_samples`
+Runtime validation sample results
+
+```sql
+CREATE TABLE validation_samples (
+  id uuid PRIMARY KEY,
+  sample_type text NOT NULL,
+  passed boolean NOT NULL,
+  details jsonb DEFAULT '{}',
+  created_at timestamptz DEFAULT now()
+);
+```
+
+#### `value_snapshots`
+Point-in-time snapshots for rollback
+
+```sql
+CREATE TABLE value_snapshots (
+  id uuid PRIMARY KEY,
+  epoch text UNIQUE NOT NULL,
+  data jsonb NOT NULL,
+  stats jsonb DEFAULT '{}',
+  created_at timestamptz DEFAULT now()
+);
+```
+
+---
+
+## Core Components
+
+### 1. Value Integrity Validator
+
+**Purpose:** Validates data quality after every rebuild
+
+**File:** `src/lib/health/validateLatestValues.ts`
+
+**Checks:**
 ```json
 {
   "check_name": "player_sync_freshness",
