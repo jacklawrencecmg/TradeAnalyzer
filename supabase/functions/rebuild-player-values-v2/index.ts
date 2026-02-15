@@ -1,3 +1,71 @@
+/**
+ * Rebuild Player Values Pipeline (v2)
+ *
+ * CRITICAL SYSTEM: This function rebuilds ALL player values with zero downtime.
+ *
+ * WHAT IT DOES:
+ * 1. Creates new epoch (version)
+ * 2. Calculates values for all players
+ * 3. Writes to staging table
+ * 4. Validates data (coverage, duplicates, tiers, sanity)
+ * 5. Atomically swaps staging → canonical (instantaneous)
+ * 6. Updates epoch status
+ *
+ * INPUTS:
+ * - None (triggered by cron or manual invoke)
+ *
+ * OUTPUTS:
+ * - epoch_id: New epoch identifier
+ * - epoch_number: Sequential epoch number
+ * - players_processed: Count of players updated
+ * - validation: Validation results
+ * - duration_ms: Time taken
+ *
+ * WHAT MUST NEVER CHANGE:
+ * - The atomic swap logic (staging → canonical)
+ * - Validation checks (prevent bad data)
+ * - Epoch creation (versioning system)
+ * - POST-2025 weight ranges (65% production, etc.)
+ *
+ * WHAT CAN CHANGE:
+ * - Model weights (via model_config table, NOT code)
+ * - Value calculation logic (carefully test)
+ * - Batch sizes (for performance)
+ * - Format list (add new formats)
+ *
+ * TRIGGERS:
+ * - Nightly cron (3 AM UTC recommended)
+ * - Manual invoke (for testing)
+ * - After model config changes
+ *
+ * SAFETY:
+ * - System must be in 'normal' mode (blocks if maintenance/safe_mode)
+ * - Validates before swap (coverage, duplicates, tiers, sanity)
+ * - Atomic swap ensures zero downtime
+ * - Old data preserved as backup during swap
+ *
+ * ERROR HANDLING:
+ * - If validation fails → swap blocked, staging kept for inspection
+ * - If swap fails → automatic rollback attempted
+ * - All errors logged to system_health_metrics
+ *
+ * DEPENDENCIES:
+ * - player_values_staging (write target)
+ * - player_values_canonical (swap target)
+ * - value_epochs (versioning)
+ * - model_config (weights)
+ * - ktc_value_snapshots (market data)
+ * - nfl_players (player data)
+ *
+ * PERFORMANCE:
+ * - Processes 1000+ players in ~30 seconds
+ * - Atomic swap completes in < 1 second
+ * - No downtime for users
+ *
+ * @see docs/DEVELOPER_GUIDE.md for detailed documentation
+ * @see PHASES_2_7_COMPLETE.md for implementation details
+ */
+
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {

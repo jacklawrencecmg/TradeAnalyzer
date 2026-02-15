@@ -23,6 +23,18 @@ export default tseslint.config(
         'warn',
         { allowConstantExport: true },
       ],
+      // Prevent direct database queries in components
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['*/supabase', '../*/supabase', '../../*/supabase'],
+              message: 'Do not import supabase directly in components. Use Canonical API from @/lib/values/canonicalApi instead.',
+            },
+          ],
+        },
+      ],
     },
   }
 );
