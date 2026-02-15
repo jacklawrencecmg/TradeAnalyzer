@@ -65,6 +65,14 @@ Deno.serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
 
+    const { data: playerValue } = await supabase
+      .from('player_values')
+      .select('dynasty_value, redraft_value, redraft_value_source')
+      .eq('player_id', playerId)
+      .order('last_updated', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const sinceDate = new Date();
     sinceDate.setDate(sinceDate.getDate() - days);
 
@@ -100,6 +108,9 @@ Deno.serve(async (req: Request) => {
           position_rank: latestValue.position_rank,
           ktc_value: latestValue.ktc_value,
           fdp_value: latestValue.fdp_value,
+          dynasty_value: playerValue?.dynasty_value || latestValue.fdp_value || latestValue.ktc_value,
+          redraft_value: playerValue?.redraft_value || latestValue.ktc_value,
+          redraft_value_source: playerValue?.redraft_value_source || 'heuristic',
           captured_at: latestValue.captured_at,
         } : null,
         history: history || [],

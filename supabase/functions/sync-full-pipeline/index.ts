@@ -102,16 +102,41 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      console.log('\n--- STEP 2: Sync Values from KTC ---');
+      console.log('\n--- STEP 2: Sync ADP Data ---');
       const step2Start = Date.now();
-      const valuesResult = await callFunction('sync-values-all', cronSecret!);
+      const adpResult = await callFunction('sync-adp', cronSecret!);
       const step2Duration = Date.now() - step2Start;
 
       pipeline.steps.push({
         step: 2,
+        name: 'sync_adp',
+        status: adpResult.success ? 'success' : 'warning',
+        duration_ms: step2Duration,
+        result: adpResult,
+      });
+
+      console.log(`ADP synced: ${adpResult.imported} imported, ${adpResult.unresolved} unresolved`);
+    } catch (error) {
+      pipeline.steps.push({
+        step: 2,
+        name: 'sync_adp',
+        status: 'warning',
+        error: error.message,
+      });
+      console.warn('ADP sync failed (non-critical):', error);
+    }
+
+    try {
+      console.log('\n--- STEP 3: Sync Values from KTC ---');
+      const step3Start = Date.now();
+      const valuesResult = await callFunction('sync-values-all', cronSecret!);
+      const step3Duration = Date.now() - step3Start;
+
+      pipeline.steps.push({
+        step: 3,
         name: 'sync_values',
         status: valuesResult.success ? 'success' : 'failed',
-        duration_ms: step2Duration,
+        duration_ms: step3Duration,
         result: valuesResult,
       });
 
@@ -123,7 +148,7 @@ Deno.serve(async (req: Request) => {
     } catch (error) {
       pipeline.success = false;
       pipeline.steps.push({
-        step: 2,
+        step: 3,
         name: 'sync_values',
         status: 'error',
         error: error.message,
@@ -132,7 +157,32 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      console.log('\n--- STEP 3: Compute Market Trends ---');
+      console.log('\n--- STEP 4: Build Top-1000 Rankings ---');
+      const step4Start = Date.now();
+      const buildResult = await callFunction('build-top-1000', cronSecret!);
+      const step4Duration = Date.now() - step4Start;
+
+      pipeline.steps.push({
+        step: 4,
+        name: 'build_top_1000',
+        status: buildResult.success ? 'success' : 'failed',
+        duration_ms: step4Duration,
+        result: buildResult,
+      });
+
+      console.log(`Top-1000 built: ${buildResult.processed} players processed`);
+    } catch (error) {
+      pipeline.steps.push({
+        step: 4,
+        name: 'build_top_1000',
+        status: 'warning',
+        error: error.message,
+      });
+      console.warn('Top-1000 build had issues:', error);
+    }
+
+    try {
+      console.log('\n--- STEP 5: Compute Market Trends ---');
       const step3Start = Date.now();
 
       const { data: trendData, error: trendError } = await supabase.rpc('execute_sql', {
@@ -158,13 +208,13 @@ Deno.serve(async (req: Request) => {
         `,
       });
 
-      const step3Duration = Date.now() - step3Start;
+      const step5Duration = Date.now() - step3Start;
 
       pipeline.steps.push({
-        step: 3,
+        step: 5,
         name: 'compute_trends',
         status: trendError ? 'failed' : 'success',
-        duration_ms: step3Duration,
+        duration_ms: step5Duration,
         result: {
           trends_computed: trendData?.length || 0,
         },
@@ -173,7 +223,7 @@ Deno.serve(async (req: Request) => {
       console.log(`Trends computed for ${trendData?.length || 0} players`);
     } catch (error) {
       pipeline.steps.push({
-        step: 3,
+        step: 5,
         name: 'compute_trends',
         status: 'warning',
         error: error.message,
@@ -182,8 +232,8 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      console.log('\n--- STEP 4: Health Check ---');
-      const step4Start = Date.now();
+      console.log('\n--- STEP 6: Health Check ---');
+      const step6Start = Date.now();
 
       const { data: playerFreshness } = await supabase
         .from('nfl_players')
@@ -204,7 +254,7 @@ Deno.serve(async (req: Request) => {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'open');
 
-      const step4Duration = Date.now() - step4Start;
+      const step6Duration = Date.now() - step6Start;
 
       const health = {
         players_last_sync: playerFreshness?.last_seen_at,
@@ -213,17 +263,17 @@ Deno.serve(async (req: Request) => {
       };
 
       pipeline.steps.push({
-        step: 4,
+        step: 6,
         name: 'health_check',
         status: 'success',
-        duration_ms: step4Duration,
+        duration_ms: step6Duration,
         result: health,
       });
 
       console.log('Health check:', health);
     } catch (error) {
       pipeline.steps.push({
-        step: 4,
+        step: 6,
         name: 'health_check',
         status: 'warning',
         error: error.message,
