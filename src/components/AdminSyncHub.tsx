@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loader2, RefreshCw, Database, TrendingUp, Activity, CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
+import { clearPlayerCache } from '../services/sleeperApi';
+import { invalidateEnrichedPlayersCache } from '../lib/players/getEnrichedPlayers';
 
 interface SyncStatus {
   last_player_sync?: string;
@@ -108,6 +110,13 @@ export function AdminSyncHub() {
       }
 
       setLastResult(data);
+
+      // Clear player caches after sync to ensure fresh data
+      if (type === 'players' || type === 'full') {
+        clearPlayerCache();
+        invalidateEnrichedPlayersCache();
+        console.log('Player caches cleared - team data will be refreshed on next request');
+      }
 
       await loadStatus();
 
@@ -274,7 +283,7 @@ export function AdminSyncHub() {
             <Database className="w-8 h-8 text-blue-600" />
             <div className="text-center">
               <h3 className="font-semibold text-gray-900">Sync Players</h3>
-              <p className="text-sm text-gray-600 mt-1">Update from Sleeper API</p>
+              <p className="text-sm text-gray-600 mt-1">Update rosters, teams, and status</p>
             </div>
             {syncing === 'players' && (
               <Loader2 className="w-5 h-5 animate-spin text-blue-600" />

@@ -1,10 +1,12 @@
 import { playerValuesApi, type PlayerValue } from './playerValuesApi';
+import { getEnrichedPlayers, mergeSleeperWithDatabase } from '../lib/players/getEnrichedPlayers';
 
 const SLEEPER_API_BASE = 'https://api.sleeper.app/v1';
 
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 30 * 60 * 1000;
-const PLAYER_CACHE_DURATION = 24 * 60 * 60 * 1000;
+// Reduced from 24 hours to 1 hour during season for fresher team data
+const PLAYER_CACHE_DURATION = 60 * 60 * 1000;
 
 function getCachedData(key: string, maxAge: number = CACHE_DURATION): any | null {
   const cached = cache.get(key);
@@ -16,6 +18,11 @@ function getCachedData(key: string, maxAge: number = CACHE_DURATION): any | null
 
 function setCachedData(key: string, data: any): void {
   cache.set(key, { data, timestamp: Date.now() });
+}
+
+export function clearPlayerCache(): void {
+  cache.delete('all_players');
+  console.log('Player cache cleared');
 }
 
 export interface SleeperPlayer {
@@ -187,9 +194,19 @@ export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> 
     throw new Error(`Failed to fetch players: ${response.statusText}`);
   }
 
-  const data = await response.json();
-  setCachedData(cacheKey, data);
-  return data;
+  const sleeperData = await response.json();
+
+  // Merge with database to get current team data
+  // Database has more up-to-date team info from recent syncs
+  try {
+    const merged = await mergeSleeperWithDatabase(sleeperData);
+    setCachedData(cacheKey, merged);
+    return merged;
+  } catch (error) {
+    console.error('Error merging with database, using Sleeper data only:', error);
+    setCachedData(cacheKey, sleeperData);
+    return sleeperData;
+  }
 }
 
 const POSITION_BASE_VALUES: Record<string, number> = {
