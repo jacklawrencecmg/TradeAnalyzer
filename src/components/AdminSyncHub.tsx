@@ -6,6 +6,7 @@ import { invalidateEnrichedPlayersCache } from '../lib/players/getEnrichedPlayer
 import SeasonRollover from './SeasonRollover';
 import ValueValidation from './ValueValidation';
 import Top1000HealthCheck from './Top1000HealthCheck';
+import SeasonRolloverAdmin from './SeasonRolloverAdmin';
 
 interface SyncStatus {
   last_player_sync?: string;
@@ -421,6 +422,11 @@ export function AdminSyncHub() {
       {/* Top 1000 Health Check */}
       <div className="mt-6">
         <Top1000HealthCheck />
+      </div>
+
+      {/* Season Rollover & Value Rebuild */}
+      <div className="mt-6">
+        <SeasonRolloverAdmin />
       </div>
     </div>
   );
