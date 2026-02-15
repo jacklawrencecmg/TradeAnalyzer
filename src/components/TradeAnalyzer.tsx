@@ -26,6 +26,8 @@ import { TradeGrade, calculateTradeGrade } from './TradeGrade';
 import { syncPlayerValuesToDatabase } from '../utils/syncPlayerValues';
 import { getCurrentPhaseInfo, getPhaseEmoji } from '../lib/picks/seasonPhase';
 import { getMultiplierPercentage } from '../lib/picks/phaseMultipliers';
+import { evaluateTrade, type TradeAsset, type TradeEvaluationResult } from '../lib/trade/evaluateTrade';
+import TradeFairnessWarning from './TradeFairnessWarning';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -45,6 +47,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [teamAGivesFAAB, setTeamAGivesFAAB] = useState<number>(0);
   const [teamAGetsFAAB, setTeamAGetsFAAB] = useState<number>(0);
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
+  const [fairnessEvaluation, setFairnessEvaluation] = useState<TradeEvaluationResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [sharing, setSharing] = useState(false);
@@ -398,6 +401,52 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       );
       setAnalysis(result);
 
+      // Evaluate trade fairness
+      try {
+        const teamAAssets: TradeAsset[] = [];
+        const teamBAssets: TradeAsset[] = [];
+
+        // Convert Team A gives (Team B gets)
+        for (const item of result.teamAItems) {
+          teamBAssets.push({
+            player_id: item.id,
+            player_name: item.name,
+            position: item.position || 'PICK',
+            value: item.value,
+            tier: item.tier,
+            is_pick: item.type === 'pick',
+          });
+        }
+
+        // Convert Team B gives (Team A gets)
+        for (const item of result.teamBItems) {
+          teamAAssets.push({
+            player_id: item.id,
+            player_name: item.name,
+            position: item.position || 'PICK',
+            value: item.value,
+            tier: item.tier,
+            is_pick: item.type === 'pick',
+          });
+        }
+
+        const currentPhase = getCurrentPhaseInfo();
+        const fairness = evaluateTrade(
+          teamAAssets,
+          teamBAssets,
+          leagueFormat === 'dynasty' ? 'dynasty' : 'redraft',
+          {
+            isSuperflex: leagueSettings.isSuperflex,
+            currentPhase: currentPhase.phase as any,
+          }
+        );
+
+        setFairnessEvaluation(fairness);
+      } catch (fairnessError) {
+        console.error('Fairness evaluation failed:', fairnessError);
+        // Don't block trade analysis if fairness evaluation fails
+      }
+
       if (user) {
         await saveTrade(result);
       }
@@ -456,6 +505,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
     setTeamAGivesFAAB(0);
     setTeamAGetsFAAB(0);
     setAnalysis(null);
+    setFairnessEvaluation(null);
     setShareUrl(null);
     setCopied(false);
   }
@@ -1574,6 +1624,16 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       {analysis && (
         <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border border-gray-700 p-6 shadow-xl animate-in fade-in duration-300">
           <h3 className="text-xl font-bold text-white mb-4">Trade Analysis Results</h3>
+
+          {/* Fairness Evaluation Warning */}
+          {fairnessEvaluation && (
+            <div className="mb-6">
+              <TradeFairnessWarning
+                evaluation={fairnessEvaluation}
+                showActions={false}
+              />
+            </div>
+          )}
 
           <div className="grid md:grid-cols-2 gap-6 mb-6">
             <div className="bg-gray-800 rounded-lg p-4 border border-gray-700">
