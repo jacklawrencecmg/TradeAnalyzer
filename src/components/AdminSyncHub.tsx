@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Loader2, RefreshCw, Database, TrendingUp, Activity, CheckCircle, XCircle, AlertCircle, Clock } from 'lucide-react';
+import { Loader2, RefreshCw, Database, TrendingUp, Activity, CheckCircle, XCircle, AlertCircle, Clock, Calendar, Shield, List } from 'lucide-react';
 import { clearPlayerCache } from '../services/sleeperApi';
 import { invalidateEnrichedPlayersCache } from '../lib/players/getEnrichedPlayers';
+import SeasonRollover from './SeasonRollover';
+import ValueValidation from './ValueValidation';
+import Top1000HealthCheck from './Top1000HealthCheck';
 
 interface SyncStatus {
   last_player_sync?: string;
@@ -414,6 +417,11 @@ export function AdminSyncHub() {
           )}
         </div>
       )}
+
+      {/* Top 1000 Health Check */}
+      <div className="mt-6">
+        <Top1000HealthCheck />
+      </div>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import TradeAnalyzer from './components/TradeAnalyzer';
 import SharedTradePage from './components/SharedTradePage';
 import PublicLeagueRankings from './components/PublicLeagueRankings';
 import DoctorAdmin from './components/DoctorAdmin';
+import Top1000Rankings from './components/Top1000Rankings';
 import SafeModeBanner from './components/SafeModeBanner';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -14,7 +15,7 @@ import { FAQ } from './components/FAQ';
 import { Help } from './components/Help';
 import { LogIn } from 'lucide-react';
 
-type Page = 'home' | 'faq' | 'help';
+type Page = 'home' | 'faq' | 'help' | 'top1000';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -29,6 +30,11 @@ function AppContent() {
 
     if (path === '/admin/doctor') {
       setShowDoctorAdmin(true);
+      return;
+    }
+
+    if (path === '/top1000' || path === '/rankings/top1000') {
+      setCurrentPage('top1000');
       return;
     }
 
@@ -71,6 +77,16 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <PublicLeagueRankings slug={leagueSlug} />
+      </>
+    );
+  }
+
+  if (currentPage === 'top1000') {
+    return (
+      <>
+        <SafeModeBanner />
+        <Top1000Rankings />
+        <Footer />
       </>
     );
   }
