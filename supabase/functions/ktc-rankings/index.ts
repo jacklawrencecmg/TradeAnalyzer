@@ -62,44 +62,52 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const position = url.searchParams.get('position') || 'QB';
-    const format = url.searchParams.get('format') || 'dynasty_sf';
+    const requestedFormat = url.searchParams.get('format') || 'dynasty_sf';
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    const { data: allSnapshots, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, team, position_rank, ktc_value, fdp_value, captured_at')
+    const canonicalFormat = requestedFormat.includes('redraft') ? 'redraft' : 'dynasty';
+
+    const { data: players, error } = await supabase
+      .from('player_values_canonical')
+      .select('player_id, player_name, position, team, rank_position, rank_overall, base_value, adjusted_value, updated_at')
       .eq('position', position)
-      .eq('format', format)
-      .order('captured_at', { ascending: false });
+      .eq('format', canonicalFormat)
+      .is('league_profile_id', null)
+      .order('adjusted_value', { ascending: false })
+      .limit(100);
 
     if (error) {
       throw error;
     }
 
-    const latestByPlayer = new Map<string, PlayerRanking>();
-    for (const snapshot of allSnapshots || []) {
-      const key = `${snapshot.player_id}`;
-      if (!latestByPlayer.has(key)) {
-        const trend = calculateTrend(allSnapshots || [], snapshot.player_id);
-        latestByPlayer.set(key, {
-          player_id: snapshot.player_id,
-          position_rank: snapshot.position_rank,
-          full_name: snapshot.full_name,
-          position: snapshot.position,
-          team: snapshot.team,
-          ktc_value: snapshot.ktc_value,
-          fdp_value: snapshot.fdp_value || snapshot.ktc_value,
-          captured_at: snapshot.captured_at,
-          trend,
-        });
-      }
+    if (!players || players.length === 0) {
+      return new Response(
+        JSON.stringify([]),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=300',
+          },
+        }
+      );
     }
 
-    const rankings = Array.from(latestByPlayer.values())
-      .sort((a, b) => a.position_rank - b.position_rank);
+    const rankings: PlayerRanking[] = players.map((player, index) => ({
+      player_id: player.player_id,
+      position_rank: player.rank_position || (index + 1),
+      full_name: player.player_name,
+      position: player.position,
+      team: player.team,
+      ktc_value: Math.round(player.base_value),
+      fdp_value: Math.round(player.adjusted_value),
+      captured_at: player.updated_at,
+      trend: 'stable',
+    }));
 
     return new Response(
       JSON.stringify(rankings),
