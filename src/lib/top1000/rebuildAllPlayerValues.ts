@@ -181,6 +181,15 @@ export async function rebuildAllPlayerValues(): Promise<RebuildResult> {
     const { buildTop1000 } = await import('./buildTop1000');
     await buildTop1000({ includeIdp: true, limit: 1000 });
 
+    // Step 8: Reset all adjustments (nightly cleanup)
+    console.log('Resetting all value adjustments...');
+    const { data: resetCount, error: resetError } = await supabase.rpc('reset_all_adjustments');
+    if (!resetError) {
+      console.log(`Reset ${resetCount || 0} value adjustments`);
+    } else {
+      console.warn('Failed to reset adjustments:', resetError);
+    }
+
     console.log(`Rebuild complete in ${duration}ms`);
     console.log(`- Processed: ${processed} players`);
     console.log(`- Inserted: ${inserted} values`);

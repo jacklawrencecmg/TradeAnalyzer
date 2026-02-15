@@ -28,6 +28,7 @@ import { PlayerValues } from './PlayerValues';
 import { Contact } from './Contact';
 import Footer from './Footer';
 import KTCAdminSync from './KTCAdminSync';
+import TrendingPlayersPanel from './TrendingPlayersPanel';
 import KTCQBRankings from './KTCQBRankings';
 import KTCRBRankings from './KTCRBRankings';
 import KTCWRRankings from './KTCWRRankings';
@@ -336,6 +337,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     <NavButton icon={Award} label="Watchlist" shortLabel="Watch" tab="watchlist" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={FileText} label="Market Reports" shortLabel="Reports" tab="reports" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Activity} label="Market Trends" shortLabel="Market" tab="market" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={TrendingUp} label="Trending Players" shortLabel="Trending" tab="trending" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={DollarSign} label="Player Values" shortLabel="Values" tab="values" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Search} label="Waiver Assistant" shortLabel="Waiver" tab="waiver" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Users} label="Lineup Optimizer" shortLabel="Lineup" tab="lineup" activeTab={activeTab} onClick={setActiveTab} />
@@ -415,6 +417,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'teamAdvice' && <TeamAdvice sleeperLeagueId={currentLeague.league_id} />}
               {activeTab === 'watchlist' && <WatchlistPanel onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)} />}
               {activeTab === 'market' && <MarketTrends onSelectPlayer={(playerId) => setSelectedPlayerId(playerId)} />}
+              {activeTab === 'trending' && <TrendingPlayersPanel />}
               {activeTab === 'rankings' && <PowerRankings leagueId={currentLeague.league_id} />}
               {activeTab === 'playoffs' && <PlayoffSimulator leagueId={currentLeague.league_id} />}
               {activeTab === 'history' && <TradeHistory leagueId={currentLeague.league_id} />}
