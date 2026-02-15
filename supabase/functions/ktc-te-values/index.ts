@@ -22,37 +22,25 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    const { data: latestSnapshots, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('*')
+    // Use canonical latest_player_values view
+    const { data: players, error } = await supabase
+      .from('latest_player_values')
+      .select('position_rank, full_name, team, ktc_value, captured_at')
       .eq('format', format)
       .eq('position', 'TE')
-      .order('captured_at', { ascending: false })
-      .limit(1000);
+      .order('position_rank', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    const latestByPlayer = new Map<string, any>();
-
-    for (const snapshot of latestSnapshots || []) {
-      const key = snapshot.full_name;
-      if (!latestByPlayer.has(key) ||
-          new Date(snapshot.captured_at) > new Date(latestByPlayer.get(key).captured_at)) {
-        latestByPlayer.set(key, snapshot);
-      }
-    }
-
-    const results = Array.from(latestByPlayer.values())
-      .sort((a, b) => a.position_rank - b.position_rank)
-      .map(snapshot => ({
-        position_rank: snapshot.position_rank,
-        full_name: snapshot.full_name,
-        team: snapshot.team,
-        value: snapshot.ktc_value,
-        captured_at: snapshot.captured_at,
-      }));
+    const results = (players || []).map(player => ({
+      position_rank: player.position_rank,
+      full_name: player.full_name,
+      team: player.team,
+      value: player.ktc_value,
+      captured_at: player.captured_at,
+    }));
 
     return new Response(
       JSON.stringify(results),
