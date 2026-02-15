@@ -13,6 +13,7 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
   const [error, setError] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<TeamRanking | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     loadRankings();
@@ -35,10 +36,13 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
   async function syncPlayerValues() {
     setSyncing(true);
     setError(null);
+    setSyncSuccess(null);
     try {
       const count = await syncPlayerValuesToDatabase(false);
+      setSyncSuccess(`Successfully synced ${count} FDP player values`);
       console.log(`Synced ${count} player values from FDP`);
       await loadRankings();
+      setTimeout(() => setSyncSuccess(null), 5000);
     } catch (err) {
       console.error('Failed to sync player values:', err);
       setError('Failed to sync player values from FDP. Please try again.');
@@ -47,24 +51,10 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
     }
   }
 
-  if (loading) {
+  if (loading && rankings.length === 0) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg text-gray-400">Loading power rankings...</div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-900/20 border border-red-500 rounded-lg p-6">
-        <p className="text-red-400">{error}</p>
-        <button
-          onClick={loadRankings}
-          className="mt-4 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-        >
-          Try Again
-        </button>
+        <div className="text-lg text-gray-400">Loading power rankings with FDP values...</div>
       </div>
     );
   }
@@ -103,20 +93,26 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border border-gray-700 p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-            <TrendingUp className="w-7 h-7 text-[#00d4ff]" />
-            Power Rankings
-          </h2>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+              <TrendingUp className="w-7 h-7 text-[#00d4ff]" />
+              Power Rankings
+            </h2>
+            <p className="text-sm text-gray-400 mt-1 flex items-center gap-2">
+              <DollarSign className="w-4 h-4" />
+              Powered by FDP Values
+            </p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={syncPlayerValues}
               disabled={syncing}
               className="text-sm px-4 py-2 bg-[#00d4ff]/10 hover:bg-[#00d4ff]/20 text-[#00d4ff] rounded-lg transition-colors border border-[#00d4ff]/30 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              title="Sync player values from SportsData.io"
+              title="Sync latest FDP player values"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-              {syncing ? 'Syncing...' : 'Sync Values'}
+              {syncing ? 'Syncing...' : 'Sync FDP Values'}
             </button>
             <button
               onClick={loadRankings}
@@ -127,6 +123,20 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
             </button>
           </div>
         </div>
+
+        {syncSuccess && (
+          <div className="mb-4 p-3 bg-green-900/20 border border-green-500 rounded-lg flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-green-500" />
+            <p className="text-sm text-green-400">{syncSuccess}</p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/20 border border-red-500 rounded-lg flex items-center gap-2">
+            <X className="w-5 h-5 text-red-500" />
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
 
         <div className="grid gap-4">
           {rankings.map((team) => (
@@ -159,7 +169,10 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                     </div>
                   </div>
                   <div className="text-right ml-4">
-                    <div className="text-sm text-gray-400 mb-1">Total Value</div>
+                    <div className="text-sm text-gray-400 mb-1 flex items-center justify-end gap-1">
+                      <DollarSign className="w-3 h-3" />
+                      FDP Value
+                    </div>
                     <div className="text-2xl font-bold text-[#00d4ff]">
                       {team.total_value.toFixed(1)}
                     </div>
@@ -215,8 +228,9 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                       {selectedTeam.record}
                     </span>
                     <span className="text-gray-400">{selectedTeam.points_for.toFixed(1)} pts</span>
-                    <span className="text-[#00d4ff] font-semibold">
-                      Value: {selectedTeam.total_value.toFixed(1)}
+                    <span className="text-[#00d4ff] font-semibold flex items-center gap-1">
+                      <DollarSign className="w-4 h-4" />
+                      FDP Value: {selectedTeam.total_value.toFixed(1)}
                     </span>
                   </div>
                 </div>
@@ -297,7 +311,8 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                             {player.team && (
                               <div className="text-xs text-gray-500 mb-2">{player.team}</div>
                             )}
-                            <div className="text-xs font-medium text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded inline-block">
+                            <div className="text-xs font-medium text-[#00d4ff] bg-[#00d4ff]/10 px-2 py-1 rounded inline-flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
                               {player.value.toFixed(1)}
                             </div>
                           </div>
