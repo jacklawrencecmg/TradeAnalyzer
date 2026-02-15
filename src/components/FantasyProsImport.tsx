@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Download, CheckCircle, AlertCircle, BarChart3, FileDown } from 'lucide-react';
-import { buildTop1000FromFantasyPros, syncTop1000ToPlayerValues } from '../lib/build/buildTop1000FromFantasyPros';
+import { Download, CheckCircle, AlertCircle, BarChart3, FileDown, RefreshCw } from 'lucide-react';
+import { buildTop1000FromFantasyPros, fillRedraftValues, syncTop1000ToPlayerValues } from '../lib/build/buildTop1000FromFantasyPros';
 
 interface ImportStatus {
   stage: 'idle' | 'downloading' | 'processing' | 'saving' | 'complete' | 'error';
@@ -15,12 +15,14 @@ export default function FantasyProsImport() {
   });
   const [result, setResult] = useState<any>(null);
   const [syncResult, setSyncResult] = useState<any>(null);
+  const [redraftResult, setRedraftResult] = useState<any>(null);
 
   const runImport = async () => {
     try {
-      setStatus({ stage: 'downloading', message: 'Downloading CSVs from FantasyPros...' });
+      setStatus({ stage: 'downloading', message: 'Building Top 1000 (Dynasty + Redraft)...' });
       setResult(null);
       setSyncResult(null);
+      setRedraftResult(null);
 
       const buildResult = await buildTop1000FromFantasyPros();
 
@@ -35,9 +37,38 @@ export default function FantasyProsImport() {
 
       setStatus({
         stage: 'complete',
-        message: `Successfully imported ${buildResult.total_players} players!`,
+        message: `Successfully imported ${buildResult.total_players} players with ${buildResult.redraft_matched} redraft matches!`,
       });
       setResult(buildResult);
+    } catch (error) {
+      setStatus({
+        stage: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
+  const runFillRedraft = async () => {
+    try {
+      setStatus({ stage: 'downloading', message: 'Filling redraft values...' });
+      setRedraftResult(null);
+
+      const fillResult = await fillRedraftValues();
+
+      if (fillResult.errors.length > 0 && fillResult.matched === 0) {
+        setStatus({
+          stage: 'error',
+          message: 'Redraft fill failed. See errors below.',
+        });
+        setRedraftResult(fillResult);
+        return;
+      }
+
+      setStatus({
+        stage: 'complete',
+        message: `Matched ${fillResult.matched} players with redraft values!`,
+      });
+      setRedraftResult(fillResult);
     } catch (error) {
       setStatus({
         stage: 'error',
@@ -83,26 +114,36 @@ export default function FantasyProsImport() {
         <div className="bg-gray-50 rounded-lg p-4">
           <h3 className="font-medium text-gray-900 mb-2">How it works</h3>
           <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-            <li>Downloads rankings from FantasyPros (Dynasty Overall, SF, IDP, DL, LB, DB)</li>
-            <li>Normalizes player names, teams, and positions</li>
-            <li>Merges offense and IDP into unified Top 1000</li>
-            <li>Converts ranks to dynasty values using exponential curve</li>
-            <li>Exports as CSV or syncs to database</li>
+            <li>Downloads dynasty rankings from FantasyPros (Dynasty Overall, SF, IDP, DL, LB, DB)</li>
+            <li>Downloads redraft/ADP rankings (PPR) for current season values</li>
+            <li>Normalizes player names and matches dynasty players with redraft data</li>
+            <li>Merges offense (top 750) + IDP (top 250) into unified Top 1000</li>
+            <li>Converts ranks to values using exponential curves (dynasty & redraft)</li>
+            <li>Exports complete CSV with both dynasty and redraft values</li>
           </ol>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <button
             onClick={runImport}
             disabled={isLoading}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <Download className="w-4 h-4" />
-            {isLoading ? 'Importing...' : 'Build Top 1000 from FantasyPros'}
+            {isLoading ? 'Building...' : 'Build Top 1000 (Dynasty + Redraft)'}
           </button>
 
           {result && result.success && (
             <>
+              <button
+                onClick={runFillRedraft}
+                disabled={isLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Fill Redraft Values
+              </button>
+
               <button
                 onClick={runSync}
                 disabled={isLoading}
@@ -162,7 +203,7 @@ export default function FantasyProsImport() {
           <div className="bg-gray-50 rounded-lg p-4 space-y-3">
             <h3 className="font-medium text-gray-900">Import Results</h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div>
                 <div className="text-2xl font-bold text-gray-900">
                   {result.total_players}
@@ -182,10 +223,22 @@ export default function FantasyProsImport() {
                 <div className="text-sm text-gray-600">IDP</div>
               </div>
               <div>
+                <div className="text-2xl font-bold text-green-600">
+                  {result.redraft_matched}
+                </div>
+                <div className="text-sm text-gray-600">Redraft Matched</div>
+              </div>
+              <div>
                 <div className="text-2xl font-bold text-orange-600">
+                  {result.redraft_unmatched}
+                </div>
+                <div className="text-sm text-gray-600">Redraft Missing</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-600">
                   {result.duplicates_removed}
                 </div>
-                <div className="text-sm text-gray-600">Duplicates Removed</div>
+                <div className="text-sm text-gray-600">Duplicates</div>
               </div>
             </div>
 
@@ -230,6 +283,38 @@ export default function FantasyProsImport() {
           </div>
         )}
 
+        {redraftResult && (
+          <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
+            <h3 className="font-medium text-orange-900 mb-2">Redraft Fill Results</h3>
+            <div className="grid grid-cols-2 gap-4 mb-2">
+              <div>
+                <div className="text-xl font-bold text-green-600">
+                  {redraftResult.matched}
+                </div>
+                <div className="text-sm text-orange-700">Matched</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-orange-600">
+                  {redraftResult.unmatched}
+                </div>
+                <div className="text-sm text-orange-700">Unmatched</div>
+              </div>
+            </div>
+            {redraftResult.errors && redraftResult.errors.length > 0 && (
+              <details className="mt-2">
+                <summary className="text-sm text-orange-700 cursor-pointer">
+                  {redraftResult.errors.length} errors (click to view)
+                </summary>
+                <ul className="mt-2 text-xs text-orange-600 space-y-1 max-h-32 overflow-y-auto">
+                  {redraftResult.errors.slice(0, 20).map((error: string, idx: number) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
         {syncResult && (
           <div className="bg-green-50 rounded-lg p-4 border border-green-200">
             <h3 className="font-medium text-green-900 mb-2">Sync Results</h3>
@@ -251,11 +336,19 @@ export default function FantasyProsImport() {
           </div>
         )}
 
+        <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+          <h3 className="text-sm font-medium text-blue-900 mb-1">Import Process</h3>
+          <ul className="text-sm text-blue-700 space-y-1">
+            <li><strong>Build Top 1000:</strong> Downloads dynasty rankings + redraft rankings, merges them into one unified list</li>
+            <li><strong>Fill Redraft Values:</strong> Updates existing Top 1000 with fresh redraft values (useful if redraft rankings change)</li>
+            <li><strong>Download CSV:</strong> Exports complete top1000.csv with dynasty_value, redraft_value, and source tracking</li>
+          </ul>
+        </div>
+
         <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
           <h3 className="text-sm font-medium text-yellow-900 mb-1">Note</h3>
           <p className="text-sm text-yellow-700">
-            This downloads public rankings from FantasyPros. For best results, ensure you
-            have a stable internet connection. The import may take 30-60 seconds.
+            This downloads public rankings from FantasyPros. The full import may take 45-90 seconds as it downloads 6 dynasty lists + 1 redraft list. Ensure stable internet connection.
           </p>
         </div>
       </div>

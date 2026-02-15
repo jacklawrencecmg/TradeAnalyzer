@@ -25,12 +25,12 @@ export function rankToValue(rank: number, maxValue: number = 10000): number {
  * Convert ranking to redraft value (steeper curve for single season)
  *
  * Redraft values decay faster since longevity doesn't matter
- * Formula: value = 10000 * exp(-0.008 * (rank - 1))
+ * Formula: value = 10000 * exp(-0.005 * (rank - 1))
  */
 export function rankToRedraftValue(rank: number, maxValue: number = 10000): number {
   if (rank < 1) return maxValue;
 
-  const decayRate = 0.008; // Steeper decay
+  const decayRate = 0.005; // Steeper decay than dynasty
   const value = maxValue * Math.exp(-decayRate * (rank - 1));
 
   return Math.round(Math.max(0, Math.min(maxValue, value)));
