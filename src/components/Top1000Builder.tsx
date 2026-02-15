@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Download, FileDown, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { Download, FileDown, CheckCircle, AlertCircle, RefreshCw, Database } from 'lucide-react';
 import { buildTop1000DynastyBase, DynastyBuildResult } from '../lib/build/buildTop1000DynastyBase';
 import { fillRedraftValues, RedraftFillResult, Top1000PlayerWithRedraft } from '../lib/build/fillRedraftValues';
 import { exportTop1000PprCsv, exportTop1000HalfCsv, exportTop1000CombinedCsv, downloadCsv } from '../lib/export/exportTop1000Csv';
+import { syncFantasyProsToDatabase, SyncResult } from '../lib/build/syncFantasyProsToDatabase';
 
 interface BuildStatus {
-  stage: 'idle' | 'dynasty' | 'redraft' | 'complete' | 'error';
+  stage: 'idle' | 'dynasty' | 'redraft' | 'syncing' | 'complete' | 'error';
   message: string;
 }
 
@@ -17,6 +18,7 @@ export default function Top1000Builder() {
   const [dynastyResult, setDynastyResult] = useState<DynastyBuildResult | null>(null);
   const [redraftResult, setRedraftResult] = useState<RedraftFillResult | null>(null);
   const [fullData, setFullData] = useState<Top1000PlayerWithRedraft[] | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   const isLoading = status.stage !== 'idle' && status.stage !== 'complete' && status.stage !== 'error';
 
@@ -69,8 +71,29 @@ export default function Top1000Builder() {
     }
   };
 
-  const buildFull = async () => {
-    await buildDynastyBase();
+  const syncToDatabase = async () => {
+    if (!fullData || fullData.length === 0) {
+      setStatus({ stage: 'error', message: 'Build and fill redraft values first' });
+      return;
+    }
+
+    try {
+      setStatus({ stage: 'syncing', message: 'Syncing values to database (matching with Sleeper IDs)...' });
+      setSyncResult(null);
+
+      const result = await syncFantasyProsToDatabase(fullData);
+
+      if (!result.success) {
+        setStatus({ stage: 'error', message: 'Database sync failed. See errors below.' });
+        setSyncResult(result);
+        return;
+      }
+
+      setStatus({ stage: 'complete', message: `Synced ${result.synced_count} players to database` });
+      setSyncResult(result);
+    } catch (error) {
+      setStatus({ stage: 'error', message: error instanceof Error ? error.message : 'Unknown error' });
+    }
   };
 
   const downloadPpr = () => {
@@ -104,6 +127,7 @@ export default function Top1000Builder() {
           <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
             <li>Build Dynasty Base: Downloads dynasty SF + overall + 4 IDP sources (6 total)</li>
             <li>Fill Redraft Values: Downloads PPR + Half-PPR rankings and ADP (4 sources)</li>
+            <li>Sync to Database: Match with Sleeper IDs and update Power Rankings + imports</li>
             <li>Export: Choose PPR, Half-PPR, or combined CSV with both flavors</li>
           </ol>
         </div>
@@ -126,6 +150,17 @@ export default function Top1000Builder() {
             >
               <RefreshCw className="w-4 h-4" />
               {isLoading && status.stage === 'redraft' ? 'Filling...' : 'Fill Redraft (ADP + Rankings)'}
+            </button>
+          )}
+
+          {fullData && fullData.length > 0 && (
+            <button
+              onClick={syncToDatabase}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Database className="w-4 h-4" />
+              {isLoading && status.stage === 'syncing' ? 'Syncing...' : 'Sync to Database'}
             </button>
           )}
 
@@ -304,6 +339,58 @@ export default function Top1000Builder() {
                 </ul>
               </details>
             )}
+          </div>
+        )}
+
+        {syncResult && (
+          <div className={`rounded-lg p-4 border ${
+            syncResult.success
+              ? 'bg-purple-50 border-purple-200'
+              : 'bg-red-50 border-red-200'
+          } space-y-3`}>
+            <h3 className={`font-medium ${
+              syncResult.success ? 'text-purple-900' : 'text-red-900'
+            }`}>Database Sync Results</h3>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <div className="text-2xl font-bold text-green-600">
+                  {syncResult.synced_count}
+                </div>
+                <div className="text-sm text-gray-700">Synced to DB</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-blue-600">
+                  {syncResult.matched_count}
+                </div>
+                <div className="text-sm text-gray-700">Matched</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-orange-600">
+                  {syncResult.unmatched_count}
+                </div>
+                <div className="text-sm text-gray-700">Unmatched</div>
+              </div>
+            </div>
+
+            {syncResult.errors.length > 0 && (
+              <details className="mt-2">
+                <summary className="text-sm text-red-700 cursor-pointer font-medium">
+                  {syncResult.errors.length} errors (click to view)
+                </summary>
+                <ul className="mt-2 text-xs text-red-600 space-y-1 max-h-32 overflow-y-auto">
+                  {syncResult.errors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+
+            <div className="bg-purple-100 rounded p-3 mt-3">
+              <p className="text-sm text-purple-900">
+                <strong>✓ Power Rankings and Sleeper imports will now use these values</strong>
+              </p>
+            </div>
           </div>
         )}
 
