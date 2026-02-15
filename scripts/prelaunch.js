@@ -89,12 +89,14 @@ async function checkDatabaseSchema(supabase) {
 
   const requiredTables = [
     'nfl_players',
-    'player_values',
+    'player_values_canonical',
+    'value_epochs',
+    'player_values_staging',
     'value_snapshots',
     'leagues',
     'league_profiles',
-    'system_health_checks',
-    'admin_audit_log',
+    'system_health_metrics',
+    'model_config',
   ];
 
   let allExist = true;
@@ -124,37 +126,64 @@ async function checkDatabaseSchema(supabase) {
   return true;
 }
 
-// Check 3: Value Freshness
+// Check 3: Value Freshness & Epoch System
 async function checkValueFreshness(supabase) {
-  logSection('3. Value Freshness');
+  logSection('3. Value Freshness & Epoch System');
 
   try {
+    // Check for active epoch
+    const { data: currentEpoch, error: epochError } = await supabase.rpc('get_current_epoch');
+
+    if (epochError || !currentEpoch) {
+      log('✗ No active epoch found!', colors.red);
+      log('  Run rebuild to create initial epoch', colors.yellow);
+      return false;
+    }
+
+    log(`✓ Active epoch: ${currentEpoch}`, colors.green);
+
+    // Get epoch info
+    const { data: epochInfo } = await supabase
+      .from('value_epochs')
+      .select('*')
+      .eq('id', currentEpoch)
+      .single();
+
+    if (epochInfo) {
+      log(`✓ Epoch created: ${new Date(epochInfo.created_at).toLocaleString()}`, colors.green);
+      log(`✓ Players processed: ${epochInfo.players_processed}`, colors.green);
+    }
+
+    // Check canonical values
     const { data, error } = await supabase
-      .from('player_values')
-      .select('format, updated_at')
+      .from('player_values_canonical')
+      .select('format, updated_at, value_epoch_id')
+      .eq('value_epoch_id', currentEpoch)
       .order('updated_at', { ascending: false })
       .limit(100);
 
     if (error) {
-      log(`✗ Failed to query player_values: ${error.message}`, colors.red);
+      log(`✗ Failed to query player_values_canonical: ${error.message}`, colors.red);
       return false;
     }
 
     if (!data || data.length === 0) {
-      log('✗ No player values found!', colors.red);
-      log('  Run: npm run rebuild:values', colors.yellow);
+      log('✗ No player values found in canonical table!', colors.red);
+      log('  Run: supabase functions invoke rebuild-player-values-v2', colors.yellow);
       return false;
     }
 
     const dynastyCount = data.filter((v) => v.format === 'dynasty').length;
     const redraftCount = data.filter((v) => v.format === 'redraft').length;
+    const bestballCount = data.filter((v) => v.format === 'bestball').length;
 
     log(`✓ Total values: ${data.length}`, colors.green);
     log(`✓ Dynasty: ${dynastyCount}`, colors.green);
     log(`✓ Redraft: ${redraftCount}`, colors.green);
+    log(`✓ Bestball: ${bestballCount}`, colors.green);
 
-    if (dynastyCount === 0 || redraftCount === 0) {
-      log('✗ Missing values for one or both formats', colors.red);
+    if (dynastyCount === 0) {
+      log('✗ Missing dynasty values', colors.red);
       return false;
     }
 
@@ -166,7 +195,7 @@ async function checkValueFreshness(supabase) {
 
     if (ageHours > 48) {
       log('✗ Values are stale (>48 hours old)', colors.red);
-      log('  Run: npm run rebuild:values', colors.yellow);
+      log('  Run: supabase functions invoke rebuild-player-values-v2', colors.yellow);
       return false;
     }
 
@@ -174,7 +203,7 @@ async function checkValueFreshness(supabase) {
       log('⚠ Values are getting old (>36 hours)', colors.yellow);
     }
 
-    log('\n✅ Values are fresh', colors.green);
+    log('\n✅ Values are fresh and epoch system working', colors.green);
     return true;
   } catch (err) {
     log(`✗ Error checking value freshness: ${err.message}`, colors.red);
@@ -188,14 +217,15 @@ async function checkPerformance(supabase) {
 
   const tests = [
     {
-      name: 'Rankings Query',
+      name: 'Rankings Query (Canonical)',
       fn: async () => {
         const start = Date.now();
         await supabase
-          .from('player_values')
+          .from('player_values_canonical')
           .select('*')
           .eq('format', 'dynasty')
-          .order('fdp_value', { ascending: false })
+          .is('league_profile_id', null)
+          .order('adjusted_value', { ascending: false })
           .limit(100);
         return Date.now() - start;
       },

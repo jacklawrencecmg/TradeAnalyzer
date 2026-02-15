@@ -128,3 +128,26 @@ export function invalidateCache(pattern?: string): void {
 export function getCacheKey(parts: (string | number | undefined)[]): string {
   return parts.filter(Boolean).join(':');
 }
+
+/**
+ * Get cache key with epoch for versioning (Phase 2)
+ */
+export function getCacheKeyWithEpoch(parts: (string | number | undefined)[], epochId: string): string {
+  return [...parts.filter(Boolean), epochId].join(':');
+}
+
+/**
+ * Invalidate all keys for a specific epoch (Phase 2)
+ */
+export function invalidateEpoch(epochId: string): void {
+  cache.invalidatePattern(`.*:${epochId}$`);
+}
+
+/**
+ * Invalidate all value-related caches (Phase 2)
+ */
+export function invalidateAllValueCaches(): void {
+  cache.invalidatePattern('player-value:.*');
+  cache.invalidatePattern('rankings:.*');
+  cache.invalidatePattern('current-epoch');
+}
