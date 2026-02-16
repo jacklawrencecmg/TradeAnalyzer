@@ -21,6 +21,7 @@
 import { supabase } from '../supabase';
 import type { FDPValueBundle, FDPValueMap, FDPProvider } from './types';
 import { createFDPBundle, createFDPBundles } from './brand';
+import { makeImmutable } from './immutable';
 
 export type { FDPValueBundle, FDPValueMap, FDPProvider } from './types';
 
@@ -54,7 +55,7 @@ export async function getFDPValue(
       return null;
     }
 
-    return createFDPBundle({
+    const bundle = createFDPBundle({
       player_id: data.player_id,
       player_name: data.player_name || 'Unknown',
       position: data.position || 'UNK',
@@ -70,6 +71,9 @@ export async function getFDPValue(
       league_profile_id: leagueProfileId,
       format,
     });
+
+    // Make bundle immutable with checksum
+    return makeImmutable(bundle) as FDPValueBundle;
   } catch (error) {
     console.error('FDP_VALUE_ERROR:', error);
     return null;
@@ -126,7 +130,15 @@ export async function getFDPValuesBatch(
       format,
     }));
 
-    return createFDPBundles(rawResponses);
+    const bundles = createFDPBundles(rawResponses);
+
+    // Make all bundles immutable
+    const immutableBundles = new Map<string, FDPValueBundle>();
+    for (const [playerId, bundle] of bundles.entries()) {
+      immutableBundles.set(playerId, makeImmutable(bundle) as FDPValueBundle);
+    }
+
+    return immutableBundles;
   } catch (error) {
     console.error('FDP_VALUE_BATCH_ERROR:', error);
     return new Map();
