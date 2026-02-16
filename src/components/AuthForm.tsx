@@ -74,7 +74,7 @@ export function AuthForm() {
             />
           </div>
           <h1 className="text-4xl font-bold text-fdp-text-1 mb-2">Fantasy Draft Pros</h1>
-          <p className="text-fdp-text-3">Sign in to manage leagues and analyze trades</p>
+          <p className="text-fdp-text-3">Professional Fantasy Football Tools - $2.99/month</p>
         </div>
 
         <div className="bg-fdp-surface-1 rounded-lg shadow-xl p-8 border border-fdp-border-1">
@@ -181,13 +181,16 @@ export function AuthForm() {
           </form>
 
           <div className="mt-6 p-4 bg-fdp-surface-2 border border-fdp-border-1 rounded-lg">
-            <p className="text-sm font-semibold text-fdp-text-1 mb-2">Features with account:</p>
+            <p className="text-sm font-semibold text-fdp-text-1 mb-2">Pro Membership - $2.99/month:</p>
             <ul className="text-sm text-fdp-text-3 space-y-1">
-              <li>Save multiple Sleeper leagues</li>
-              <li>Switch between leagues instantly</li>
-              <li>Compare trades across leagues</li>
-              <li>Track saved trades and history</li>
-              <li>Private data - only you can see your leagues</li>
+              <li>Unlimited trade calculations</li>
+              <li>Unlimited league imports</li>
+              <li>Power rankings and playoff odds</li>
+              <li>Trade suggestions engine</li>
+              <li>Team strategy advice</li>
+              <li>Market alerts and watchlist</li>
+              <li>Advanced IDP presets</li>
+              <li>Player trend analytics</li>
             </ul>
           </div>
         </div>

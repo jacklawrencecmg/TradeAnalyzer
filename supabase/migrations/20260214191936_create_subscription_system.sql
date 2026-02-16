@@ -19,7 +19,7 @@
     - 10 trade calculations/day
     - No alerts or advanced analytics
     
-    **Pro Tier - $7/month:**
+    **Pro Tier - $2.99/month:**
     - Unlimited trade calculations
     - Unlimited league imports
     - Trade suggestions engine
