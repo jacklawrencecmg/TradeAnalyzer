@@ -1,5 +1,6 @@
 import { playerValuesApi, type PlayerValue } from './playerValuesApi';
 import { getEnrichedPlayers, mergeSleeperWithDatabase } from '../lib/players/getEnrichedPlayers';
+import { SEASON_CONTEXT } from '../config/seasonContext';
 
 const SLEEPER_API_BASE = 'https://api.sleeper.app/v1';
 
@@ -923,9 +924,9 @@ export async function calculatePowerRankings(leagueId: string): Promise<TeamRank
     const totalValue = playerValues.reduce((sum, p) => sum + p.value, 0);
     const topPlayers = playerValues.slice(0, 5);
 
-    const leagueYear = parseInt(league.season);
-    const calendarYear = new Date().getFullYear();
-    const currentYear = Math.max(leagueYear, calendarYear);
+    // Use SEASON_CONTEXT to determine the correct draft year
+    // This ensures we show the correct upcoming draft picks based on season phase
+    const currentYear = SEASON_CONTEXT.league_year;
     const teamPicks: Array<{ season: string; round: number; original_owner_id: string }> = [];
     const totalRounds = settings.draftRounds || 4;
 

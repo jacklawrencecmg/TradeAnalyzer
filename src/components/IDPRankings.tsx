@@ -224,7 +224,7 @@ export default function IDPRankings() {
                     FDP Value
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                    KTC Value
+                    Base Value
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
                     Tier
