@@ -28,6 +28,7 @@ import { PlayerValues } from './PlayerValues';
 import { Contact } from './Contact';
 import Footer from './Footer';
 import KTCAdminSync from './KTCAdminSync';
+import { AdminSyncHub } from './AdminSyncHub';
 import TrendingPlayersPanel from './TrendingPlayersPanel';
 import KTCQBRankings from './KTCQBRankings';
 import KTCRBRankings from './KTCRBRankings';
@@ -384,7 +385,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                 <div>
                   <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Data Management</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                    <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="Admin" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={RefreshCw} label="System Admin" shortLabel="Admin" tab="adminSync" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="KTC" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Award} label="RB Rankings" shortLabel="RBs" tab="ktcRBRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Radio} label="WR Rankings" shortLabel="WRs" tab="ktcWRRankings" activeTab={activeTab} onClick={setActiveTab} />
@@ -439,6 +441,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'news' && <PlayerNewsFeed />}
               {activeTab === 'export' && <ExportShare leagueId={currentLeague.league_id} rosterId="1" />}
               {activeTab === 'contact' && <Contact />}
+              {activeTab === 'adminSync' && <AdminSyncHub />}
               {activeTab === 'ktcAdmin' && <KTCAdminSync />}
               {activeTab === 'ktcRankings' && <KTCQBRankings />}
               {activeTab === 'ktcRBRankings' && <KTCRBRankings />}

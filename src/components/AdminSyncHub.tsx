@@ -94,7 +94,7 @@ export function AdminSyncHub() {
     }
   }
 
-  async function runSync(type: 'players' | 'values' | 'full') {
+  async function runSync(type: 'players' | 'values' | 'full' | 'rebuild') {
     try {
       setSyncing(type);
       setError(null);
@@ -104,6 +104,7 @@ export function AdminSyncHub() {
         players: 'sync-sleeper-players',
         values: 'sync-values-all',
         full: 'sync-full-pipeline',
+        rebuild: 'rebuild-player-values-v2',
       };
 
       const functionName = functionMap[type];
@@ -278,7 +279,7 @@ export function AdminSyncHub() {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Sync Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <button
             onClick={() => runSync('players')}
             disabled={syncing !== null}
@@ -306,6 +307,21 @@ export function AdminSyncHub() {
             </div>
             {syncing === 'values' && (
               <Loader2 className="w-5 h-5 animate-spin text-green-600" />
+            )}
+          </button>
+
+          <button
+            onClick={() => runSync('rebuild')}
+            disabled={syncing !== null}
+            className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-lg hover:border-[#00d4ff] hover:bg-[#00d4ff]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Shield className="w-8 h-8 text-[#00d4ff]" />
+            <div className="text-center">
+              <h3 className="font-semibold text-gray-900">Rebuild Player Values</h3>
+              <p className="text-sm text-gray-600 mt-1">Full rebuild with validation</p>
+            </div>
+            {syncing === 'rebuild' && (
+              <Loader2 className="w-5 h-5 animate-spin text-[#00d4ff]" />
             )}
           </button>
 
