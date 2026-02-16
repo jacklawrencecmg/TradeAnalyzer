@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Loader2, RefreshCw, Database, TrendingUp, Activity, CheckCircle, XCircle, AlertCircle, Clock, Calendar, Shield, List } from 'lucide-react';
-import { clearPlayerCache } from '../services/sleeperApi';
+import { clearPlayerCache, clearPlayerValuesCache, clearAllCaches } from '../services/sleeperApi';
 import { invalidateEnrichedPlayersCache } from '../lib/players/getEnrichedPlayers';
 import SeasonRollover from './SeasonRollover';
 import ValueValidation from './ValueValidation';
@@ -121,6 +121,12 @@ export function AdminSyncHub() {
         clearPlayerCache();
         invalidateEnrichedPlayersCache();
         console.log('Player caches cleared - team data will be refreshed on next request');
+      }
+
+      // Clear player values cache after value syncs
+      if (type === 'values' || type === 'rebuild' || type === 'full') {
+        clearPlayerValuesCache();
+        console.log('Player values cache cleared - values will be refreshed on next request');
       }
 
       await loadStatus();

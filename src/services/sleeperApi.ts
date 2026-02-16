@@ -5,8 +5,8 @@ const SLEEPER_API_BASE = 'https://api.sleeper.app/v1';
 
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 30 * 60 * 1000;
-// Reduced from 24 hours to 1 hour during season for fresher team data
-const PLAYER_CACHE_DURATION = 60 * 60 * 1000;
+// Cache player values for 5 minutes to ensure fresh data after syncs
+const PLAYER_CACHE_DURATION = 5 * 60 * 1000;
 
 function getCachedData(key: string, maxAge: number = CACHE_DURATION): any | null {
   const cached = cache.get(key);
@@ -23,6 +23,28 @@ function setCachedData(key: string, data: any): void {
 export function clearPlayerCache(): void {
   cache.delete('all_players');
   console.log('Player cache cleared');
+}
+
+export function clearPlayerValuesCache(): void {
+  const keysToDelete: string[] = [];
+  for (const key of cache.keys()) {
+    if (key.startsWith('db_player_values_') || key.startsWith('fdp_values_')) {
+      keysToDelete.push(key);
+    }
+  }
+  keysToDelete.forEach(key => cache.delete(key));
+  dbPlayerValues = new Map();
+  fdpValues = {};
+  fdpSuperflexValues = {};
+  console.log(`Cleared ${keysToDelete.length} player value cache entries`);
+}
+
+export function clearAllCaches(): void {
+  cache.clear();
+  dbPlayerValues = new Map();
+  fdpValues = {};
+  fdpSuperflexValues = {};
+  console.log('All caches cleared');
 }
 
 export interface SleeperPlayer {

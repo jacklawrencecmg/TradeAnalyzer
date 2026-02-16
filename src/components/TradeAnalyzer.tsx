@@ -7,6 +7,7 @@ import {
   fetchLeagueRosters,
   fetchLeagueUsers,
   fetchTradedPicks,
+  clearPlayerValuesCache,
   type SleeperPlayer,
   type SleeperRoster,
   type SleeperUser,
@@ -1178,10 +1179,12 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
               onClick={async () => {
                 setSyncingValues(true);
                 showToast('Refreshing player values...', 'info');
+                clearPlayerValuesCache();
                 const synced = await syncPlayerValuesToDatabase(leagueSettings.isSuperflex);
                 setSyncingValues(false);
                 if (synced > 0) {
                   showToast(`Successfully refreshed ${synced} player values!`, 'success');
+                  window.location.reload();
                 } else {
                   showToast('Failed to refresh player values', 'error');
                 }
