@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { createCheckoutSession } from '../lib/subscription';
 import { useSubscription } from '../hooks/useSubscription';
 import ProBadge from './ProBadge';
+import { SubscriptionManagement } from './SubscriptionManagement';
 
 interface PricingPageProps {
   onBack: () => void;
@@ -93,6 +94,12 @@ export default function PricingPage({ onBack }: PricingPageProps) {
             Start with our free tier or unlock premium features with Pro
           </p>
         </div>
+
+        {isPro && !subscription?.is_trial && (
+          <div className="mb-8 max-w-2xl mx-auto">
+            <SubscriptionManagement />
+          </div>
+        )}
 
         {subscription?.is_trial && (
           <div className="mb-8 bg-green-50 border border-green-200 rounded-lg p-6 text-center">

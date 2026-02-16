@@ -7,6 +7,7 @@ export interface UserSubscription {
   is_trial: boolean;
   trial_days_left: number;
   period_end: string | null;
+  cancel_at_period_end: boolean;
 }
 
 export const FREE_FEATURES = [
@@ -186,6 +187,70 @@ export async function createCheckoutSession(
   } catch (err) {
     console.error('Error creating checkout session:', err);
     return null;
+  }
+}
+
+export async function cancelSubscription(): Promise<{ success: boolean; message: string; period_end?: string }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/cancel-subscription`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to cancel subscription');
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Error canceling subscription:', err);
+    throw err;
+  }
+}
+
+export async function reactivateSubscription(): Promise<{ success: boolean; message: string }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reactivate-subscription`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || 'Failed to reactivate subscription');
+    }
+
+    return result;
+  } catch (err) {
+    console.error('Error reactivating subscription:', err);
+    throw err;
   }
 }
 
