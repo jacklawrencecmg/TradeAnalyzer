@@ -37,15 +37,20 @@ export function AuthForm() {
 
     try {
       if (mode === 'signup') {
+        console.log('Starting signup process...');
         const result = await signUp(email, password);
+        console.log('Signup result:', result);
+
         if (result.error) {
-          setError(result.error);
+          console.error('Signup error:', result.error);
+          setError(`Signup failed: ${result.error}`);
         } else {
-          setSuccess('Account created! Please check your email to verify, then login.');
+          console.log('Signup successful!');
+          setSuccess('Account created successfully! You now have a 7-day Pro trial. Welcome!');
           setEmail('');
           setPassword('');
           setConfirmPassword('');
-          setTimeout(() => setMode('login'), 2000);
+          // Don't auto-switch to login since user is now logged in
         }
       } else {
         const result = await signIn(email, password);
@@ -53,6 +58,9 @@ export function AuthForm() {
           setError(result.error);
         }
       }
+    } catch (err) {
+      console.error('Form submission error:', err);
+      setError('An unexpected error occurred. Please try again.');
     } finally {
       setLoading(false);
     }

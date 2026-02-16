@@ -27,10 +27,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event);
+
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // If a new user just signed up, ensure they have a subscription
+      if (event === 'SIGNED_IN' && session?.user) {
+        try {
+          // Check if user has a subscription, if not create one
+          const { data: existingSub } = await supabase
+            .from('user_subscriptions')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (!existingSub) {
+            console.log('Creating trial subscription for new user');
+            // Call the function to create subscription
+            await supabase.rpc('create_trial_subscription', {
+              p_user_id: session.user.id
+            });
+            console.log('Trial subscription created');
+          }
+        } catch (error) {
+          console.error('Error ensuring subscription:', error);
+          // Don't block the user if subscription creation fails
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
