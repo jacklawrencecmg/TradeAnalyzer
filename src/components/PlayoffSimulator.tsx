@@ -206,14 +206,13 @@ export default function PlayoffSimulator({ leagueId }: PlayoffSimulatorProps) {
 
   return (
     <div className="space-y-6">
-      {deleteConfirm && (
-        <ConfirmDialog
-          title="Delete Simulation"
-          message="Are you sure you want to delete this saved simulation? This action cannot be undone."
-          onConfirm={() => deleteSimulation(deleteConfirm)}
-          onCancel={() => setDeleteConfirm(null)}
-        />
-      )}
+      <ConfirmDialog
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => deleteConfirm && deleteSimulation(deleteConfirm)}
+        title="Delete Simulation"
+        message="Are you sure you want to delete this saved simulation? This action cannot be undone."
+      />
 
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border border-gray-700 p-6 shadow-xl">
         <div className="flex items-center justify-between mb-6">
