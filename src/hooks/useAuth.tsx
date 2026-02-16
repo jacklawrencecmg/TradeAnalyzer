@@ -28,11 +28,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
+      console.log('Auth state changed:', event, 'Session:', session ? 'exists' : 'null');
 
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      // Handle sign out event
+      if (event === 'SIGNED_OUT') {
+        console.log('User signed out, clearing state');
+        setSession(null);
+        setUser(null);
+        return;
+      }
 
       // If a new user just signed up, ensure they have a subscription
       if (event === 'SIGNED_IN' && session?.user) {
@@ -101,7 +109,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      console.log('Signing out...');
+
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+        throw error;
+      }
+
+      // Clear local state immediately
+      setUser(null);
+      setSession(null);
+
+      // Clear auth-related storage
+      localStorage.removeItem('fdp-auth-token');
+      sessionStorage.clear();
+
+      console.log('Sign out successful, redirecting...');
+
+      // Small delay to ensure state updates, then redirect
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+    } catch (error) {
+      console.error('Error during sign out:', error);
+      // Force clear auth data and redirect anyway
+      setUser(null);
+      setSession(null);
+      localStorage.removeItem('fdp-auth-token');
+      sessionStorage.clear();
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 100);
+    }
   };
 
   return (
