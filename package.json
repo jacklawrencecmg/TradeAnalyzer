@@ -14,6 +14,7 @@
     "test:fdp": "vitest run src/tests/fdpInvariant.test.ts src/tests/fdp-contract.test.ts",
     "test:ci": "npm run fdp-scan && vitest run",
     "fdp-scan": "tsx scripts/fdp-policy-scan.ts",
+    "populate:idp": "tsx scripts/populate-idp-values.ts",
     "prelaunch": "node scripts/prelaunch.js",
     "post-deploy": "node scripts/post-deploy-check.js",
     "release": "npm run fdp-scan && npm run lint && npm run typecheck && npm run test:values && npm run test:fdp && npm run prelaunch && npm run build && npm run post-deploy"
@@ -32,6 +33,7 @@
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.18",
+    "dotenv": "^17.3.1",
     "eslint": "^9.9.1",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.11",
