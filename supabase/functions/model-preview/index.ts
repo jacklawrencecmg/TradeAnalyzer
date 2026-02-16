@@ -15,20 +15,6 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Verify authorization
-    const authHeader = req.headers.get("Authorization");
-    const adminSecret = Deno.env.get("VITE_ADMIN_SYNC_SECRET");
-
-    if (!authHeader || authHeader !== `Bearer ${adminSecret}`) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized - invalid ADMIN_SYNC_SECRET" }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);

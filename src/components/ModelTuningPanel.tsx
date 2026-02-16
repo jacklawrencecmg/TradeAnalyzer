@@ -126,12 +126,14 @@ export default function ModelTuningPanel() {
     setError(null);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
       const { data, error: previewError } = await supabase.functions.invoke(
         'model-preview',
         {
           body: { config_changes: changes },
           headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_ADMIN_SYNC_SECRET}`,
+            Authorization: `Bearer ${session?.access_token || 'anonymous'}`,
           },
         }
       );
