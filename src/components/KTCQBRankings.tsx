@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, TrendingUp, TrendingDown, Award } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
 import { PlayerAvatar } from './PlayerAvatar';
+import { supabase } from '../lib/supabase';
 
 interface QBValue {
   position_rank: number;
   full_name: string;
+  player_name: string;
   player_id?: string;
   team: string | null;
-  value: number;
+  ktc_value: number;
+  fdp_value: number;
   captured_at: string;
 }
 
@@ -33,24 +36,17 @@ export default function KTCQBRankings() {
   const fetchQBValues = async () => {
     try {
       setLoading(true);
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/ktc-qb-values?format=dynasty_sf`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data, error: rpcError } = await supabase.rpc('get_latest_values', {
+        p_format: 'dynasty_sf',
+        p_position: 'QB',
+        p_limit: null
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch QB values');
+      if (rpcError) {
+        throw new Error(rpcError.message);
       }
 
-      const data = await response.json();
-      setQbs(data);
+      setQbs(data || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load QB rankings');
@@ -217,7 +213,7 @@ export default function KTCQBRankings() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">
-                      <span className="text-lg font-bold text-gray-900">{qb.value}</span>
+                      <span className="text-lg font-bold text-gray-900">{qb.fdp_value || qb.ktc_value}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

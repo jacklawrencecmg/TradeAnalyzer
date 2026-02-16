@@ -2,21 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Award, AlertTriangle } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
 import { PlayerAvatar } from './PlayerAvatar';
+import { supabase } from '../lib/supabase';
 
 interface RBValue {
   position_rank: number;
   full_name: string;
+  player_name: string;
   player_id?: string;
   team: string | null;
   ktc_value: number;
   fdp_value: number;
-  value: number;
   captured_at: string;
-  age?: number;
-  depth_role?: string;
-  workload_tier?: string;
-  injury_risk?: string;
-  contract_security?: string;
+  metadata?: {
+    age?: number;
+    depth_role?: string;
+    workload_tier?: string;
+    injury_risk?: string;
+    contract_security?: string;
+  };
 }
 
 export default function KTCRBRankings() {
@@ -58,26 +61,19 @@ export default function KTCRBRankings() {
   const fetchRBValues = async () => {
     try {
       setLoading(true);
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/ktc-rb-values?format=dynasty_sf`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data, error: rpcError } = await supabase.rpc('get_latest_values', {
+        p_format: 'dynasty_sf',
+        p_position: 'RB',
+        p_limit: null
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch RB values');
+      if (rpcError) {
+        throw new Error(rpcError.message);
       }
 
-      const data = await response.json();
-      setRbs(data);
+      setRbs(data || []);
 
-      if (data.length > 0) {
+      if (data && data.length > 0) {
         const latest = new Date(data[0].captured_at);
         setLastUpdated(latest.toLocaleString());
       }
@@ -255,22 +251,22 @@ export default function KTCRBRankings() {
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-gray-900">{rb.full_name}</span>
-                          {hasAgeCliffWarning(rb.age) && (
+                          {hasAgeCliffWarning(rb.metadata?.age) && (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300">
                               <AlertTriangle className="w-3 h-3" />
-                              Age {rb.age}
+                              Age {rb.metadata?.age}
                             </span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
-                          {getRoleBadge(rb.depth_role) && (
-                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadge(rb.depth_role)!.color}`}>
-                              {getRoleBadge(rb.depth_role)!.label}
+                          {getRoleBadge(rb.metadata?.depth_role) && (
+                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadge(rb.metadata?.depth_role)!.color}`}>
+                              {getRoleBadge(rb.metadata?.depth_role)!.label}
                             </span>
                           )}
-                          {rb.age && rb.age <= 24 && (
+                          {rb.metadata?.age && rb.metadata.age <= 24 && (
                             <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
-                              Age {rb.age}
+                              Age {rb.metadata.age}
                             </span>
                           )}
                         </div>

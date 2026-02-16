@@ -2,13 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, TrendingUp, Award, Radio } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
 import { PlayerAvatar } from './PlayerAvatar';
+import { supabase } from '../lib/supabase';
 
 interface WRValue {
   position_rank: number;
   full_name: string;
+  player_name: string;
   player_id?: string;
   team: string | null;
-  value: number;
+  ktc_value: number;
+  fdp_value: number;
   captured_at: string;
 }
 
@@ -33,24 +36,17 @@ export default function KTCWRRankings() {
   const fetchWRValues = async () => {
     try {
       setLoading(true);
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/ktc-wr-values?format=dynasty_sf`,
-        {
-          headers: {
-            'Authorization': `Bearer ${supabaseAnonKey}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const { data, error: rpcError } = await supabase.rpc('get_latest_values', {
+        p_format: 'dynasty_sf',
+        p_position: 'WR',
+        p_limit: null
+      });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch WR values');
+      if (rpcError) {
+        throw new Error(rpcError.message);
       }
 
-      const data = await response.json();
-      setWrs(data);
+      setWrs(data || []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load WR rankings');
@@ -238,7 +234,7 @@ export default function KTCWRRankings() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <span className="text-lg font-bold text-gray-900">{wr.value}</span>
+                      <span className="text-lg font-bold text-gray-900">{wr.fdp_value || wr.ktc_value}</span>
                     </div>
                   </td>
                 </tr>
