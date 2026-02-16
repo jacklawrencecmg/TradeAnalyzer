@@ -136,20 +136,40 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
         return;
       }
 
-      const userPlayers = await Promise.all(
-        (userRoster.players || []).map(async (pid: string) => {
+      // Collect all player IDs from all rosters for batch fetching
+      const allPlayerIds = new Set<string>();
+      rosters.forEach((roster: any) => {
+        (roster.players || []).forEach((pid: string) => allPlayerIds.add(pid));
+      });
+
+      // Batch fetch all player values at once
+      const playerValuesMap = new Map<string, number>();
+      await Promise.all(
+        Array.from(allPlayerIds).map(async (pid) => {
+          try {
+            const value = await getPlayerValue(pid);
+            playerValuesMap.set(pid, value);
+          } catch (err) {
+            console.error(`Error fetching value for ${pid}:`, err);
+            playerValuesMap.set(pid, 0);
+          }
+        })
+      );
+
+      const userPlayers = (userRoster.players || [])
+        .map((pid: string) => {
           const player = allPlayers[pid];
           if (!player) return null;
           return {
             id: pid,
             name: player.full_name,
             position: player.position,
-            value: await getPlayerValue(pid)
+            value: playerValuesMap.get(pid) || 0
           };
         })
-      );
+        .filter((p): p is NonNullable<typeof p> => p !== null);
 
-      const validUserPlayers = userPlayers.filter(p => p !== null && p.value > 5.0);
+      const validUserPlayers = userPlayers.filter(p => p.value > 5.0);
       const userAnalysis = analyzeTeamNeeds(validUserPlayers, allPlayers);
 
       const tradeSuggestions: TradeProposal[] = [];
@@ -157,20 +177,20 @@ export default function TradeFinder({ leagueId, rosterId }: TradeFinderProps) {
       for (const roster of rosters) {
         if (roster.roster_id.toString() === selectedTeam) continue;
 
-        const theirPlayers = await Promise.all(
-          (roster.players || []).map(async (pid: string) => {
+        const theirPlayers = (roster.players || [])
+          .map((pid: string) => {
             const player = allPlayers[pid];
             if (!player) return null;
             return {
               id: pid,
               name: player.full_name,
               position: player.position,
-              value: await getPlayerValue(pid)
+              value: playerValuesMap.get(pid) || 0
             };
           })
-        );
+          .filter((p): p is NonNullable<typeof p> => p !== null);
 
-        const validTheirPlayers = theirPlayers.filter(p => p !== null && p.value > 5.0);
+        const validTheirPlayers = theirPlayers.filter(p => p.value > 5.0);
         const theirAnalysis = analyzeTeamNeeds(validTheirPlayers, allPlayers);
 
         for (const need of userAnalysis.needs) {
