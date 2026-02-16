@@ -69,9 +69,36 @@ Deno.serve(async (req: Request) => {
     console.log('Player data:', playerData);
 
     if (!playerData) {
-      console.error('No player found with ID:', playerId);
+      console.error('No player found with ID:', playerId, 'format:', format);
+
+      const { data: anyFormatData } = await supabase
+        .from('latest_player_values')
+        .select('player_name, format')
+        .eq('player_id', playerId)
+        .limit(5);
+
+      if (anyFormatData && anyFormatData.length > 0) {
+        const availableFormats = anyFormatData.map(d => d.format).join(', ');
+        const playerName = anyFormatData[0].player_name;
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            error: `${playerName} not found in ${format} format`,
+            details: `This player is available in: ${availableFormats}. Try switching formats.`
+          }),
+          {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       return new Response(
-        JSON.stringify({ ok: false, error: 'Player not found' }),
+        JSON.stringify({
+          ok: false,
+          error: 'Player not found in database',
+          details: 'This player may need to be synced. Try syncing player values from the admin panel.'
+        }),
         {
           status: 404,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -41,7 +41,7 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [format, setFormat] = useState<string>('dynasty');
+  const [format, setFormat] = useState<string>('dynasty_sf');
 
   useEffect(() => {
     loadPlayerData();
@@ -72,11 +72,10 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
       if (result.ok) {
         setData(result);
       } else {
-        const errorMsg = result.details
-          ? `${result.error}\n\nDetails: ${result.details}`
-          : result.error || 'Failed to load player data';
-        console.error('Error from API:', errorMsg);
-        setError(errorMsg);
+        const errorMsg = result.error || 'Failed to load player data';
+        const detailMsg = result.details ? `\n\nTechnical details: ${result.details}` : '';
+        console.error('Error from API:', errorMsg, result);
+        setError(`${errorMsg}${detailMsg}\n\nTry switching to a different format (Superflex/1QB/TEP) or check if this player has been synced to the database.`);
       }
     } catch (err) {
       console.error('Error loading player data:', err);
