@@ -194,10 +194,10 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { data: rbs, error: rbsError } = await supabase
-      .from('player_values')
-      .select('player_id, player_name, age, team, ktc_value, position, depth_role, workload_tier, contract_security')
+      .from('latest_player_values')
+      .select('player_id, player_name, metadata, team, market_value, position')
       .eq('position', 'RB')
-      .order('ktc_value', { ascending: false });
+      .order('market_value', { ascending: false });
 
     if (rbsError) throw rbsError;
     if (!rbs || rbs.length === 0) {
@@ -216,13 +216,13 @@ Deno.serve(async (req: Request) => {
       rbsByTeam.get(team)!.push({
         player_id: rb.player_id,
         player_name: rb.player_name,
-        age: rb.age,
+        age: rb.metadata?.age || null,
         team: rb.team,
-        ktc_value: rb.ktc_value,
+        ktc_value: rb.market_value || 0,
         position_rank: 0,
-        depth_role: rb.depth_role,
-        workload_tier: rb.workload_tier,
-        contract_security: rb.contract_security,
+        depth_role: rb.metadata?.depth_role || null,
+        workload_tier: rb.metadata?.workload_tier || null,
+        contract_security: rb.metadata?.contract_security || null,
       });
     }
 

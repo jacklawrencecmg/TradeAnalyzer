@@ -60,18 +60,21 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     const { data: dbPlayers, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, team, fdp_value')
-      .eq('format', 'dynasty_sf')
-      .order('captured_at', { ascending: false });
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, adjusted_value')
+      .eq('format', 'dynasty');
 
     if (error) throw error;
 
     const latestByPlayer = new Map<string, any>();
     for (const player of dbPlayers || []) {
-      if (!latestByPlayer.has(player.player_id)) {
-        latestByPlayer.set(player.player_id, player);
-      }
+      latestByPlayer.set(player.player_id, {
+        player_id: player.player_id,
+        full_name: player.player_name,
+        position: player.position,
+        team: player.team,
+        fdp_value: player.adjusted_value
+      });
     }
 
     function normalizePlayerName(name: string): string {
