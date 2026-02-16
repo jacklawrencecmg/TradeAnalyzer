@@ -1,6 +1,16 @@
 import { supabase } from '../lib/supabase';
 import { sportsDataAPI } from './sportsdataApi';
 
+/**
+ * Player Values API
+ *
+ * IMPORTANT: All read operations use `latest_player_values` view which is the
+ * canonical source of truth for current player values. This view automatically
+ * provides the most recent values per player and format from ktc_value_snapshots.
+ *
+ * Write operations (sync, upsert) should target `player_values` table directly.
+ */
+
 const KNOWN_BACKUP_QBS = [
   'joe milton', 'joe milton iii', 'trey lance', 'sam howell', 'tyler huntley',
   'jake browning', 'easton stick', 'cooper rush', 'taylor heinicke',
@@ -10,16 +20,19 @@ const KNOWN_BACKUP_QBS = [
 ];
 
 export interface PlayerValue {
-  id: string;
+  id?: string;
   player_id: string;
   player_name: string;
   position: string;
   team: string | null;
   base_value: number | string;
-  fdp_value: number | string;
-  trend: 'up' | 'down' | 'stable';
-  last_updated: string;
-  metadata: Record<string, any>;
+  fdp_value?: number | string;  // Legacy - use adjusted_value instead
+  adjusted_value?: number | string;  // Current canonical FDP value
+  market_value?: number | string;  // Market consensus value (KTC)
+  trend?: 'up' | 'down' | 'stable';
+  last_updated?: string;  // Legacy - use updated_at instead
+  updated_at?: string;  // Current canonical timestamp
+  metadata?: Record<string, any>;
   age?: number | string | null;
   years_experience?: number | null;
   injury_status?: string | null;
@@ -31,6 +44,11 @@ export interface PlayerValue {
   contract_years_remaining?: number | null;
   tier?: string | null;
   volatility_score?: number | string | null;
+  rank_overall?: number | null;
+  rank_position?: number | null;
+  format?: string | null;
+  source?: string | null;
+  confidence_score?: number | null;
 }
 
 export interface PlayerValueHistory {
@@ -102,6 +120,22 @@ function toNumber(value: number | string | null | undefined, defaultValue: numbe
   if (typeof value === 'number') return value;
   const parsed = parseFloat(value);
   return isNaN(parsed) ? defaultValue : parsed;
+}
+
+/**
+ * Normalize PlayerValue from database to ensure backward compatibility
+ * Maps adjusted_value -> fdp_value and updated_at -> last_updated for legacy code
+ */
+function normalizePlayerValue(value: PlayerValue): PlayerValue {
+  return {
+    ...value,
+    // Ensure fdp_value is set (prefer adjusted_value, fallback to fdp_value)
+    fdp_value: value.adjusted_value ?? value.fdp_value ?? value.base_value,
+    // Ensure last_updated is set (prefer updated_at, fallback to last_updated)
+    last_updated: value.updated_at ?? value.last_updated ?? new Date().toISOString(),
+    // Extract trend from metadata if not present
+    trend: value.trend ?? (value.metadata?.trend as 'up' | 'down' | 'stable') ?? 'stable',
+  };
 }
 
 class PlayerValuesApi {
@@ -435,9 +469,9 @@ class PlayerValuesApi {
   ): Promise<PlayerValue[]> {
     try {
       let query = supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
-        .order('fdp_value', { ascending: false })
+        .order('adjusted_value', { ascending: false })
         .limit(limit);
 
       if (position) {
@@ -447,7 +481,7 @@ class PlayerValuesApi {
       const { data, error } = await query;
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(normalizePlayerValue);
     } catch (error) {
       console.error('Error fetching player values:', error);
       return [];
@@ -457,13 +491,13 @@ class PlayerValuesApi {
   async getPlayerValue(playerId: string): Promise<PlayerValue | null> {
     try {
       const { data, error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
         .eq('player_id', playerId)
         .maybeSingle();
 
       if (error) throw error;
-      return data;
+      return data ? normalizePlayerValue(data) : null;
     } catch (error) {
       console.error('Error fetching player value:', error);
       return null;
@@ -531,10 +565,10 @@ class PlayerValuesApi {
   async searchPlayers(searchTerm: string, limit: number = 20): Promise<PlayerValue[]> {
     try {
       const { data, error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
         .or(`player_name.ilike.%${searchTerm}%,team.ilike.%${searchTerm}%`)
-        .order('fdp_value', { ascending: false, nullsLast: true })
+        .order('adjusted_value', { ascending: false, nullsLast: true })
         .limit(limit);
 
       if (error) {
@@ -542,7 +576,7 @@ class PlayerValuesApi {
         throw error;
       }
 
-      return data || [];
+      return (data || []).map(normalizePlayerValue);
     } catch (error) {
       console.error('Error searching players:', error);
       return [];
@@ -552,14 +586,14 @@ class PlayerValuesApi {
   async getTopRisers(limit: number = 10): Promise<PlayerValue[]> {
     try {
       const { data, error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
-        .eq('trend', 'up')
-        .order('fdp_value', { ascending: false })
+        .order('adjusted_value', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return data || [];
+      // Filter for upward trend in metadata or use value changes
+      return (data || []).map(normalizePlayerValue).filter(p => p.trend === 'up');
     } catch (error) {
       console.error('Error fetching top risers:', error);
       return [];
@@ -569,14 +603,14 @@ class PlayerValuesApi {
   async getTopFallers(limit: number = 10): Promise<PlayerValue[]> {
     try {
       const { data, error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
-        .eq('trend', 'down')
-        .order('fdp_value', { ascending: false })
+        .order('adjusted_value', { ascending: false })
         .limit(limit);
 
       if (error) throw error;
-      return data || [];
+      // Filter for downward trend in metadata or use value changes
+      return (data || []).map(normalizePlayerValue).filter(p => p.trend === 'down');
     } catch (error) {
       console.error('Error fetching top fallers:', error);
       return [];
@@ -586,12 +620,12 @@ class PlayerValuesApi {
   async comparePlayerValues(playerIds: string[]): Promise<PlayerValue[]> {
     try {
       const { data, error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
         .in('player_id', playerIds);
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(normalizePlayerValue);
     } catch (error) {
       console.error('Error comparing player values:', error);
       return [];
@@ -673,13 +707,13 @@ class PlayerValuesApi {
       if (playerIds.length === 0) return { risers: [], fallers: [] };
 
       const { data: players, error: playersError } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
         .in('player_id', playerIds);
 
       if (playersError) throw playersError;
 
-      const playerMap = new Map(players?.map(p => [p.player_id, p]) || []);
+      const playerMap = new Map(players?.map(p => [p.player_id, normalizePlayerValue(p)]) || []);
 
       const risers = changes
         ?.filter(c => (c as any)[changeColumn] > 0)
@@ -729,13 +763,13 @@ class PlayerValuesApi {
       const currentYear = year || new Date().getFullYear();
 
       const { data, error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .select('*')
         .eq('draft_year', currentYear)
-        .order('fdp_value', { ascending: false });
+        .order('adjusted_value', { ascending: false });
 
       if (error) throw error;
-      return data || [];
+      return (data || []).map(normalizePlayerValue);
     } catch (error) {
       console.error('Error fetching rookies:', error);
       return [];
