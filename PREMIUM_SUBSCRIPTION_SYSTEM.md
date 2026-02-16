@@ -1,6 +1,6 @@
 # Premium Subscription System
 
-A complete monetization system with Stripe integration, feature gating, and trial management. Free users get core value while Pro members unlock advanced features for $7/month.
+A complete monetization system with Stripe integration, feature gating, and trial management. Free users get core value while Pro members unlock advanced features for $2.99/month.
 
 ## Overview
 
@@ -16,7 +16,7 @@ This system transforms your dynasty fantasy platform from a free tool into a sus
 - 1 league import ✅
 - Player value history ✅
 
-**Pro Tier** ($7/month):
+**Pro Tier** ($2.99/month):
 - Everything in Free, plus:
 - Unlimited trade calculations
 - Unlimited league imports
@@ -661,7 +661,7 @@ Users automatically downgraded to free when trial ends.
 5. **Simplicity:**
    - One-click Stripe checkout
    - No commitment (cancel anytime)
-   - Low price ($7/month)
+   - Low price ($2.99/month)
 
 ### 8. Revenue Projections
 
@@ -672,7 +672,7 @@ Users automatically downgraded to free when trial ends.
 | Monthly Signups | 1,000 |
 | Trial Conversion Rate | 10% |
 | Monthly Pro Subscribers | 100 |
-| Revenue per Sub | $7/month |
+| Revenue per Sub | $2.99/month |
 | **Monthly Recurring Revenue** | **$700** |
 | Annual Run Rate | $8,400 |
 
@@ -747,7 +747,7 @@ APP_URL=https://your-app.com
 
 1. Create Stripe account
 2. Create product: "Fantasy Draft Pros - Pro"
-3. Create price: $7/month, recurring
+3. Create price: $2.99/month, recurring
 4. Copy Price ID → `STRIPE_PRICE_ID`
 5. Get API keys → `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`
 6. Set up webhook → `STRIPE_WEBHOOK_SECRET`
@@ -940,7 +940,7 @@ You now have a complete premium subscription system with:
 ✅ **Usage Limits** - Daily tracking and enforcement
 ✅ **UI Components** - Badges, locks, modals, meters
 ✅ **Pricing Page** - Full comparison and FAQ
-✅ **Revenue Model** - $7/month sustainable business
+✅ **Revenue Model** - $2.99/month sustainable business
 
 **Business Impact:**
 

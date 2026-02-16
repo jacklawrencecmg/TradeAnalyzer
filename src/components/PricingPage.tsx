@@ -13,24 +13,12 @@ export default function PricingPage({ onBack }: PricingPageProps) {
   const [loading, setLoading] = useState(false);
   const { subscription, isPro } = useSubscription();
 
-  const handleUpgrade = async () => {
-    try {
-      setLoading(true);
-      const url = await createCheckoutSession(
-        window.location.origin + '/dashboard?upgrade=success',
-        window.location.origin + '/dashboard?upgrade=canceled'
-      );
-
-      if (url) {
-        window.location.href = url;
-      } else {
-        alert('Failed to create checkout session. Please try again.');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      alert('An error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+  const handleUpgrade = () => {
+    const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK;
+    if (stripeLink) {
+      window.location.href = stripeLink;
+    } else {
+      alert('Payment link not configured. Please contact support.');
     }
   };
 
@@ -167,7 +155,7 @@ export default function PricingPage({ onBack }: PricingPageProps) {
                 <ProBadge size="md" />
               </div>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-4xl font-bold text-gray-900">$7</span>
+                <span className="text-4xl font-bold text-gray-900">$2.99</span>
                 <span className="text-gray-600">/month</span>
               </div>
               <p className="text-gray-700">
@@ -192,10 +180,10 @@ export default function PricingPage({ onBack }: PricingPageProps) {
 
               <button
                 onClick={handleUpgrade}
-                disabled={loading || isPro}
+                disabled={isPro}
                 className="w-full mt-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
-                {loading ? 'Loading...' : isPro ? 'Current Plan' : 'Start Free Trial'}
+                {isPro ? 'Current Plan' : 'Start Free Trial'}
               </button>
 
               <p className="text-center text-xs text-gray-500 mt-4">
@@ -219,7 +207,7 @@ export default function PricingPage({ onBack }: PricingPageProps) {
             <div>
               <h4 className="font-bold text-blue-900 mb-1">What happens after the free trial?</h4>
               <p className="text-blue-800">
-                After 7 days, you'll be charged $7/month. You can cancel before the trial ends to avoid being charged.
+                After 7 days, you'll be charged $2.99/month. You can cancel before the trial ends to avoid being charged.
               </p>
             </div>
             <div>

@@ -11,24 +11,12 @@ interface UpgradeModalProps {
 export default function UpgradeModal({ onClose, feature }: UpgradeModalProps) {
   const [loading, setLoading] = useState(false);
 
-  const handleUpgrade = async () => {
-    try {
-      setLoading(true);
-      const url = await createCheckoutSession(
-        window.location.origin + '/dashboard?upgrade=success',
-        window.location.origin + '/dashboard?upgrade=canceled'
-      );
-
-      if (url) {
-        window.location.href = url;
-      } else {
-        alert('Failed to create checkout session. Please try again.');
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      alert('An error occurred. Please try again.');
-    } finally {
-      setLoading(false);
+  const handleUpgrade = () => {
+    const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK;
+    if (stripeLink) {
+      window.location.href = stripeLink;
+    } else {
+      alert('Payment link not configured. Please contact support.');
     }
   };
 
@@ -67,7 +55,7 @@ export default function UpgradeModal({ onClose, feature }: UpgradeModalProps) {
         <div className="p-6">
           <div className="text-center mb-8">
             <div className="inline-flex items-baseline gap-2 mb-2">
-              <span className="text-5xl font-bold text-gray-900">$7</span>
+              <span className="text-5xl font-bold text-gray-900">$2.99</span>
               <span className="text-xl text-gray-600">/month</span>
             </div>
             <p className="text-gray-600">Cancel anytime. No long-term commitment.</p>
@@ -103,10 +91,9 @@ export default function UpgradeModal({ onClose, feature }: UpgradeModalProps) {
 
           <button
             onClick={handleUpgrade}
-            disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+            className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg"
           >
-            {loading ? 'Loading...' : 'Start 7-Day Free Trial'}
+            Start 7-Day Free Trial
           </button>
 
           <p className="text-center text-xs text-gray-500 mt-4">
