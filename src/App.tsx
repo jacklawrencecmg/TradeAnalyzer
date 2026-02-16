@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { AuthForm } from './components/AuthForm';
+import { LandingPage } from './components/LandingPage';
 import { Dashboard } from './components/Dashboard';
 import { SubscriptionGate } from './components/SubscriptionGate';
 import TradeAnalyzer from './components/TradeAnalyzer';
@@ -106,8 +106,8 @@ function AppContent() {
     return (
       <>
         <SafeModeBanner />
-        <AuthForm />
-        <FeedbackButton context={{ page: 'auth' }} />
+        <LandingPage />
+        <FeedbackButton context={{ page: 'landing' }} />
       </>
     );
   }

@@ -37,9 +37,10 @@ import UpgradeModal from './UpgradeModal';
 interface TradeAnalyzerProps {
   leagueId?: string;
   onTradeSaved?: () => void;
+  isGuest?: boolean;
 }
 
-export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerProps) {
+export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false }: TradeAnalyzerProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
   const { isPro } = useSubscription();
@@ -392,11 +393,12 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       return;
     }
 
-    // Check usage limit for non-pro users
-    if (user && !isPro) {
+    // Check usage limit for non-pro users (skip for guests)
+    if (!isGuest && user && !isPro) {
       const canUse = await checkUsageLimit(user.id, 'trade_calc', USAGE_LIMITS.free.trade_calc);
       if (!canUse) {
         showToast('Daily trade calculation limit reached. Upgrade to Pro for unlimited access!', 'error');
+        setShowUpgradeModal(true);
         return;
       }
     }
@@ -465,8 +467,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
       if (user) {
         await saveTrade(result);
-        // Track usage after successful analysis
-        await trackUsage(user.id, 'trade_calc');
+        // Track usage after successful analysis (skip for guests)
+        if (!isGuest) {
+          await trackUsage(user.id, 'trade_calc');
+        }
       }
       showToast('Trade analyzed successfully!', 'success');
     } catch (error) {
