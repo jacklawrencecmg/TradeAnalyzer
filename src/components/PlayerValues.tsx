@@ -42,7 +42,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   const [leagueFormat, setLeagueFormat] = useState<LeagueFormat>('dynasty');
   const [scoringFormat, setScoringFormat] = useState<ScoringFormat>('ppr');
   const [searchMinChars, setSearchMinChars] = useState(2);
-  const [searchMaxResults, setSearchMaxResults] = useState(10);
+  const [searchMaxResults, setSearchMaxResults] = useState(50);
   const [searchDebounceMs, setSearchDebounceMs] = useState(300);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -54,7 +54,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
         setLeagueFormat(settings.leagueFormat || 'dynasty');
         setScoringFormat(settings.scoringFormat || 'ppr');
         setSearchMinChars(settings.searchMinChars || 2);
-        setSearchMaxResults(settings.searchMaxResults || 10);
+        setSearchMaxResults(settings.searchMaxResults || 50);
         setSearchDebounceMs(settings.searchDebounceMs || 300);
       } catch (e) {
         console.error('Error loading settings:', e);
@@ -172,9 +172,22 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
           console.log('Searching for:', value.trim());
           const results = await playerValuesApi.searchPlayers(value.trim(), searchMaxResults);
           console.log('Search results:', results.length, 'players found');
-          setSuggestions(results);
 
-          if (results.length === 0) {
+          const uniqueResults = results.reduce((acc: PlayerValue[], current) => {
+            const isDuplicate = acc.some(item => item.player_id === current.player_id);
+            if (!isDuplicate) {
+              acc.push(current);
+            }
+            return acc;
+          }, []);
+
+          if (uniqueResults.length !== results.length) {
+            console.log(`Removed ${results.length - uniqueResults.length} duplicate players`);
+          }
+
+          setSuggestions(uniqueResults);
+
+          if (uniqueResults.length === 0) {
             console.log('No results found. Database may be empty.');
           }
         } catch (error) {
@@ -472,9 +485,9 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                   <input
                     type="number"
                     min="5"
-                    max="50"
+                    max="100"
                     value={searchMaxResults}
-                    onChange={(e) => setSearchMaxResults(parseInt(e.target.value) || 10)}
+                    onChange={(e) => setSearchMaxResults(parseInt(e.target.value) || 50)}
                     className="w-full px-3 py-2 bg-fdp-surface-1 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 outline-none"
                   />
                   <p className="text-xs text-fdp-text-3 mt-1">Maximum search results to show</p>
@@ -569,7 +582,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
             />
 
             {showSuggestions && (
-              <div className="absolute z-50 w-full mt-2 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-h-96 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-2 bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-xl max-h-[600px] overflow-y-auto">
                 {searchLoading ? (
                   <div className="px-4 py-6 text-center">
                     <div className="animate-spin w-6 h-6 border-2 border-fdp-accent-1 border-t-transparent rounded-full mx-auto mb-2"></div>

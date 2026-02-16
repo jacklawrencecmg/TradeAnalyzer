@@ -58,7 +58,7 @@ Deno.serve(async (req: Request) => {
       .eq('format', 'dynasty')
       .ilike('player_name', `%${searchTerm}%`)
       .order('adjusted_value', { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (error) {
       console.error('Database query error:', error);
