@@ -6,6 +6,8 @@ The Fantasy Football Trade Analyzer now pulls complete data from the Sleeper API
 
 All Sleeper API data is fetched and cached for optimal performance. The app intelligently uses your league's specific settings to provide accurate, contextual trade valuations.
 
+**Season Context**: The app pulls from the **2025 completed season** by default (configurable via `SEASON_CONTEXT.last_completed_season`). This ensures you're analyzing actual roster data, not preseason rosters. The system automatically pulls the most recently completed season with full roster and transaction data.
+
 ## Features
 
 ### 📋 League Overview Dashboard
@@ -163,8 +165,8 @@ All existing features now use league-specific data:
 ```python
 {
   'name': 'My Dynasty League',
-  'season': '2026',
-  'status': 'in_season',
+  'season': '2025',  # Currently pulling 2025 completed season
+  'status': 'complete',
   'scoring_settings': {
     'rec': 1.0,  # Full PPR
     'pass_td': 6,  # 6pt passing TDs

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
+import { SEASON_CONTEXT } from '../config/seasonContext';
 import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload, Radio, Zap, ChevronRight, AlertCircle, X } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
@@ -590,7 +591,7 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
       const userData = await userRes.json();
       const userId = userData.user_id;
 
-      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/2024`);
+      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${SEASON_CONTEXT.last_completed_season}`);
       if (!leaguesRes.ok) {
         setError('Failed to fetch leagues');
         setLoading(false);

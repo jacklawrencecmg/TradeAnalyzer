@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Users, ChevronRight, AlertCircle, Loader } from 'lucide-react';
+import { SEASON_CONTEXT } from '../config/seasonContext';
 
 interface SleeperLeague {
   league_id: string;
@@ -43,7 +44,7 @@ export default function SleeperImport({ onLeagueSelected }: SleeperImportProps) 
       const userData = await userRes.json();
       const userId = userData.user_id;
 
-      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/2024`);
+      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${SEASON_CONTEXT.last_completed_season}`);
 
       if (!leaguesRes.ok) {
         setError('Failed to fetch leagues');

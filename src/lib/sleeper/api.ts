@@ -1,3 +1,5 @@
+import { SEASON_CONTEXT } from '../../config/seasonContext';
+
 const SLEEPER_BASE_URL = 'https://api.sleeper.app/v1';
 
 interface SleeperUser {
@@ -65,7 +67,7 @@ export async function getSleeperUser(username: string): Promise<SleeperUser | nu
   }
 }
 
-export async function getUserLeagues(userId: string, season: string = '2026'): Promise<SleeperLeague[]> {
+export async function getUserLeagues(userId: string, season: string = SEASON_CONTEXT.last_completed_season.toString()): Promise<SleeperLeague[]> {
   try {
     const response = await fetch(`${SLEEPER_BASE_URL}/user/${userId}/leagues/nfl/${season}`);
     if (!response.ok) return [];
