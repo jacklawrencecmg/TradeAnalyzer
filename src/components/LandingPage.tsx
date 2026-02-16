@@ -222,8 +222,11 @@ export function LandingPage() {
             />
           </div>
           <h1 className="text-5xl font-bold text-fdp-text-1 mb-3">Fantasy Draft Pros</h1>
-          <p className="text-xl text-fdp-text-2 mb-6">
+          <p className="text-xl text-fdp-text-2 mb-2">
             Dynasty Trade Analyzer & Player Values
+          </p>
+          <p className="text-lg text-fdp-accent-1 font-semibold mb-6">
+            World's First Offensive Player + IDP + FAAB + Pick - Trade Analyzer
           </p>
           <div className="flex gap-4 justify-center">
             <button
