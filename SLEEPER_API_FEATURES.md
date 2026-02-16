@@ -163,7 +163,7 @@ All existing features now use league-specific data:
 ```python
 {
   'name': 'My Dynasty League',
-  'season': '2025',
+  'season': '2026',
   'status': 'in_season',
   'scoring_settings': {
     'rec': 1.0,  # Full PPR

@@ -217,7 +217,7 @@ def get_future_picks_inventory(league_id: str, league_details: Dict, rosters: Li
     if not league_details or not rosters or not users:
         return pd.DataFrame()
 
-    current_season = int(league_details.get('season', datetime.now().year))
+    current_season = int(league_details.get('season', 2026))
     num_teams = len(rosters)
     num_rounds = league_details.get('settings', {}).get('draft_rounds', 3)
 

@@ -71,7 +71,8 @@ function shouldIncludePlayer(player: SleeperPlayer): boolean {
     return false;
   }
 
-  const currentYear = new Date().getFullYear();
+  // Use 2026 as the current league year (2025 season just completed)
+  const currentYear = 2026;
   const yearsAgo = currentYear - (player.years_exp || 0);
 
   if (player.status === 'Retired' && yearsAgo > 2) {
@@ -95,7 +96,8 @@ function shouldIncludePlayer(player: SleeperPlayer): boolean {
 }
 
 function getRookieYear(player: SleeperPlayer): number | null {
-  const currentYear = new Date().getFullYear();
+  // Use 2026 as the current league year (2025 season just completed)
+  const currentYear = 2026;
 
   if (player.years_exp === 0) {
     return currentYear;

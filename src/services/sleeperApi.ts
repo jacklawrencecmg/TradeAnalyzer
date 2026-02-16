@@ -267,9 +267,8 @@ export async function fetchPlayerValues(
   leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
   scoringFormat: 'ppr' | 'half' | 'standard' = 'ppr'
 ): Promise<void> {
-  const currentYear = new Date().getFullYear();
-  // Use 2026 as the current league year (2025 season just completed)
-  const targetYear = currentYear >= 2026 ? currentYear : 2026;
+  // Use the current league year from SEASON_CONTEXT
+  const targetYear = SEASON_CONTEXT.league_year;
   const format = isSuperflex ? 2 : 1;
   const cacheKey = `fdp_values_${targetYear}_${format}_${leagueFormat}_${scoringFormat}`;
   const dbCacheKey = `db_player_values_${leagueFormat}_${scoringFormat}`;
@@ -390,7 +389,8 @@ export function getDraftPickValue(
     return ktcValueSource[earlyPickKey];
   }
 
-  const currentYear = new Date().getFullYear();
+  // Use the current league year from SEASON_CONTEXT
+  const currentYear = SEASON_CONTEXT.league_year;
   const yearDiff = year - currentYear;
   const totalRounds = settings?.totalRounds || 4;
 
