@@ -66,23 +66,41 @@ export default function PlayerSearch({
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/player-search?q=${encodeURIComponent(searchQuery)}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-        }
-      );
+      const url = `${supabaseUrl}/functions/v1/player-search?q=${encodeURIComponent(searchQuery)}`;
+      console.log(`[PlayerSearch] Searching for: "${searchQuery}"`);
+
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+      });
+
+      console.log(`[PlayerSearch] Response status: ${response.status}`);
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error(`[PlayerSearch] Error response: ${text}`);
+        setResults([]);
+        setShowResults(false);
+        return;
+      }
 
       const data = await response.json();
+      console.log(`[PlayerSearch] Response data:`, data);
 
       if (data.ok) {
-        setResults(data.results);
+        console.log(`[PlayerSearch] Found ${data.results?.length || 0} results`);
+        setResults(data.results || []);
         setShowResults(true);
+      } else {
+        console.warn(`[PlayerSearch] Search returned ok=false:`, data);
+        setResults([]);
+        setShowResults(false);
       }
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('[PlayerSearch] Search error:', error);
+      setResults([]);
+      setShowResults(false);
     } finally {
       setLoading(false);
     }

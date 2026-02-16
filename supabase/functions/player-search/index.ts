@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const cache = new Map<string, { data: any; timestamp: number }>();
-const CACHE_TTL = 60 * 1000;
+const CACHE_TTL = 5 * 1000;
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -35,6 +35,7 @@ Deno.serve(async (req: Request) => {
     const cacheKey = `search_${query}_${limit}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log(`Cache hit for query: ${query}`);
       return new Response(
         JSON.stringify(cached.data),
         {
@@ -49,6 +50,7 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     const searchTerm = query.trim().toLowerCase();
+    console.log(`Searching for: "${searchTerm}"`);
 
     const { data: players, error } = await supabase
       .from('latest_player_values')
@@ -59,8 +61,11 @@ Deno.serve(async (req: Request) => {
       .limit(50);
 
     if (error) {
+      console.error('Database query error:', error);
       throw error;
     }
+
+    console.log(`Found ${players?.length || 0} players matching "${searchTerm}"`);
 
     const matches = (players || [])
       .sort((a, b) => {
