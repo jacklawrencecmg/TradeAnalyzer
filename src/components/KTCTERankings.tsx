@@ -34,8 +34,15 @@ export default function KTCTERankings() {
     try {
       setLoading(true);
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       const response = await fetch(
-        `${supabaseUrl}/functions/v1/ktc-te-values?format=dynasty_sf`
+        `${supabaseUrl}/functions/v1/ktc-te-values?format=dynasty_sf`,
+        {
+          headers: {
+            'Authorization': `Bearer ${supabaseAnonKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
 
       if (!response.ok) {
