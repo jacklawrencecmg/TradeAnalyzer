@@ -8,19 +8,19 @@ export interface IDPPresetMultipliers {
 
 export const idpPresetMultipliers: Record<IDPScoringPreset, IDPPresetMultipliers> = {
   tackle_heavy: {
-    LB: 1.30,
-    DL: 0.95,
-    DB: 1.05,
+    LB: 1.65,
+    DL: 1.25,
+    DB: 1.35,
   },
   balanced: {
-    LB: 1.15,
-    DL: 1.05,
-    DB: 1.00,
+    LB: 1.50,
+    DL: 1.40,
+    DB: 1.30,
   },
   big_play: {
-    LB: 0.95,
-    DL: 1.25,
-    DB: 0.90,
+    LB: 1.25,
+    DL: 1.60,
+    DB: 1.20,
   },
 };
 

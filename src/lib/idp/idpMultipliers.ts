@@ -10,37 +10,37 @@ export interface IDPFormatMultipliers {
 
 export const idpMultipliers: Record<IDPFormat, IDPFormatMultipliers> = {
   dynasty_sf_idp: {
-    DL: 1.05,
-    LB: 1.10,
-    DB: 0.98,
+    DL: 1.35,
+    LB: 1.40,
+    DB: 1.25,
   },
   dynasty_1qb_idp: {
-    DL: 1.05,
-    LB: 1.10,
-    DB: 0.98,
+    DL: 1.35,
+    LB: 1.40,
+    DB: 1.25,
   },
   dynasty_sf_idp123: {
-    DL: 1.08,
-    LB: 1.12,
-    DB: 0.95,
+    DL: 1.40,
+    LB: 1.45,
+    DB: 1.22,
   },
 };
 
 export const scoringStyleMultipliers: Record<ScoringStyle, IDPFormatMultipliers> = {
   tackle_heavy: {
-    DL: 0.90,
-    LB: 1.25,
-    DB: 1.10,
+    DL: 1.10,
+    LB: 1.50,
+    DB: 1.35,
   },
   balanced: {
-    DL: 1.00,
-    LB: 1.00,
-    DB: 1.00,
+    DL: 1.25,
+    LB: 1.25,
+    DB: 1.25,
   },
   big_play: {
-    DL: 1.15,
-    LB: 0.95,
-    DB: 1.05,
+    DL: 1.45,
+    LB: 1.20,
+    DB: 1.30,
   },
 };
 
