@@ -50,12 +50,10 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     const { data: latestSnapshot, error: latestError } = await supabase
-      .from('ktc_value_snapshots')
+      .from('latest_player_values')
       .select('player_id, full_name, position, team, ktc_value, fdp_value, position_rank, captured_at')
       .eq('player_id', playerId)
       .eq('format', format)
-      .order('captured_at', { ascending: false })
-      .limit(1)
       .maybeSingle();
 
     if (latestError) {
