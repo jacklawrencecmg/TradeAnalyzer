@@ -125,22 +125,26 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    const { data: allSnapshots, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, ktc_value, fdp_value, captured_at')
-      .eq('format', format)
-      .order('captured_at', { ascending: false });
+    const { data: players, error } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, adjusted_value, market_value')
+      .eq('format', format === 'dynasty_sf' ? 'dynasty' : format);
 
     if (error) {
       throw error;
     }
 
     const latestByPlayer = new Map<string, PlayerValue>();
-    for (const snapshot of allSnapshots || []) {
-      const key = `${snapshot.full_name}_${snapshot.position}`;
-      if (!latestByPlayer.has(key)) {
-        latestByPlayer.set(key, snapshot);
-      }
+    for (const player of players || []) {
+      const key = `${player.player_name}_${player.position}`;
+      latestByPlayer.set(key, {
+        player_id: player.player_id,
+        full_name: player.player_name,
+        position: player.position,
+        ktc_value: player.market_value,
+        fdp_value: player.adjusted_value,
+        captured_at: new Date().toISOString(),
+      });
     }
 
     const lookupPlayer = async (item: TradePlayer | string) => {

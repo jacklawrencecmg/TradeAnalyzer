@@ -28,6 +28,10 @@ import { getCurrentPhaseInfo, getPhaseEmoji } from '../lib/picks/seasonPhase';
 import { getMultiplierPercentage } from '../lib/picks/phaseMultipliers';
 import { evaluateTrade, type TradeAsset, type TradeEvaluationResult } from '../lib/trade/evaluateTrade';
 import TradeFairnessWarning from './TradeFairnessWarning';
+import { trackUsage, checkUsageLimit, USAGE_LIMITS } from '../lib/subscription';
+import { useSubscription } from '../hooks/useSubscription';
+import UsageMeter from './UsageMeter';
+import UpgradeModal from './UpgradeModal';
 
 interface TradeAnalyzerProps {
   leagueId?: string;
@@ -37,6 +41,7 @@ interface TradeAnalyzerProps {
 export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { isPro } = useSubscription();
   const [players, setPlayers] = useState<Record<string, SleeperPlayer>>({});
   const [searchTermA, setSearchTermA] = useState('');
   const [searchTermB, setSearchTermB] = useState('');
@@ -72,6 +77,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
   const [leagueFormat, setLeagueFormat] = useState<'dynasty' | 'redraft'>('dynasty');
   const [scoringFormat, setScoringFormat] = useState<'ppr' | 'half' | 'standard'>('ppr');
   const [syncingValues, setSyncingValues] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
     loadPlayers();
@@ -385,6 +391,15 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
       return;
     }
 
+    // Check usage limit for non-pro users
+    if (user && !isPro) {
+      const canUse = await checkUsageLimit(user.id, 'trade_calc', USAGE_LIMITS.free.trade_calc);
+      if (!canUse) {
+        showToast('Daily trade calculation limit reached. Upgrade to Pro for unlimited access!', 'error');
+        return;
+      }
+    }
+
     setAnalyzing(true);
     try {
       const result = await analyzeTrade(
@@ -449,6 +464,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
       if (user) {
         await saveTrade(result);
+        // Track usage after successful analysis
+        await trackUsage(user.id, 'trade_calc');
       }
       showToast('Trade analyzed successfully!', 'success');
     } catch (error) {
@@ -706,6 +723,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
 
   return (
     <div className="space-y-6">
+      {user && !isPro && (
+        <UsageMeter feature="trade_calc" onUpgrade={() => setShowUpgradeModal(true)} />
+      )}
+
       <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-lg border border-gray-700 p-6 shadow-xl">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-white flex items-center gap-2">
@@ -1871,6 +1892,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved }: TradeAnalyzerP
             </div>
           )}
         </div>
+      )}
+
+      {showUpgradeModal && (
+        <UpgradeModal onClose={() => setShowUpgradeModal(false)} />
       )}
     </div>
   );
