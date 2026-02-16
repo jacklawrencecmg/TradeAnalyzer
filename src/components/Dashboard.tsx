@@ -121,16 +121,20 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     if (!user) return;
 
     try {
-      const { error } = await supabase.from('user_leagues').insert({
-        user_id: user.id,
-        league_id: leagueId,
-        league_name: leagueName || `League ${leagueId}`,
-        team_name: teamName,
-        is_superflex: isSuperflex,
-        is_active: true,
-        platform: platform,
-        platform_settings: platformSettings || {},
-      });
+      const { error } = await supabase.from('user_leagues')
+        .upsert({
+          user_id: user.id,
+          league_id: leagueId,
+          league_name: leagueName || `League ${leagueId}`,
+          team_name: teamName,
+          is_superflex: isSuperflex,
+          is_active: true,
+          platform: platform,
+          platform_settings: platformSettings || {},
+        }, {
+          onConflict: 'user_id,league_id',
+          ignoreDuplicates: false
+        });
 
       if (error) throw error;
 
@@ -139,11 +143,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} league added successfully!`, 'success');
     } catch (error: any) {
       console.error('Error adding league:', error);
-      if (error.message?.includes('duplicate')) {
-        showToast('This league is already saved to your account.', 'error');
-      } else {
-        showToast('Failed to add league. Please try again.', 'error');
-      }
+      showToast('Failed to add league. Please try again.', 'error');
     }
   };
 
