@@ -277,18 +277,20 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
         player_name: playerData.full_name || `${playerData.first_name} ${playerData.last_name}`,
         position: playerData.position,
         team: playerData.team || null,
+        format: isSuperflex ? 'superflex' : 'standard',
         base_value: parseFloat((adjustedValue * 0.95).toFixed(0)),
-        fdp_value: parseFloat(adjustedValue.toFixed(0)),
-        trend: trend,
-        last_updated: new Date().toISOString(),
-        injury_status: playerData.injury_status?.toLowerCase() || null,
-        age: playerData.age || null,
-        years_experience: playerData.years_exp || null,
+        adjusted_value: parseFloat(adjustedValue.toFixed(0)),
+        market_value: parseFloat(adjustedValue.toFixed(0)),
+        source: 'fantasy_draft_pros',
+        confidence_score: 0.85,
+        updated_at: new Date().toISOString(),
         metadata: {
-          source: 'fantasy_draft_pros_normalized',
+          trend: trend,
           is_superflex: isSuperflex,
           sleeper_status: playerData.status,
-          sleeper_injury_status: playerData.injury_status,
+          injury_status: playerData.injury_status?.toLowerCase() || null,
+          age: playerData.age || null,
+          years_experience: playerData.years_exp || null,
           original_fdp_value: fdpData.value,
           backup_qb_applied: playerData.position === 'QB' && isKnownBackup,
           rookie_penalty_applied: isRookie && playerData.position !== 'QB',
@@ -302,7 +304,7 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
       const group = positionGroups[position];
       if (group.length === 0) return;
 
-      group.sort((a, b) => b.fdp_value - a.fdp_value);
+      group.sort((a, b) => b.adjusted_value - a.adjusted_value);
 
       const positionMultipliers: Record<string, number> = {
         QB: isSuperflex ? 1.0 : 0.75,
@@ -315,15 +317,23 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
 
       group.forEach((player, index) => {
         const tierBonus = index < 5 ? 1.15 : index < 12 ? 1.1 : index < 24 ? 1.05 : 1.0;
-        player.fdp_value = parseFloat((player.fdp_value * multiplier * tierBonus).toFixed(0));
-        player.base_value = parseFloat((player.fdp_value * 0.95).toFixed(0));
+        player.adjusted_value = parseFloat((player.adjusted_value * multiplier * tierBonus).toFixed(0));
+        player.market_value = player.adjusted_value;
+        player.base_value = parseFloat((player.adjusted_value * 0.95).toFixed(0));
+        player.rank_position = index + 1;
         playerValues.push(player);
       });
     });
 
+    // Calculate overall rankings
+    playerValues.sort((a, b) => b.adjusted_value - a.adjusted_value);
+    playerValues.forEach((player, index) => {
+      player.rank_overall = index + 1;
+    });
+
     if (playerValues.length > 0) {
       const { error } = await supabase
-        .from('player_values')
+        .from('latest_player_values')
         .upsert(playerValues, { onConflict: 'player_id' });
 
       if (error) {
@@ -332,9 +342,9 @@ export async function syncPlayerValuesToDatabase(isSuperflex: boolean = false): 
       }
 
       const topPlayers = playerValues
-        .sort((a, b) => b.fdp_value - a.fdp_value)
+        .sort((a, b) => b.adjusted_value - a.adjusted_value)
         .slice(0, 10)
-        .map(p => `${p.player_name} (${p.position}): ${p.fdp_value}`);
+        .map(p => `${p.player_name} (${p.position}): ${p.adjusted_value}`);
 
       console.log(`Successfully synced ${playerValues.length} player values to database`);
       console.log('Top 10 player values:', topPlayers);
