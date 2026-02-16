@@ -54,8 +54,8 @@ Deno.serve(async (req: Request) => {
     const playerDataPromises = uniquePlayerIds.map(async (playerId) => {
       const [valuesResult, trendsResult, snapshotsResult] = await Promise.all([
         supabase
-          .from('player_values')
-          .select('player_id, full_name, position, team, fdp_value, rb_context')
+          .from('latest_player_values')
+          .select('player_id, player_name, position, team, adjusted_value, metadata')
           .eq('player_id', playerId)
           .maybeSingle(),
 
@@ -83,14 +83,14 @@ Deno.serve(async (req: Request) => {
       const trend = trendsResult.data;
       const snapshot = snapshotsResult.data;
 
-      const value_now = player.fdp_value || 0;
+      const value_now = player.adjusted_value || 0;
       const value_7d = snapshot?.fdp_value || value_now;
       const change_7d = value_now - value_7d;
       const change_7d_pct = value_7d > 0 ? ((change_7d / value_7d) * 100) : 0;
 
       return {
         player_id: player.player_id,
-        player_name: player.full_name,
+        player_name: player.player_name,
         position: player.position,
         team: player.team,
         value_now,

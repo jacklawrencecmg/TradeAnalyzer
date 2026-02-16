@@ -86,8 +86,8 @@ Deno.serve(async (req: Request) => {
     users.forEach((user: any) => userMap.set(user.user_id, user));
 
     const { data: allPlayers, error: playersError } = await supabase
-      .from('player_values')
-      .select('player_id, full_name, position, age, fdp_value, team');
+      .from('latest_player_values')
+      .select('player_id, player_name, position, metadata, adjusted_value, team');
 
     if (playersError) {
       throw new Error(`Failed to fetch players: ${playersError.message}`);
@@ -97,10 +97,10 @@ Deno.serve(async (req: Request) => {
     allPlayers?.forEach((p: any) => {
       playerMap.set(p.player_id, {
         player_id: p.player_id,
-        full_name: p.full_name,
+        full_name: p.player_name,
         position: p.position,
-        age: p.age,
-        fdp_value: p.fdp_value || 0,
+        age: p.metadata?.age || null,
+        fdp_value: p.adjusted_value || 0,
         team: p.team,
       });
     });

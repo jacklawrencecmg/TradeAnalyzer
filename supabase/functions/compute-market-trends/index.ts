@@ -89,8 +89,8 @@ Deno.serve(async (req: Request) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
     const { data: players, error: playersError } = await supabase
-      .from('player_values')
-      .select('player_id, full_name, position, team, fdp_value');
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, adjusted_value');
 
     if (playersError) {
       throw new Error(`Failed to fetch players: ${playersError.message}`);
@@ -137,7 +137,7 @@ Deno.serve(async (req: Request) => {
           (a, b) => new Date(b.snapshot_date).getTime() - new Date(a.snapshot_date).getTime()
         );
 
-        const valueNow = sorted[0].fdp_value;
+        const valueNow = sorted.length > 0 ? sorted[0].fdp_value : player.adjusted_value;
         if (valueNow < 500) continue;
 
         const value7d = interpolateValue(playerSnapshots, 7);
@@ -188,7 +188,7 @@ Deno.serve(async (req: Request) => {
 
         trends.push({
           player_id: player.player_id,
-          player_name: player.full_name,
+          player_name: player.player_name,
           player_position: player.position,
           team: player.team,
           value_now: Math.round(valueNow),
