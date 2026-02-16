@@ -14,10 +14,11 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import Footer from './components/Footer';
 import { FAQ } from './components/FAQ';
 import { Help } from './components/Help';
+import { Contact } from './components/Contact';
 import { FeedbackButton } from './components/FeedbackButton';
 import { LogIn } from 'lucide-react';
 
-type Page = 'home' | 'faq' | 'help' | 'top1000';
+type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -125,6 +126,18 @@ function AppContent() {
           <Help onClose={() => setCurrentPage('home')} />
           <FeedbackButton context={{ page: 'help' }} />
         </>
+      ) : currentPage === 'contact' ? (
+        <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 py-12 px-4">
+          <SafeModeBanner />
+          <button
+            onClick={() => setCurrentPage('home')}
+            className="mb-6 text-fdp-text-2 hover:text-fdp-text-1 transition-colors"
+          >
+            ← Back to Dashboard
+          </button>
+          <Contact />
+          <FeedbackButton context={{ page: 'contact' }} />
+        </div>
       ) : (
         <>
           <SafeModeBanner />

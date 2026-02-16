@@ -2,7 +2,7 @@ import React from 'react';
 import { Facebook, Instagram } from 'lucide-react';
 
 interface FooterProps {
-  onNavigate?: (page: 'home' | 'faq' | 'help') => void;
+  onNavigate?: (page: 'home' | 'faq' | 'help' | 'contact') => void;
 }
 
 export default function Footer({ onNavigate }: FooterProps) {
@@ -18,12 +18,12 @@ export default function Footer({ onNavigate }: FooterProps) {
             </div>
 
             <div className="flex items-center gap-6 text-sm">
-              <a
-                href="mailto:contact@fantasydraftpros.com"
+              <button
+                onClick={() => onNavigate?.('contact')}
                 className="text-fdp-text-2 hover:text-fdp-accent-1 transition-colors"
               >
                 Contact Us
-              </a>
+              </button>
               <button
                 onClick={() => onNavigate?.('faq')}
                 className="text-fdp-text-2 hover:text-fdp-accent-1 transition-colors"
