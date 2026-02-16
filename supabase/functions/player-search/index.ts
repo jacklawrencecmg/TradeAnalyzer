@@ -50,44 +50,35 @@ Deno.serve(async (req: Request) => {
 
     const searchTerm = query.trim().toLowerCase();
 
-    const { data: allSnapshots, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, team, ktc_value, fdp_value, captured_at')
-      .eq('format', 'dynasty_sf')
-      .order('captured_at', { ascending: false });
+    const { data: players, error } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, adjusted_value, market_value')
+      .eq('format', 'dynasty')
+      .ilike('player_name', `%${searchTerm}%`)
+      .order('adjusted_value', { ascending: false })
+      .limit(50);
 
     if (error) {
       throw error;
     }
 
-    const latestByPlayer = new Map<string, any>();
-    for (const snapshot of allSnapshots || []) {
-      if (!latestByPlayer.has(snapshot.player_id)) {
-        latestByPlayer.set(snapshot.player_id, snapshot);
-      }
-    }
-
-    const matches = Array.from(latestByPlayer.values())
-      .filter((player) => {
-        const name = player.full_name.toLowerCase();
-        return name.includes(searchTerm) || searchTerm.includes(name.split(' ')[0]);
-      })
+    const matches = (players || [])
       .sort((a, b) => {
-        const aName = a.full_name.toLowerCase();
-        const bName = b.full_name.toLowerCase();
+        const aName = a.player_name.toLowerCase();
+        const bName = b.player_name.toLowerCase();
 
         if (aName.startsWith(searchTerm)) return -1;
         if (bName.startsWith(searchTerm)) return 1;
 
-        return b.fdp_value - a.fdp_value;
+        return b.adjusted_value - a.adjusted_value;
       })
       .slice(0, limit)
       .map((player) => ({
         id: player.player_id,
-        name: player.full_name,
+        name: player.player_name,
         position: player.position,
         team: player.team,
-        value: player.fdp_value,
+        value: player.adjusted_value,
       }));
 
     const result = { ok: true, results: matches };
