@@ -124,6 +124,17 @@ export default function TeamAdvice({ leagueId, sleeperLeagueId, rosterId }: Team
           icon: TrendingDown,
           description: 'Focus on the future. Acquire picks and young talent for sustained success.',
         };
+      default:
+        return {
+          label: 'RETOOL',
+          color: 'yellow',
+          bgGradient: 'from-yellow-500 to-orange-500',
+          bgLight: 'bg-yellow-50',
+          textColor: 'text-yellow-700',
+          borderColor: 'border-yellow-200',
+          icon: Minus,
+          description: 'Balance present and future. Strategic moves can push you into contention.',
+        };
     }
   };
 
