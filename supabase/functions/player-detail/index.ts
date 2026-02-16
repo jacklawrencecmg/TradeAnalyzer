@@ -23,7 +23,10 @@ Deno.serve(async (req: Request) => {
     const format = url.searchParams.get('format') || 'dynasty_sf';
     const daysBack = parseInt(url.searchParams.get('days') || '180', 10);
 
+    console.log('Player detail request:', { playerId, format, daysBack });
+
     if (!playerId) {
+      console.error('No player ID provided');
       return new Response(
         JSON.stringify({ ok: false, error: 'Player ID required' }),
         {
@@ -49,6 +52,8 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+    console.log('Fetching latest snapshot for player:', playerId);
+
     const { data: latestSnapshot, error: latestError } = await supabase
       .from('ktc_value_snapshots')
       .select('player_id, full_name, position, team, ktc_value, fdp_value, position_rank, captured_at')
@@ -59,10 +64,14 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (latestError) {
+      console.error('Error fetching latest snapshot:', latestError);
       throw latestError;
     }
 
+    console.log('Latest snapshot:', latestSnapshot);
+
     if (!latestSnapshot) {
+      console.error('No snapshot found for player:', playerId);
       return new Response(
         JSON.stringify({ ok: false, error: 'Player not found' }),
         {
@@ -75,6 +84,8 @@ Deno.serve(async (req: Request) => {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - daysBack);
 
+    console.log('Fetching history data since:', cutoffDate.toISOString());
+
     const { data: historyData, error: historyError } = await supabase
       .from('ktc_value_snapshots')
       .select('captured_at, ktc_value, fdp_value')
@@ -84,8 +95,11 @@ Deno.serve(async (req: Request) => {
       .order('captured_at', { ascending: true });
 
     if (historyError) {
+      console.error('Error fetching history:', historyError);
       throw historyError;
     }
+
+    console.log('History data points:', historyData?.length || 0);
 
     let history = historyData || [];
 
@@ -200,10 +214,17 @@ Deno.serve(async (req: Request) => {
     );
   } catch (error) {
     console.error('Error in player-detail function:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
+
     return new Response(
       JSON.stringify({
         ok: false,
         error: error instanceof Error ? error.message : 'Unknown error',
+        details: error instanceof Error ? error.stack : undefined,
       }),
       {
         status: 500,
