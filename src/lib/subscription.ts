@@ -33,7 +33,7 @@ export const PRO_FEATURES = [
 
 export const USAGE_LIMITS = {
   free: {
-    trade_calc: 10,
+    trade_calc: 3,
     league_import: 1,
   },
   pro: {

@@ -83,7 +83,7 @@ export default function UpgradeModal({ onClose, feature }: UpgradeModalProps) {
             <h3 className="font-bold text-blue-900 mb-2">Free Tier Keeps:</h3>
             <ul className="text-sm text-blue-800 space-y-1">
               <li>• Rankings and player values</li>
-              <li>• Basic trade calculator (10/day)</li>
+              <li>• Basic trade calculator (3/day)</li>
               <li>• Player search and profiles</li>
               <li>• Weekly market reports</li>
             </ul>

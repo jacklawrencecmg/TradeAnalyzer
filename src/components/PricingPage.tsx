@@ -27,7 +27,7 @@ export default function PricingPage({ onBack }: PricingPageProps) {
       { name: 'Player search and profiles', included: true },
       { name: 'Dynasty rankings', included: true },
       { name: 'Weekly market reports', included: true },
-      { name: 'Basic trade calculator', included: true, note: '10/day' },
+      { name: 'Basic trade calculator', included: true, note: '3/day' },
       { name: 'League import', included: true, note: '1 league' },
       { name: 'Player value history', included: true },
       { name: 'Trade suggestions', included: false },
