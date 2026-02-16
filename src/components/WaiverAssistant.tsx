@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, Search, Star, X, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getPlayerValueById as getPlayerValue, getLeagueRosters, fetchPlayerValues } from '../services/sleeperApi';
+import { getPlayerValueById as getPlayerValue, getLeagueRosters, fetchPlayerValues, clearPlayerValuesCache, fetchAllPlayers } from '../services/sleeperApi';
 import { PlayerAvatar } from './PlayerAvatar';
 import { StatSparkline } from './StatSparkline';
 import { AchievementBadge } from './AchievementBadge';
@@ -50,7 +50,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
   const forceRefreshValues = async () => {
     setRefreshing(true);
     try {
-      localStorage.clear();
+      clearPlayerValuesCache();
       await fetchPlayerValues();
       await loadRecommendations();
     } catch (error) {
@@ -72,7 +72,7 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
         return;
       }
 
-      const allPlayers = await fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json());
+      const allPlayers = await fetchAllPlayers();
       const rostered = new Set(rosters.flatMap((r: any) => r.players || []));
 
       const availablePlayers = Object.entries(allPlayers)
@@ -98,14 +98,26 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
 
       const playersToAnalyze = availablePlayers.slice(0, 300);
 
-      const withValues = await Promise.all(
+      // Batch fetch all player values at once
+      const playerValuesMap = new Map<string, number>();
+      await Promise.all(
         playersToAnalyze.map(async (player) => {
-          const value = await getPlayerValue(player.player_id);
-          const score = calculateRecommendationScore(player, userRoster, value);
-          const reasoning = generateReasoning(player, userRoster, value);
-          return { ...player, value, recommendation_score: score, reasoning };
+          try {
+            const value = await getPlayerValue(player.player_id);
+            playerValuesMap.set(player.player_id, value);
+          } catch (err) {
+            console.error(`Error fetching value for ${player.player_id}:`, err);
+            playerValuesMap.set(player.player_id, 0);
+          }
         })
       );
+
+      const withValues = playersToAnalyze.map((player) => {
+        const value = playerValuesMap.get(player.player_id) || 0;
+        const score = calculateRecommendationScore(player, userRoster, value);
+        const reasoning = generateReasoning(player, userRoster, value);
+        return { ...player, value, recommendation_score: score, reasoning };
+      });
 
       const topRecommendations = withValues
         .filter(p => p.value > 50)

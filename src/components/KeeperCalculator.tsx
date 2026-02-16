@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, TrendingUp, RefreshCw } from 'lucide-react';
-import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers } from '../services/sleeperApi';
+import { getLeagueRosters, getPlayerValueById as getPlayerValue, fetchLeagueUsers, fetchAllPlayers } from '../services/sleeperApi';
 
 interface KeeperPlayer {
   player_id: string;
@@ -86,14 +86,29 @@ export default function KeeperCalculator({ leagueId, rosterId }: KeeperCalculato
         return;
       }
 
-      const allPlayers = await fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json());
+      const allPlayers = await fetchAllPlayers();
 
-      const keeperPlayers = await Promise.all(
-        (userRoster.players || []).map(async (playerId: string) => {
+      // Batch fetch all player values at once
+      const playerIds = userRoster.players || [];
+      const playerValuesMap = new Map<string, number>();
+      await Promise.all(
+        playerIds.map(async (playerId: string) => {
+          try {
+            const value = await getPlayerValue(playerId);
+            playerValuesMap.set(playerId, value);
+          } catch (err) {
+            console.error(`Error fetching value for ${playerId}:`, err);
+            playerValuesMap.set(playerId, 0);
+          }
+        })
+      );
+
+      const keeperPlayers = playerIds
+        .map((playerId: string) => {
           const playerData = allPlayers[playerId];
           if (!playerData) return null;
 
-          const value = await getPlayerValue(playerId);
+          const value = playerValuesMap.get(playerId) || 0;
           const cost = defaultCost;
           const surplus = value - cost;
 
@@ -107,11 +122,9 @@ export default function KeeperCalculator({ leagueId, rosterId }: KeeperCalculato
             recommendation: surplus > 500 ? 'keep' : 'cut'
           } as KeeperPlayer;
         })
-      );
+        .filter((p): p is KeeperPlayer => p !== null);
 
-      const valid = keeperPlayers
-        .filter((p): p is KeeperPlayer => p !== null)
-        .sort((a, b) => b.surplus - a.surplus);
+      const valid = keeperPlayers.sort((a, b) => b.surplus - a.surplus);
 
       setPlayers(valid);
     } catch (error) {

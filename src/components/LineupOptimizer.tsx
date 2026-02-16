@@ -122,12 +122,27 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
 
       setRoster(userRoster);
 
-      const rosterPlayers = await Promise.all(
-        (userRoster.players || []).map(async (playerId: string) => {
+      // Batch fetch all player values at once
+      const playerIds = userRoster.players || [];
+      const playerValuesMap = new Map<string, number>();
+      await Promise.all(
+        playerIds.map(async (playerId: string) => {
+          try {
+            const value = await getPlayerValue(playerId, leagueSettings);
+            playerValuesMap.set(playerId, value);
+          } catch (err) {
+            console.error(`Error fetching value for ${playerId}:`, err);
+            playerValuesMap.set(playerId, 0);
+          }
+        })
+      );
+
+      const rosterPlayers = playerIds
+        .map((playerId: string) => {
           const playerData = allPlayers[playerId];
           if (!playerData) return null;
 
-          const value = await getPlayerValue(playerId, leagueSettings);
+          const value = playerValuesMap.get(playerId) || 0;
           return {
             player_id: playerId,
             name: playerData.full_name,
@@ -138,9 +153,9 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
             injury_status: playerData.injury_status
           };
         })
-      );
+        .filter((p): p is NonNullable<typeof p> => p !== null);
 
-      const validPlayers = rosterPlayers.filter(p => p !== null) as Player[];
+      const validPlayers = rosterPlayers as Player[];
       setPlayers(validPlayers);
 
       const currentLineup = buildCurrentLineup(userRoster, validPlayers);

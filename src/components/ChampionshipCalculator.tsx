@@ -43,12 +43,29 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
 
       const userMap = new Map(users.map(user => [user.user_id, user]));
 
-      const teamValues = await Promise.all(
-        rosters.map(async (roster: any) => {
+      // Collect all unique player IDs across all rosters
+      const allPlayerIds = new Set<string>();
+      rosters.forEach((roster: any) => {
+        (roster.players || []).forEach((id: string) => allPlayerIds.add(id));
+      });
+
+      // Batch fetch all player values at once
+      const playerValuesMap = new Map<string, number>();
+      await Promise.all(
+        Array.from(allPlayerIds).map(async (id) => {
+          try {
+            const value = await getPlayerValue(id);
+            playerValuesMap.set(id, value);
+          } catch (err) {
+            console.error(`Error fetching value for ${id}:`, err);
+            playerValuesMap.set(id, 0);
+          }
+        })
+      );
+
+      const teamValues = rosters.map((roster: any) => {
           const playerIds = roster.players || [];
-          const values = await Promise.all(
-            playerIds.map((id: string) => getPlayerValue(id))
-          );
+          const values = playerIds.map((id: string) => playerValuesMap.get(id) || 0);
           const totalValue = values.reduce((sum: number, val: number) => sum + val, 0);
 
           const positionalStrengths = { QB: 0, RB: 0, WR: 0, TE: 0 };
@@ -72,8 +89,7 @@ export default function ChampionshipCalculator({ leagueId }: ChampionshipCalcula
             points_for: roster.settings?.fpts || 0,
             positional_strengths: positionalStrengths
           };
-        })
-      );
+        });
 
       const totalLeagueValue = teamValues.reduce((sum, team) => sum + team.total_value, 0);
       const avgValue = totalLeagueValue / teamValues.length;

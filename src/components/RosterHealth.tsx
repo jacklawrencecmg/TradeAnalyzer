@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, AlertTriangle, CheckCircle, Calendar, Info } from 'lucide-react';
-import { getLeagueRosters } from '../services/sleeperApi';
+import { getLeagueRosters, fetchAllPlayers } from '../services/sleeperApi';
 import { sportsDataAPI } from '../services/sportsdataApi';
 import Tooltip from './Tooltip';
 import { PlayerAvatar } from './PlayerAvatar';
@@ -45,7 +45,7 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
       }
 
       const [allPlayers, sportsDataInjuries] = await Promise.all([
-        fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json()),
+        fetchAllPlayers(),
         sportsDataAPI.getInjuries().catch(() => [])
       ]);
 
@@ -60,10 +60,11 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
 
         let status: PlayerHealth['status'] = 'Healthy';
         const injuryStatus = sportsDataInjury?.Status || player.injury_status;
-        if (injuryStatus?.toLowerCase().includes('out') || injuryStatus?.toLowerCase() === 'ir') status = 'Out';
-        else if (injuryStatus?.toLowerCase().includes('doubtful')) status = 'Doubtful';
-        else if (injuryStatus?.toLowerCase().includes('questionable')) status = 'Questionable';
-        else if (injuryStatus?.toLowerCase() === 'ir') status = 'IR';
+        const injuryStatusLower = injuryStatus?.toLowerCase();
+        if (injuryStatusLower === 'ir') status = 'IR';
+        else if (injuryStatusLower?.includes('out')) status = 'Out';
+        else if (injuryStatusLower?.includes('doubtful')) status = 'Doubtful';
+        else if (injuryStatusLower?.includes('questionable')) status = 'Questionable';
 
         return {
           player_id: playerId,

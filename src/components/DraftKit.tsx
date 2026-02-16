@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clipboard, Star, Search } from 'lucide-react';
-import { getPlayerValueById as getPlayerValue } from '../services/sleeperApi';
+import { getPlayerValueById as getPlayerValue, fetchAllPlayers } from '../services/sleeperApi';
 import { supabase } from '../lib/supabase';
 import { PlayerAvatar } from './PlayerAvatar';
 import { StatSparkline } from './StatSparkline';
@@ -36,29 +36,40 @@ export default function DraftKit({ leagueId, userId }: DraftKitProps) {
   const loadDraftBoard = async () => {
     setLoading(true);
     try {
-      const allPlayers = await fetch('https://api.sleeper.app/v1/players/nfl').then(r => r.json());
+      const allPlayers = await fetchAllPlayers();
 
-      const playersWithValues = await Promise.all(
-        Object.entries(allPlayers)
-          .filter(([_, player]: [string, any]) =>
-            ['QB', 'RB', 'WR', 'TE'].includes(player.position) &&
-            player.status === 'Active'
-          )
-          .slice(0, 200)
-          .map(async ([id, player]: [string, any], index) => {
+      const eligiblePlayers = Object.entries(allPlayers)
+        .filter(([_, player]: [string, any]) =>
+          ['QB', 'RB', 'WR', 'TE'].includes(player.position) &&
+          player.status === 'Active'
+        )
+        .slice(0, 200);
+
+      // Batch fetch all player values at once
+      const playerValuesMap = new Map<string, number>();
+      await Promise.all(
+        eligiblePlayers.map(async ([id, _]: [string, any]) => {
+          try {
             const value = await getPlayerValue(id);
-            return {
-              player_id: id,
-              full_name: player.full_name || `${player.first_name} ${player.last_name}`,
-              position: player.position,
-              team: player.team || 'FA',
-              value,
-              rank: index + 1,
-              tier: Math.floor(index / 20) + 1,
-              age: player.age
-            };
-          })
+            playerValuesMap.set(id, value);
+          } catch (err) {
+            console.error(`Error fetching value for ${id}:`, err);
+            playerValuesMap.set(id, 0);
+          }
+        })
       );
+
+      const playersWithValues = eligiblePlayers
+        .map(([id, player]: [string, any], index) => ({
+          player_id: id,
+          full_name: player.full_name || `${player.first_name} ${player.last_name}`,
+          position: player.position,
+          team: player.team || 'FA',
+          value: playerValuesMap.get(id) || 0,
+          rank: index + 1,
+          tier: Math.floor(index / 20) + 1,
+          age: player.age
+        }));
 
       const ranked = playersWithValues
         .filter(p => p.value > 0)
