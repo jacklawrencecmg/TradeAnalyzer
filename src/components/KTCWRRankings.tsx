@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, TrendingUp, Award, Radio } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface WRValue {
   position_rank: number;
   full_name: string;
+  player_id?: string;
   team: string | null;
   value: number;
   captured_at: string;
@@ -123,7 +125,7 @@ export default function KTCWRRankings() {
             Wide Receiver Rankings
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Dynasty Superflex values from KeepTradeCut
+            Dynasty Superflex values from Fantasy Draft Pros
           </p>
         </div>
         <button
@@ -204,9 +206,13 @@ export default function KTCWRRankings() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-700 font-bold">
-                        {wr.full_name.split(' ').map((n) => n[0]).join('')}
-                      </div>
+                      <PlayerAvatar
+                        playerId={wr.player_id}
+                        playerName={wr.full_name}
+                        team={wr.team || undefined}
+                        position="WR"
+                        size="md"
+                      />
                       <div>
                         <div className="font-semibold text-gray-900">{wr.full_name}</div>
                         <div className="text-xs text-gray-500">Wide Receiver</div>

@@ -386,7 +386,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <h3 className="text-sm font-semibold text-fdp-text-3 mb-3">Data Management</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={RefreshCw} label="System Admin" shortLabel="Admin" tab="adminSync" activeTab={activeTab} onClick={setActiveTab} />
-                    <NavButton icon={Shield} label="KTC Admin Sync" shortLabel="KTC" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Shield} label="FDP Admin Sync" shortLabel="FDP" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Award} label="RB Rankings" shortLabel="RBs" tab="ktcRBRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Radio} label="WR Rankings" shortLabel="WRs" tab="ktcWRRankings" activeTab={activeTab} onClick={setActiveTab} />

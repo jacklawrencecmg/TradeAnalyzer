@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Award, AlertTriangle } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface RBValue {
   position_rank: number;
   full_name: string;
+  player_id?: string;
   team: string | null;
   ktc_value: number;
   fdp_value: number;
@@ -145,7 +147,7 @@ export default function KTCRBRankings() {
             Running Back Rankings
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            Dynasty Superflex values from KeepTradeCut
+            Dynasty Superflex values powered by Fantasy Draft Pros
           </p>
           {lastUpdated && (
             <p className="text-xs text-gray-500 mt-1">Last updated: {lastUpdated}</p>
@@ -219,7 +221,7 @@ export default function KTCRBRankings() {
                   Team
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  {showFdpValue ? 'FDP Value' : 'KTC Value'}
+                  {showFdpValue ? 'FDP Value' : 'Base Value'}
                 </th>
               </tr>
             </thead>
@@ -235,27 +237,36 @@ export default function KTCRBRankings() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{rb.full_name}</span>
-                        {hasAgeCliffWarning(rb.age) && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300">
-                            <AlertTriangle className="w-3 h-3" />
-                            Age {rb.age}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {getRoleBadge(rb.depth_role) && (
-                          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadge(rb.depth_role)!.color}`}>
-                            {getRoleBadge(rb.depth_role)!.label}
-                          </span>
-                        )}
-                        {rb.age && rb.age <= 24 && (
-                          <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
-                            Age {rb.age}
-                          </span>
-                        )}
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar
+                        playerId={rb.player_id}
+                        playerName={rb.full_name}
+                        team={rb.team || undefined}
+                        position="RB"
+                        size="md"
+                      />
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{rb.full_name}</span>
+                          {hasAgeCliffWarning(rb.age) && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 border border-red-300">
+                              <AlertTriangle className="w-3 h-3" />
+                              Age {rb.age}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getRoleBadge(rb.depth_role) && (
+                            <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium border ${getRoleBadge(rb.depth_role)!.color}`}>
+                              {getRoleBadge(rb.depth_role)!.label}
+                            </span>
+                          )}
+                          {rb.age && rb.age <= 24 && (
+                            <span className="inline-flex px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-300">
+                              Age {rb.age}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </td>
@@ -300,7 +311,7 @@ export default function KTCRBRankings() {
         <h3 className="font-semibold text-blue-900 mb-2">About RB Rankings & FDP Values</h3>
         <div className="space-y-2 text-sm text-blue-800">
           <p>
-            Running back values are synced from KeepTradeCut (dynasty superflex). <strong>FDP values</strong> apply sophisticated RB-specific adjustments based on age, role, workload, injury risk, and contract security—not just simple multipliers.
+            Running back values are powered by Fantasy Draft Pros (dynasty superflex). <strong>FDP values</strong> apply sophisticated RB-specific adjustments based on age, role, workload, injury risk, and contract security—not just simple multipliers.
           </p>
           <div className="grid md:grid-cols-2 gap-3 mt-3">
             <div>

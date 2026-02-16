@@ -35,6 +35,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const results = (players || []).map(player => ({
+      player_id: player.player_id,
       position_rank: player.rank_position,
       full_name: player.player_name,
       team: player.team,

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, TrendingUp, TrendingDown, Award } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface QBValue {
   position_rank: number;
   full_name: string;
+  player_id?: string;
   team: string | null;
   value: number;
   captured_at: string;
@@ -111,7 +113,7 @@ export default function KTCQBRankings() {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Dynasty QB Rankings</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Superflex format • Data from KeepTradeCut
+            Superflex format • Powered by Fantasy Draft Pros
           </p>
         </div>
         <button
@@ -187,8 +189,19 @@ export default function KTCQBRankings() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-semibold text-gray-900">{qb.full_name}</div>
-                    <div className="text-sm text-gray-500">QB{qb.position_rank}</div>
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar
+                        playerId={qb.player_id}
+                        playerName={qb.full_name}
+                        team={qb.team || undefined}
+                        position="QB"
+                        size="md"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">{qb.full_name}</div>
+                        <div className="text-sm text-gray-500">QB{qb.position_rank}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="px-3 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">

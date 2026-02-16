@@ -13,7 +13,7 @@ interface SyncResult {
   reason?: string;
 }
 
-export default function KTCAdminSync() {
+export default function FDPAdminSync() {
   const [adminToken, setAdminToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<SyncResult | null>(null);
@@ -41,7 +41,7 @@ export default function KTCAdminSync() {
       const data = await response.json();
 
       if (response.status === 429) {
-        setResult({ ok: false, blocked: true, error: 'KTC blocked the request. Try again later.' });
+        setResult({ ok: false, blocked: true, error: 'FDP blocked the request. Try again later.' });
       } else if (!response.ok) {
         setResult({ ok: false, error: data.error || 'Sync failed' });
       } else {
@@ -64,7 +64,7 @@ export default function KTCAdminSync() {
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <Shield className="w-8 h-8 text-blue-600" />
-        <h2 className="text-2xl font-bold text-gray-900">KTC Admin Sync</h2>
+        <h2 className="text-2xl font-bold text-gray-900">FDP Admin Sync</h2>
       </div>
 
       <div className="space-y-4">
@@ -99,7 +99,7 @@ export default function KTCAdminSync() {
           ) : (
             <>
               <RefreshCw className="w-5 h-5" />
-              Sync KTC QBs
+              Sync FDP QBs
             </>
           )}
         </button>
@@ -125,7 +125,7 @@ export default function KTCAdminSync() {
                   <div>
                     <p className="font-semibold text-green-900">Sync Successful</p>
                     <p className="text-sm text-green-700 mt-1">
-                      Successfully synced {result.count} of {result.total} QB values from KTC
+                      Successfully synced {result.count} of {result.total} QB values from FDP
                     </p>
                     {result.maxRank !== undefined && (
                       <div className="mt-2 flex items-center gap-4 text-sm">
@@ -140,7 +140,7 @@ export default function KTCAdminSync() {
                   <div>
                     <p className="font-semibold text-yellow-900">Request Blocked</p>
                     <p className="text-sm text-yellow-700 mt-1">
-                      KTC blocked the request. Please try again later or use a different IP.
+                      FDP blocked the request. Please try again later or use a different IP.
                     </p>
                   </div>
                 ) : (
