@@ -44,7 +44,7 @@ export default function SleeperImport({ onLeagueSelected }: SleeperImportProps) 
       const userData = await userRes.json();
       const userId = userData.user_id;
 
-      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${SEASON_CONTEXT.last_completed_season}`);
+      const leaguesRes = await fetch(`https://api.sleeper.app/v1/user/${userId}/leagues/nfl/${SEASON_CONTEXT.league_year}`);
 
       if (!leaguesRes.ok) {
         setError('Failed to fetch leagues');

@@ -67,7 +67,7 @@ export async function getSleeperUser(username: string): Promise<SleeperUser | nu
   }
 }
 
-export async function getUserLeagues(userId: string, season: string = SEASON_CONTEXT.last_completed_season.toString()): Promise<SleeperLeague[]> {
+export async function getUserLeagues(userId: string, season: string = SEASON_CONTEXT.league_year.toString()): Promise<SleeperLeague[]> {
   try {
     const response = await fetch(`${SLEEPER_BASE_URL}/user/${userId}/leagues/nfl/${season}`);
     if (!response.ok) return [];

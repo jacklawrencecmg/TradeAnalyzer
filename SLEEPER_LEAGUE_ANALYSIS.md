@@ -194,7 +194,7 @@ Functions:
 - Instructions for users
 
 **Step 2: Select League**
-- Shows all 2025 completed season leagues
+- Shows all 2026 current season leagues
 - Displays team count and status
 - Click to analyze league
 - Back button to re-enter username
