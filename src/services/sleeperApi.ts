@@ -267,7 +267,8 @@ export async function fetchPlayerValues(
   scoringFormat: 'ppr' | 'half' | 'standard' = 'ppr'
 ): Promise<void> {
   const currentYear = new Date().getFullYear();
-  const targetYear = currentYear >= 2025 ? currentYear : 2025;
+  // Use 2026 as the current league year (2025 season just completed)
+  const targetYear = currentYear >= 2026 ? currentYear : 2026;
   const format = isSuperflex ? 2 : 1;
   const cacheKey = `fdp_values_${targetYear}_${format}_${leagueFormat}_${scoringFormat}`;
   const dbCacheKey = `db_player_values_${leagueFormat}_${scoringFormat}`;

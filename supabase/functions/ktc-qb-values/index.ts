@@ -25,24 +25,24 @@ Deno.serve(async (req: Request) => {
     // Use canonical latest_player_values view
     const { data: players, error } = await supabase
       .from('latest_player_values')
-      .select('position_rank, full_name, team, ktc_value, dynasty_value, redraft_value, redraft_value_source, captured_at')
+      .select('rank_position, player_name, team, base_value, adjusted_value, market_value, updated_at')
       .eq('format', format)
       .eq('position', 'QB')
-      .order('position_rank', { ascending: true });
+      .order('rank_position', { ascending: true });
 
     if (error) {
       throw error;
     }
 
     const results = (players || []).map(player => ({
-      position_rank: player.position_rank,
-      full_name: player.full_name,
+      position_rank: player.rank_position,
+      full_name: player.player_name,
       team: player.team,
-      value: player.ktc_value,
-      dynasty_value: player.dynasty_value || player.ktc_value,
-      redraft_value: player.redraft_value || player.ktc_value,
-      value_source: player.redraft_value_source || 'heuristic',
-      captured_at: player.captured_at,
+      value: player.market_value || player.base_value,
+      dynasty_value: player.adjusted_value || player.base_value,
+      redraft_value: player.market_value || player.base_value,
+      value_source: 'latest_player_values',
+      captured_at: player.updated_at,
     }));
 
     return new Response(

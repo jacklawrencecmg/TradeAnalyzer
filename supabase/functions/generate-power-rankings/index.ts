@@ -11,13 +11,13 @@ async function calculateRosterStrength(supabase: any, players: string[]): Promis
 
   try {
     const { data: playerValues } = await supabase
-      .from('player_values')
-      .select('player_id, value')
+      .from('latest_player_values')
+      .select('player_id, adjusted_value')
       .in('player_id', players);
 
     if (!playerValues || playerValues.length === 0) return 0;
 
-    const totalValue = playerValues.reduce((sum: number, p: any) => sum + (p.value || 0), 0);
+    const totalValue = playerValues.reduce((sum: number, p: any) => sum + (p.adjusted_value || 0), 0);
     const avgValue = totalValue / players.length;
 
     return Math.min(avgValue / 10, 1.0);
@@ -102,7 +102,7 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url);
     const leagueId = url.searchParams.get('league_id');
     const week = parseInt(url.searchParams.get('week') || '1');
-    const season = parseInt(url.searchParams.get('season') || '2025');
+    const season = parseInt(url.searchParams.get('season') || '2026');
 
     if (!leagueId) {
       return new Response('Missing league_id', {
