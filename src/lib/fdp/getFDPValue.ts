@@ -10,49 +10,39 @@
  * NO direct database queries to value tables are allowed elsewhere.
  * NO fallback math or hidden recalculations are permitted.
  * NO future features can bypass this interface.
+ *
+ * TYPE SAFETY ENFORCEMENT:
+ * - FDPValueBundle uses branded types (FDPValue, FDPTier, FDPRank)
+ * - UI cannot render raw numbers as values
+ * - TypeScript errors if non-FDP values are used
+ * - Only this module can create branded types
  */
 
 import { supabase } from '../supabase';
+import type { FDPValueBundle, FDPValueMap, FDPProvider } from './types';
+import { createFDPBundle, createFDPBundles } from './brand';
 
-export interface FDPValue {
-  player_id: string;
-  value: number;
-  tier: string;
-  overall_rank: number;
-  pos_rank: number;
-  position: string;
-  value_epoch: number;
-  updated_at: string;
-  league_profile_id?: string;
-  format?: string;
-  adjustments?: {
-    injury_discount?: number;
-    availability_modifier?: number;
-    temporary_boost?: number;
-  };
-}
-
-export interface FDPValueProvider {
-  getValue(playerId: string, leagueProfileId?: string, format?: string): Promise<FDPValue | null>;
-  getValuesBatch(playerIds: string[], leagueProfileId?: string, format?: string): Promise<Map<string, FDPValue>>;
-}
+export type { FDPValueBundle, FDPValueMap, FDPProvider } from './types';
 
 /**
  * Get canonical FDP value for a single player
  *
  * This is the ONLY legal way to retrieve a player value.
- * Returns value from latest_player_values with applied adjustments.
+ * Returns branded FDPValueBundle that cannot be constructed from raw numbers.
+ *
+ * @returns FDPValueBundle with branded types or null if not found
  */
 export async function getFDPValue(
   playerId: string,
   leagueProfileId?: string,
   format: string = 'dynasty_1qb'
-): Promise<FDPValue | null> {
+): Promise<FDPValueBundle | null> {
   try {
     const { data, error } = await supabase
       .from('latest_player_values')
       .select('*')
       .eq('player_id', playerId)
+      .eq('format', format)
       .maybeSingle();
 
     if (error) {
@@ -64,32 +54,22 @@ export async function getFDPValue(
       return null;
     }
 
-    const adjustments = await getPlayerAdjustments(playerId);
-
-    let adjustedValue = data.value || 0;
-    if (adjustments.injury_discount) {
-      adjustedValue *= (1 - adjustments.injury_discount);
-    }
-    if (adjustments.availability_modifier) {
-      adjustedValue *= adjustments.availability_modifier;
-    }
-    if (adjustments.temporary_boost) {
-      adjustedValue += adjustments.temporary_boost;
-    }
-
-    return {
+    return createFDPBundle({
       player_id: data.player_id,
-      value: Math.round(adjustedValue),
-      tier: data.tier || 'Unknown',
-      overall_rank: data.overall_rank || 999,
-      pos_rank: data.pos_rank || 999,
+      player_name: data.player_name || 'Unknown',
       position: data.position || 'UNK',
-      value_epoch: data.value_epoch || Date.now(),
+      team: data.team,
+      base_value: data.base_value || 0,
+      adjusted_value: data.adjusted_value || data.base_value || 0,
+      market_value: data.market_value || data.base_value || 0,
+      tier: data.tier || '5',
+      rank_overall: data.rank_overall || 999,
+      rank_position: data.rank_position || 999,
+      value_epoch_id: data.value_epoch_id || crypto.randomUUID(),
       updated_at: data.updated_at || new Date().toISOString(),
       league_profile_id: leagueProfileId,
       format,
-      adjustments: Object.keys(adjustments).length > 0 ? adjustments : undefined,
-    };
+    });
   } catch (error) {
     console.error('FDP_VALUE_ERROR:', error);
     return null;
@@ -100,69 +80,56 @@ export async function getFDPValue(
  * Get canonical FDP values for multiple players (batch operation)
  *
  * More efficient than calling getFDPValue repeatedly.
- * Returns a Map for O(1) lookups.
+ * Returns FDPValueMap with branded types for O(1) lookups.
+ *
+ * @returns Map of player_id to FDPValueBundle with branded types
  */
 export async function getFDPValuesBatch(
   playerIds: string[],
   leagueProfileId?: string,
   format: string = 'dynasty_1qb'
-): Promise<Map<string, FDPValue>> {
-  const result = new Map<string, FDPValue>();
-
+): Promise<FDPValueMap> {
   if (playerIds.length === 0) {
-    return result;
+    return new Map();
   }
 
   try {
     const { data, error } = await supabase
       .from('latest_player_values')
       .select('*')
-      .in('player_id', playerIds);
+      .in('player_id', playerIds)
+      .eq('format', format);
 
     if (error) {
       console.error('FDP_VALUE_BATCH_ERROR:', error);
-      return result;
+      return new Map();
     }
 
     if (!data) {
-      return result;
+      return new Map();
     }
 
-    const adjustmentsMap = await getPlayerAdjustmentsBatch(playerIds);
+    const rawResponses = data.map(row => ({
+      player_id: row.player_id,
+      player_name: row.player_name || 'Unknown',
+      position: row.position || 'UNK',
+      team: row.team,
+      base_value: row.base_value || 0,
+      adjusted_value: row.adjusted_value || row.base_value || 0,
+      market_value: row.market_value || row.base_value || 0,
+      tier: row.tier || '5',
+      rank_overall: row.rank_overall || 999,
+      rank_position: row.rank_position || 999,
+      value_epoch_id: row.value_epoch_id || crypto.randomUUID(),
+      updated_at: row.updated_at || new Date().toISOString(),
+      league_profile_id: leagueProfileId,
+      format,
+    }));
 
-    for (const row of data) {
-      const adjustments = adjustmentsMap.get(row.player_id) || {};
-
-      let adjustedValue = row.value || 0;
-      if (adjustments.injury_discount) {
-        adjustedValue *= (1 - adjustments.injury_discount);
-      }
-      if (adjustments.availability_modifier) {
-        adjustedValue *= adjustments.availability_modifier;
-      }
-      if (adjustments.temporary_boost) {
-        adjustedValue += adjustments.temporary_boost;
-      }
-
-      result.set(row.player_id, {
-        player_id: row.player_id,
-        value: Math.round(adjustedValue),
-        tier: row.tier || 'Unknown',
-        overall_rank: row.overall_rank || 999,
-        pos_rank: row.pos_rank || 999,
-        position: row.position || 'UNK',
-        value_epoch: row.value_epoch || Date.now(),
-        updated_at: row.updated_at || new Date().toISOString(),
-        league_profile_id: leagueProfileId,
-        format,
-        adjustments: Object.keys(adjustments).length > 0 ? adjustments : undefined,
-      });
-    }
-
-    return result;
+    return createFDPBundles(rawResponses);
   } catch (error) {
     console.error('FDP_VALUE_BATCH_ERROR:', error);
-    return result;
+    return new Map();
   }
 }
 
@@ -170,81 +137,28 @@ export async function getFDPValuesBatch(
  * Create an FDP value provider for dependency injection
  *
  * Use this to inject value lookups into trade calculators, advice engines, etc.
+ * Engines should accept FDPProvider, not raw numbers.
+ *
+ * @example
+ * const provider = createFDPProvider(leagueId, 'dynasty_superflex');
+ * const tradeResult = await evaluateTrade(trade, provider);
  */
 export function createFDPProvider(
   leagueProfileId?: string,
   format: string = 'dynasty_1qb'
-): FDPValueProvider {
+): FDPProvider {
   return {
     getValue: (playerId: string) => getFDPValue(playerId, leagueProfileId, format),
-    getValuesBatch: (playerIds: string[]) => getFDPValuesBatch(playerIds, leagueProfileId, format),
+    getValues: (playerIds: string[]) => getFDPValuesBatch(playerIds, leagueProfileId, format),
+    getLeagueProfile: () => ({ league_profile_id: leagueProfileId || null, format }),
   };
-}
-
-/**
- * Get player adjustments (injuries, availability, temporary modifiers)
- */
-async function getPlayerAdjustments(playerId: string): Promise<{
-  injury_discount?: number;
-  availability_modifier?: number;
-  temporary_boost?: number;
-}> {
-  try {
-    const { data } = await supabase
-      .from('player_value_adjustments')
-      .select('*')
-      .eq('player_id', playerId)
-      .gte('expires_at', new Date().toISOString())
-      .maybeSingle();
-
-    if (!data) {
-      return {};
-    }
-
-    return {
-      injury_discount: data.injury_discount,
-      availability_modifier: data.availability_modifier,
-      temporary_boost: data.temporary_boost,
-    };
-  } catch (error) {
-    return {};
-  }
-}
-
-/**
- * Get adjustments for multiple players (batch)
- */
-async function getPlayerAdjustmentsBatch(
-  playerIds: string[]
-): Promise<Map<string, any>> {
-  const result = new Map();
-
-  try {
-    const { data } = await supabase
-      .from('player_value_adjustments')
-      .select('*')
-      .in('player_id', playerIds)
-      .gte('expires_at', new Date().toISOString());
-
-    if (data) {
-      for (const row of data) {
-        result.set(row.player_id, {
-          injury_discount: row.injury_discount,
-          availability_modifier: row.availability_modifier,
-          temporary_boost: row.temporary_boost,
-        });
-      }
-    }
-  } catch (error) {
-    console.error('Error fetching adjustments:', error);
-  }
-
-  return result;
 }
 
 /**
  * Verify that a value matches the canonical FDP value
  * Used for runtime consistency checks
+ *
+ * Note: Accepts raw number for verification, but compares against branded canonical
  */
 export async function verifyFDPValue(
   playerId: string,
@@ -256,9 +170,9 @@ export async function verifyFDPValue(
   canonical: number;
   difference: number;
 }> {
-  const canonicalValue = await getFDPValue(playerId, leagueProfileId, format);
+  const canonicalBundle = await getFDPValue(playerId, leagueProfileId, format);
 
-  if (!canonicalValue) {
+  if (!canonicalBundle) {
     return {
       valid: false,
       canonical: 0,
@@ -266,27 +180,30 @@ export async function verifyFDPValue(
     };
   }
 
-  const difference = Math.abs(claimedValue - canonicalValue.value);
+  const canonicalNum = canonicalBundle.value as number;
+  const difference = Math.abs(claimedValue - canonicalNum);
   const valid = difference === 0;
 
   if (!valid) {
     console.warn('FDP_VALUE_MISMATCH:', {
       player_id: playerId,
       claimed: claimedValue,
-      canonical: canonicalValue.value,
+      canonical: canonicalNum,
       difference,
     });
   }
 
   return {
     valid,
-    canonical: canonicalValue.value,
+    canonical: canonicalNum,
     difference,
   };
 }
 
 /**
  * Verify multiple values (used for response validation)
+ *
+ * Note: Accepts raw numbers for verification, but compares against branded canonical
  */
 export async function verifyFDPValuesBatch(
   values: Array<{ player_id: string; value: number }>,
@@ -307,22 +224,23 @@ export async function verifyFDPValuesBatch(
   const mismatches = [];
 
   for (const { player_id, value } of values) {
-    const canonicalValue = canonical.get(player_id);
-    if (!canonicalValue) continue;
+    const canonicalBundle = canonical.get(player_id);
+    if (!canonicalBundle) continue;
 
-    const difference = Math.abs(value - canonicalValue.value);
+    const canonicalNum = canonicalBundle.value as number;
+    const difference = Math.abs(value - canonicalNum);
     if (difference > 0) {
       mismatches.push({
         player_id,
         claimed: value,
-        canonical: canonicalValue.value,
+        canonical: canonicalNum,
         difference,
       });
 
       console.warn('FDP_VALUE_MISMATCH:', {
         player_id,
         claimed: value,
-        canonical: canonicalValue.value,
+        canonical: canonicalNum,
         difference,
       });
     }

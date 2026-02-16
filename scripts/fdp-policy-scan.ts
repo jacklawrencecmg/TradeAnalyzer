@@ -51,6 +51,16 @@ const PROHIBITED_PATTERNS = [
   /return.*value:\s*\d+/,                     // return { value: 123 }
 ];
 
+// Prohibited prop types (raw value props)
+const RAW_VALUE_PROP_PATTERNS = [
+  /value:\s*number/,                          // value: number
+  /dynasty_value:\s*number/,                  // dynasty_value: number
+  /player_value:\s*number/,                   // player_value: number
+  /ktc_value:\s*number/,                      // ktc_value: number
+  /base_value:\s*number/,                     // base_value: number
+  /market_value:\s*number/,                   // market_value: number
+];
+
 // File patterns to scan
 const SCAN_PATTERNS = [
   'src/**/*.ts',
@@ -174,6 +184,24 @@ function scanFile(filePath: string): void {
           message: 'Direct .value access without FDP validation.',
           snippet: line.trim(),
         });
+      }
+    }
+
+    // Check for raw value props in components (TypeScript interfaces/types)
+    if (
+      (filePath.endsWith('.tsx') || filePath.endsWith('.ts')) &&
+      filePath.includes('/components/')
+    ) {
+      for (const pattern of RAW_VALUE_PROP_PATTERNS) {
+        if (pattern.test(line) && !line.includes('FDPValue') && !line.includes('// allowed')) {
+          violations.push({
+            file: filePath,
+            line: lineNum,
+            rule: 'RAW_VALUE_PROP',
+            message: 'Component prop uses raw number for value. Use FDPValueBundle instead.',
+            snippet: line.trim(),
+          });
+        }
       }
     }
   });
