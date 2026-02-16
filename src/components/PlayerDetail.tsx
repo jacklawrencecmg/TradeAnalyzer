@@ -41,7 +41,7 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
   const [data, setData] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [format, setFormat] = useState<string>('dynasty_sf');
+  const [format, setFormat] = useState<string>('dynasty');
 
   useEffect(() => {
     loadPlayerData();

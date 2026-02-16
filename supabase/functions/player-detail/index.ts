@@ -20,7 +20,7 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const playerId = url.searchParams.get('id') || '';
-    const format = url.searchParams.get('format') || 'dynasty_sf';
+    const format = url.searchParams.get('format') || 'dynasty';
     const daysBack = parseInt(url.searchParams.get('days') || '180', 10);
 
     console.log('Player detail request:', { playerId, format, daysBack });
@@ -52,26 +52,24 @@ Deno.serve(async (req: Request) => {
     const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-    console.log('Fetching latest snapshot for player:', playerId);
+    console.log('Fetching from latest_player_values for player:', playerId);
 
-    const { data: latestSnapshot, error: latestError } = await supabase
-      .from('ktc_value_snapshots')
-      .select('player_id, full_name, position, team, ktc_value, fdp_value, position_rank, captured_at')
+    const { data: playerData, error: playerError } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, base_value, adjusted_value, market_value, rank_overall, rank_position, updated_at')
       .eq('player_id', playerId)
       .eq('format', format)
-      .order('captured_at', { ascending: false })
-      .limit(1)
       .maybeSingle();
 
-    if (latestError) {
-      console.error('Error fetching latest snapshot:', latestError);
-      throw latestError;
+    if (playerError) {
+      console.error('Error fetching player data:', playerError);
+      throw playerError;
     }
 
-    console.log('Latest snapshot:', latestSnapshot);
+    console.log('Player data:', playerData);
 
-    if (!latestSnapshot) {
-      console.error('No snapshot found for player:', playerId);
+    if (!playerData) {
+      console.error('No player found with ID:', playerId);
       return new Response(
         JSON.stringify({ ok: false, error: 'Player not found' }),
         {
@@ -90,13 +88,11 @@ Deno.serve(async (req: Request) => {
       .from('ktc_value_snapshots')
       .select('captured_at, ktc_value, fdp_value')
       .eq('player_id', playerId)
-      .eq('format', format)
       .gte('captured_at', cutoffDate.toISOString())
       .order('captured_at', { ascending: true });
 
     if (historyError) {
       console.error('Error fetching history:', historyError);
-      throw historyError;
     }
 
     console.log('History data points:', historyData?.length || 0);
@@ -104,23 +100,28 @@ Deno.serve(async (req: Request) => {
     let history = historyData || [];
 
     if (history.length === 0) {
-      const { data: fallbackData, error: fallbackError } = await supabase
+      const { data: fallbackData } = await supabase
         .from('ktc_value_snapshots')
         .select('captured_at, ktc_value, fdp_value')
         .eq('player_id', playerId)
-        .eq('format', format)
         .order('captured_at', { ascending: false })
         .limit(200);
 
-      if (!fallbackError && fallbackData) {
+      if (fallbackData && fallbackData.length > 0) {
         history = fallbackData.reverse();
+      } else {
+        history = [{
+          captured_at: playerData.updated_at || new Date().toISOString(),
+          ktc_value: playerData.base_value,
+          fdp_value: playerData.adjusted_value
+        }];
       }
     }
 
     const formattedHistory = history.map((point) => ({
       date: point.captured_at,
-      ktc: point.ktc_value,
-      fdp: point.fdp_value,
+      ktc: point.ktc_value || playerData.base_value,
+      fdp: point.fdp_value || playerData.adjusted_value,
     }));
 
     const calculateTrend = (): 'up' | 'down' | 'stable' => {
@@ -187,16 +188,16 @@ Deno.serve(async (req: Request) => {
     const result = {
       ok: true,
       player: {
-        id: latestSnapshot.player_id,
-        name: latestSnapshot.full_name,
-        position: latestSnapshot.position,
-        team: latestSnapshot.team,
+        id: playerData.player_id,
+        name: playerData.player_name,
+        position: playerData.position,
+        team: playerData.team,
       },
       latest: {
-        ktc_value: latestSnapshot.ktc_value,
-        fdp_value: latestSnapshot.fdp_value,
-        rank: latestSnapshot.position_rank,
-        updated_at: latestSnapshot.captured_at,
+        ktc_value: playerData.base_value,
+        fdp_value: playerData.adjusted_value,
+        rank: playerData.rank_position,
+        updated_at: playerData.updated_at,
       },
       history: formattedHistory,
       trend: calculateTrend(),
