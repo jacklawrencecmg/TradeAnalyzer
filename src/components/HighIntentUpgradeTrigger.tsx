@@ -3,6 +3,7 @@ import { X, Zap, Clock, TrendingUp, Bell, Target, ArrowRight, Sparkles } from 'l
 import { useAuth } from '../hooks/useAuth';
 import { useSubscription } from '../hooks/useSubscription';
 import { recordUpgradeTrigger, grantTrial } from '../lib/subscription';
+import { trackCTAImpression, trackCTAClick, trackAction } from '../lib/attribution';
 
 export type TriggerType =
   | 'trade_limit_reached'
@@ -85,8 +86,10 @@ export function HighIntentUpgradeTrigger({ trigger, context, onClose }: HighInte
   useEffect(() => {
     if (user && !isPro && !isTrial) {
       recordUpgradeTrigger(user.id, trigger, context || {});
+      trackCTAImpression(trigger, config.cta, trigger);
+      trackAction('view_upgrade_trigger', { trigger, ...context }, user.id);
     }
-  }, [user, trigger, context, isPro, isTrial]);
+  }, [user, trigger, context, isPro, isTrial, config]);
 
   if (!user || isPro || isTrial || dismissed) {
     return null;
@@ -95,11 +98,15 @@ export function HighIntentUpgradeTrigger({ trigger, context, onClose }: HighInte
   async function handleUpgrade() {
     if (!user) return;
 
+    trackCTAClick(trigger, config.cta, trigger);
+    trackAction('click_upgrade_cta', { trigger, cta: config.cta, ...context }, user.id);
+
     if (config.trialEligible) {
       setIsGrantingTrial(true);
       const trialId = await grantTrial(user.id, trigger, 24);
 
       if (trialId) {
+        trackAction('start_trial', { trigger, trial_id: trialId }, user.id);
         alert('🎉 24-hour premium trial activated! Enjoy all features.');
         window.location.reload();
       } else {
