@@ -8,6 +8,11 @@ import SharedTradePage from './components/SharedTradePage';
 import PublicLeagueRankings from './components/PublicLeagueRankings';
 import DoctorAdmin from './components/DoctorAdmin';
 import Top1000Rankings from './components/Top1000Rankings';
+import { PlayerValuePage } from './components/PlayerValuePage';
+import { DynastyRankingsPage } from './components/DynastyRankingsPage';
+import { PlayerComparisonPage } from './components/PlayerComparisonPage';
+import { SEOAdmin } from './components/SEOAdmin';
+import { RouterProvider } from './lib/seo/router';
 import SafeModeBanner from './components/SafeModeBanner';
 import { ToastProvider } from './components/Toast';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -18,7 +23,7 @@ import { Contact } from './components/Contact';
 import { FeedbackButton } from './components/FeedbackButton';
 import { LogIn } from 'lucide-react';
 
-type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000';
+type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000' | 'dynasty-rankings' | 'player-value' | 'player-comparison';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -26,13 +31,45 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [tradeSlug, setTradeSlug] = useState<string | null>(null);
   const [leagueSlug, setLeagueSlug] = useState<string | null>(null);
+  const [playerSlug, setPlayerSlug] = useState<string | null>(null);
+  const [comparisonSlug, setComparisonSlug] = useState<string | null>(null);
   const [showDoctorAdmin, setShowDoctorAdmin] = useState(false);
+  const [showSEOAdmin, setShowSEOAdmin] = useState(false);
 
   useEffect(() => {
     const path = window.location.pathname;
 
     if (path === '/admin/doctor') {
       setShowDoctorAdmin(true);
+      return;
+    }
+
+    if (path === '/admin/seo') {
+      setShowSEOAdmin(true);
+      return;
+    }
+
+    if (path === '/trade-calculator') {
+      window.location.href = '/';
+      return;
+    }
+
+    if (path === '/dynasty-rankings' || path === '/dynasty-superflex-rankings' || path === '/dynasty-rookie-rankings' || path === '/dynasty-idp-rankings') {
+      setCurrentPage('dynasty-rankings');
+      return;
+    }
+
+    const playerValueMatch = path.match(/^\/dynasty-value\/([a-z0-9-]+)$/);
+    if (playerValueMatch) {
+      setPlayerSlug(playerValueMatch[1]);
+      setCurrentPage('player-value');
+      return;
+    }
+
+    const comparisonMatch = path.match(/^\/compare\/([a-z0-9-]+)-vs-([a-z0-9-]+)-dynasty$/);
+    if (comparisonMatch) {
+      setComparisonSlug(`${comparisonMatch[1]}-vs-${comparisonMatch[2]}-dynasty`);
+      setCurrentPage('player-comparison');
       return;
     }
 
@@ -71,6 +108,15 @@ function AppContent() {
     );
   }
 
+  if (showSEOAdmin) {
+    return (
+      <>
+        <SEOAdmin />
+        <FeedbackButton context={{ page: 'admin/seo' }} />
+      </>
+    );
+  }
+
   if (tradeSlug) {
     return (
       <>
@@ -88,6 +134,39 @@ function AppContent() {
         <PublicLeagueRankings slug={leagueSlug} />
         <FeedbackButton context={{ page: `league/${leagueSlug}` }} />
       </>
+    );
+  }
+
+  if (currentPage === 'dynasty-rankings') {
+    return (
+      <>
+        <SafeModeBanner />
+        <DynastyRankingsPage />
+        <Footer />
+        <FeedbackButton context={{ page: 'dynasty-rankings' }} />
+      </>
+    );
+  }
+
+  if (currentPage === 'player-value' && playerSlug) {
+    return (
+      <RouterProvider params={{ slug: playerSlug }}>
+        <SafeModeBanner />
+        <PlayerValuePage />
+        <Footer />
+        <FeedbackButton context={{ page: `player-value/${playerSlug}` }} />
+      </RouterProvider>
+    );
+  }
+
+  if (currentPage === 'player-comparison' && comparisonSlug) {
+    return (
+      <RouterProvider params={{ slug: comparisonSlug }}>
+        <SafeModeBanner />
+        <PlayerComparisonPage />
+        <Footer />
+        <FeedbackButton context={{ page: `comparison/${comparisonSlug}` }} />
+      </RouterProvider>
     );
   }
 

@@ -264,6 +264,49 @@ export function LandingPage() {
 
         <div className="max-w-5xl mx-auto mb-12">
           <h2 className="text-3xl font-bold text-fdp-text-1 text-center mb-8">
+            Player Rankings & Values
+          </h2>
+          <div className="grid md:grid-cols-3 gap-6">
+            <a
+              href="/dynasty-rankings"
+              className="bg-fdp-surface-1 rounded-lg p-6 border-2 border-fdp-border-1 hover:border-fdp-accent-1 transition-all group"
+            >
+              <h3 className="text-xl font-bold text-fdp-text-1 mb-2 group-hover:text-fdp-accent-1 transition-colors">
+                Dynasty Rankings
+              </h3>
+              <p className="text-fdp-text-3">
+                Top 1000 dynasty player values updated daily with rankings, tiers, and trade analysis.
+              </p>
+            </a>
+
+            <a
+              href="/top1000"
+              className="bg-fdp-surface-1 rounded-lg p-6 border-2 border-fdp-border-1 hover:border-fdp-accent-1 transition-all group"
+            >
+              <h3 className="text-xl font-bold text-fdp-text-1 mb-2 group-hover:text-fdp-accent-1 transition-colors">
+                Top 1000 Values
+              </h3>
+              <p className="text-fdp-text-3">
+                Complete player value database with filtering by position and league settings.
+              </p>
+            </a>
+
+            <a
+              href="/trade-calculator"
+              className="bg-fdp-surface-1 rounded-lg p-6 border-2 border-fdp-border-1 hover:border-fdp-accent-1 transition-all group"
+            >
+              <h3 className="text-xl font-bold text-fdp-text-1 mb-2 group-hover:text-fdp-accent-1 transition-colors">
+                Trade Calculator
+              </h3>
+              <p className="text-fdp-text-3">
+                Analyze dynasty trades with picks, IDP, and FAAB. Get instant fairness ratings.
+              </p>
+            </a>
+          </div>
+        </div>
+
+        <div className="max-w-5xl mx-auto mb-12">
+          <h2 className="text-3xl font-bold text-fdp-text-1 text-center mb-8">
             Unlock Pro Features
           </h2>
           <div className="grid md:grid-cols-3 gap-6">
