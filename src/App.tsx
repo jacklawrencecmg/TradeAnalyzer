@@ -260,6 +260,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <LandingPage />
+        <Footer />
         <FeedbackButton context={{ page: 'landing' }} />
       </>
     );
