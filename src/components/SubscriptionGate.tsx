@@ -48,15 +48,7 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
     checkSubscription();
   }, [user]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0">
-        <div className="text-fdp-text-1 text-xl">Checking subscription...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
+  if (loading || !user) {
     return <>{children}</>;
   }
 
