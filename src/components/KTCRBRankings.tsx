@@ -13,6 +13,7 @@ interface RBValue {
   ktc_value: number;
   fdp_value: number;
   captured_at: string;
+  headshot_url?: string;
   metadata?: {
     age?: number;
     depth_role?: string;
@@ -71,11 +72,31 @@ export default function KTCRBRankings() {
         throw new Error(rpcError.message);
       }
 
-      setRbs(data || []);
-
       if (data && data.length > 0) {
         const latest = new Date(data[0].captured_at);
         setLastUpdated(latest.toLocaleString());
+
+        const playerIds = data
+          .map((rb: RBValue) => rb.player_id)
+          .filter((id): id is string => !!id);
+
+        const { data: identities } = await supabase
+          .from('player_identity')
+          .select('player_id, headshot_url')
+          .in('player_id', playerIds);
+
+        const headshotMap = new Map(
+          (identities || []).map((identity) => [identity.player_id, identity.headshot_url])
+        );
+
+        const rbsWithHeadshots = data.map((rb: RBValue) => ({
+          ...rb,
+          headshot_url: rb.player_id ? headshotMap.get(rb.player_id) : undefined,
+        }));
+
+        setRbs(rbsWithHeadshots);
+      } else {
+        setRbs(data || []);
       }
 
       setError(null);
@@ -247,6 +268,7 @@ export default function KTCRBRankings() {
                         team={rb.team || undefined}
                         position="RB"
                         size="md"
+                        headshotUrl={rb.headshot_url}
                       />
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">

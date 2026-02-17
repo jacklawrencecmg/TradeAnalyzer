@@ -13,6 +13,7 @@ interface TEValue {
   ktc_value: number;
   fdp_value: number;
   captured_at: string;
+  headshot_url?: string;
 }
 
 export default function KTCTERankings() {
@@ -46,7 +47,30 @@ export default function KTCTERankings() {
         throw new Error(rpcError.message);
       }
 
-      setTes(data || []);
+      if (data && data.length > 0) {
+        const playerIds = data
+          .map((te: TEValue) => te.player_id)
+          .filter((id): id is string => !!id);
+
+        const { data: identities } = await supabase
+          .from('player_identity')
+          .select('player_id, headshot_url')
+          .in('player_id', playerIds);
+
+        const headshotMap = new Map(
+          (identities || []).map((identity) => [identity.player_id, identity.headshot_url])
+        );
+
+        const tesWithHeadshots = data.map((te: TEValue) => ({
+          ...te,
+          headshot_url: te.player_id ? headshotMap.get(te.player_id) : undefined,
+        }));
+
+        setTes(tesWithHeadshots);
+      } else {
+        setTes(data || []);
+      }
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load TE rankings');
@@ -237,6 +261,7 @@ export default function KTCTERankings() {
                         team={te.team || undefined}
                         position="TE"
                         size="md"
+                        headshotUrl={te.headshot_url}
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{te.full_name}</div>

@@ -17,6 +17,7 @@ interface IDPPlayer {
   fdp_value: number;
   captured_at: string;
   fdp_rank: number;
+  headshot_url?: string;
 }
 
 export default function IDPRankings() {
@@ -249,6 +250,7 @@ export default function IDPRankings() {
                             playerId={player.player_id}
                             playerName={player.full_name}
                             size="sm"
+                            headshotUrl={player.headshot_url}
                           />
                           <div>
                             <div className="font-semibold text-gray-900">

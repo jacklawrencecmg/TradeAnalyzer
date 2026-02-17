@@ -45,6 +45,18 @@ Deno.serve(async (req: Request) => {
 
     if (error) throw error;
 
+    // Fetch headshots from player_identity
+    const playerIds = (players || []).map(p => p.player_id).filter(Boolean);
+
+    const { data: identities } = await supabase
+      .from('player_identity')
+      .select('player_id, headshot_url')
+      .in('player_id', playerIds);
+
+    const headshotMap = new Map(
+      (identities || []).map(identity => [identity.player_id, identity.headshot_url])
+    );
+
     const rankings = (players || []).map((player, index) => ({
       player_id: player.player_id,
       full_name: player.player_name,
@@ -55,6 +67,7 @@ Deno.serve(async (req: Request) => {
       fdp_value: player.adjusted_value,
       captured_at: player.updated_at,
       fdp_rank: index + 1,
+      headshot_url: headshotMap.get(player.player_id),
     }));
 
     return new Response(

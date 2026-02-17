@@ -13,6 +13,7 @@ interface QBValue {
   ktc_value: number;
   fdp_value: number;
   captured_at: string;
+  headshot_url?: string;
 }
 
 export default function KTCQBRankings() {
@@ -46,7 +47,30 @@ export default function KTCQBRankings() {
         throw new Error(rpcError.message);
       }
 
-      setQbs(data || []);
+      if (data && data.length > 0) {
+        const playerIds = data
+          .map((qb: QBValue) => qb.player_id)
+          .filter((id): id is string => !!id);
+
+        const { data: identities } = await supabase
+          .from('player_identity')
+          .select('player_id, headshot_url')
+          .in('player_id', playerIds);
+
+        const headshotMap = new Map(
+          (identities || []).map((identity) => [identity.player_id, identity.headshot_url])
+        );
+
+        const qbsWithHeadshots = data.map((qb: QBValue) => ({
+          ...qb,
+          headshot_url: qb.player_id ? headshotMap.get(qb.player_id) : undefined,
+        }));
+
+        setQbs(qbsWithHeadshots);
+      } else {
+        setQbs(data || []);
+      }
+
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load QB rankings');
@@ -199,6 +223,7 @@ export default function KTCQBRankings() {
                         team={qb.team || undefined}
                         position="QB"
                         size="md"
+                        headshotUrl={qb.headshot_url}
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{qb.full_name}</div>
