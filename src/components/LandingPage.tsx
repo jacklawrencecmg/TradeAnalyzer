@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import TradeAnalyzer from './TradeAnalyzer';
+import { TodayInDynasty } from './TodayInDynasty';
 import { LogIn, UserPlus, TrendingUp, Target, Bell } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -261,6 +262,8 @@ export function LandingPage() {
             <TradeAnalyzer isGuest={true} />
           </div>
         </div>
+
+        <TodayInDynasty />
 
         <div className="max-w-5xl mx-auto mb-12">
           <h2 className="text-3xl font-bold text-fdp-text-1 text-center mb-8">

@@ -11,6 +11,8 @@ import Top1000Rankings from './components/Top1000Rankings';
 import { PlayerValuePage } from './components/PlayerValuePage';
 import { DynastyRankingsPage } from './components/DynastyRankingsPage';
 import { PlayerComparisonPage } from './components/PlayerComparisonPage';
+import { NewsArticlePage } from './components/NewsArticlePage';
+import { NewsIndexPage } from './components/NewsIndexPage';
 import { SEOAdmin } from './components/SEOAdmin';
 import { RouterProvider } from './lib/seo/router';
 import SafeModeBanner from './components/SafeModeBanner';
@@ -23,7 +25,7 @@ import { Contact } from './components/Contact';
 import { FeedbackButton } from './components/FeedbackButton';
 import { LogIn } from 'lucide-react';
 
-type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000' | 'dynasty-rankings' | 'player-value' | 'player-comparison';
+type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000' | 'dynasty-rankings' | 'player-value' | 'player-comparison' | 'news-index' | 'news-article';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -33,6 +35,7 @@ function AppContent() {
   const [leagueSlug, setLeagueSlug] = useState<string | null>(null);
   const [playerSlug, setPlayerSlug] = useState<string | null>(null);
   const [comparisonSlug, setComparisonSlug] = useState<string | null>(null);
+  const [newsSlug, setNewsSlug] = useState<string | null>(null);
   const [showDoctorAdmin, setShowDoctorAdmin] = useState(false);
   const [showSEOAdmin, setShowSEOAdmin] = useState(false);
 
@@ -51,6 +54,18 @@ function AppContent() {
 
     if (path === '/trade-calculator') {
       window.location.href = '/';
+      return;
+    }
+
+    if (path === '/news') {
+      setCurrentPage('news-index');
+      return;
+    }
+
+    const newsArticleMatch = path.match(/^\/news\/([a-z0-9-]+)$/);
+    if (newsArticleMatch) {
+      setNewsSlug(newsArticleMatch[1]);
+      setCurrentPage('news-article');
       return;
     }
 
@@ -134,6 +149,28 @@ function AppContent() {
         <PublicLeagueRankings slug={leagueSlug} />
         <FeedbackButton context={{ page: `league/${leagueSlug}` }} />
       </>
+    );
+  }
+
+  if (currentPage === 'news-index') {
+    return (
+      <>
+        <SafeModeBanner />
+        <NewsIndexPage />
+        <Footer />
+        <FeedbackButton context={{ page: 'news' }} />
+      </>
+    );
+  }
+
+  if (currentPage === 'news-article' && newsSlug) {
+    return (
+      <RouterProvider params={{ slug: newsSlug }}>
+        <SafeModeBanner />
+        <NewsArticlePage />
+        <Footer />
+        <FeedbackButton context={{ page: `news/${newsSlug}` }} />
+      </RouterProvider>
     );
   }
 
