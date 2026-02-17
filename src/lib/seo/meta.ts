@@ -84,16 +84,21 @@ export function generatePlayerMetaTags(player: {
 }) {
   const slug = generatePlayerSlug(player.full_name);
   const canonical = `https://www.fantasydraftpros.com/dynasty-value/${slug}`;
+  const ogImage = `https://www.fantasydraftpros.com/api/og-image/player/${slug}?value=${player.fdp_value || 0}&rank=${player.dynasty_rank || 0}&pos=${player.position}`;
+
+  const valueText = player.fdp_value ? Math.round(player.fdp_value).toString() : 'N/A';
+  const rankText = player.dynasty_rank ? `#${player.dynasty_rank}` : '';
 
   const title = `${player.full_name} Dynasty Value (2026) | Fantasy Trade Calculator`;
-  const description = `See ${player.full_name}'s dynasty value (${player.fdp_value || 'N/A'}), ${player.position} ranking ${player.dynasty_rank ? `#${player.dynasty_rank}` : ''}, trade advice, and comparison vs similar players. Updated daily with expert analysis.`;
+  const description = `${player.full_name} — Dynasty Value: ${valueText} | Rank: ${rankText} | ${player.position} • ${player.team || 'FA'} | Trade advice, trends, and expert analysis. Updated daily.`;
 
   return {
     title,
     description,
     canonical,
-    ogTitle: title,
-    ogDescription: description,
+    ogTitle: `${player.full_name} — ${valueText} Dynasty Value`,
+    ogDescription: `Rank ${rankText} ${player.position} | ${player.team || 'FA'} | See live trade values, trends, and analysis`,
+    ogImage,
     ogType: 'article',
     keywords: [
       `${player.full_name} dynasty value`,
