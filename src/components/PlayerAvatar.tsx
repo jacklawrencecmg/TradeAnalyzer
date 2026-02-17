@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
+import { getPlayerHeadshot } from '../lib/players/getPlayerHeadshot';
 
 interface PlayerAvatarProps {
   playerId?: string;
@@ -11,6 +12,7 @@ interface PlayerAvatarProps {
   showBadge?: boolean;
   badgeContent?: React.ReactNode;
   className?: string;
+  headshotUrl?: string;
 }
 
 const teamColors: Record<string, string> = {
@@ -79,8 +81,10 @@ export function PlayerAvatar({
   showBadge = false,
   badgeContent,
   className = '',
+  headshotUrl: providedHeadshotUrl,
 }: PlayerAvatarProps) {
   const [imageError, setImageError] = useState(false);
+  const [canonicalHeadshotUrl, setCanonicalHeadshotUrl] = useState<string | null>(providedHeadshotUrl || null);
 
   const initials = playerName
     .split(' ')
@@ -90,7 +94,31 @@ export function PlayerAvatar({
     .slice(0, 2);
 
   const teamColor = team ? teamColors[team] || 'bg-gray-600' : 'bg-gray-600';
-  const playerImageUrl = playerId ? `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg` : null;
+
+  useEffect(() => {
+    if (providedHeadshotUrl) {
+      setCanonicalHeadshotUrl(providedHeadshotUrl);
+      return;
+    }
+
+    if (!playerId) {
+      return;
+    }
+
+    let isMounted = true;
+
+    getPlayerHeadshot(playerId).then((headshot) => {
+      if (isMounted) {
+        setCanonicalHeadshotUrl(headshot.url);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [playerId, providedHeadshotUrl]);
+
+  const playerImageUrl = canonicalHeadshotUrl;
 
   return (
     <div className={`relative inline-block ${className}`}>
