@@ -42,7 +42,7 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
         ...context,
       };
 
-      const { error } = await supabase.from('user_feedback').insert({
+      supabase.from('user_feedback').insert({
         user_id: user?.id || null,
         league_id: context?.leagueId || null,
         page: context?.page || window.location.pathname,
@@ -50,11 +50,11 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
         message: issue,
         metadata,
         status: 'open',
+      }).then(({ error }) => {
+        if (error) console.error('DB insert error (non-fatal):', error);
       });
 
-      if (error) throw error;
-
-      fetch(`${env.supabaseUrl}/functions/v1/send-contact-email`, {
+      await fetch(`${env.supabaseUrl}/functions/v1/send-contact-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
           leagueId: context?.leagueId,
           timestamp: new Date().toISOString(),
         }),
-      }).catch(err => console.error('Failed to send feedback email:', err));
+      });
 
       setSuccess(true);
       setTimeout(() => {
@@ -85,7 +85,7 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
       }, 2000);
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      alert('Failed to submit feedback. Please try again.');
+      alert('Failed to submit feedback. Please try again or email us at fantasydraftproshelp@gmail.com');
     } finally {
       setSubmitting(false);
     }
