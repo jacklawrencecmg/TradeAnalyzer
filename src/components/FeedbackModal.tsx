@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, AlertCircle, Bug, HelpCircle, Lightbulb, ThumbsDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
+import { env } from '../lib/env';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -52,6 +53,27 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
       });
 
       if (error) throw error;
+
+      fetch(`${env.supabaseUrl}/functions/v1/send-contact-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${env.supabaseAnonKey}`,
+        },
+        body: JSON.stringify({
+          type: 'feedback',
+          feedbackType: type,
+          goal,
+          issue,
+          page: context?.page || window.location.pathname,
+          url: window.location.href,
+          userEmail: user?.email,
+          playerName: context?.playerName,
+          valueWrong,
+          leagueId: context?.leagueId,
+          timestamp: new Date().toISOString(),
+        }),
+      }).catch(err => console.error('Failed to send feedback email:', err));
 
       setSuccess(true);
       setTimeout(() => {
