@@ -62,7 +62,7 @@ import { useSubscription } from '../hooks/useSubscription';
 type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'ktcWRRankings' | 'ktcTERankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing';
 
 interface DashboardProps {
-  onNavigate?: (page: 'home' | 'faq' | 'help') => void;
+  onNavigate?: (page: 'home' | 'faq' | 'help' | 'contact') => void;
 }
 
 export function Dashboard({ onNavigate }: DashboardProps = {}) {

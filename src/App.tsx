@@ -255,6 +255,45 @@ function AppContent() {
     );
   }
 
+  if (currentPage === 'faq') {
+    return (
+      <>
+        <SafeModeBanner />
+        <FAQ onClose={() => setCurrentPage('home')} />
+        <Footer onNavigate={setCurrentPage} />
+        <FeedbackButton context={{ page: 'faq' }} />
+      </>
+    );
+  }
+
+  if (currentPage === 'help') {
+    return (
+      <>
+        <SafeModeBanner />
+        <Help onClose={() => setCurrentPage('home')} />
+        <Footer onNavigate={setCurrentPage} />
+        <FeedbackButton context={{ page: 'help' }} />
+      </>
+    );
+  }
+
+  if (currentPage === 'contact') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 py-12 px-4">
+        <SafeModeBanner />
+        <button
+          onClick={() => setCurrentPage('home')}
+          className="mb-6 text-fdp-text-2 hover:text-fdp-text-1 transition-colors"
+        >
+          ← Back
+        </button>
+        <Contact />
+        <Footer onNavigate={setCurrentPage} />
+        <FeedbackButton context={{ page: 'contact' }} />
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <>
@@ -268,37 +307,11 @@ function AppContent() {
 
   return (
     <SubscriptionGate>
-      {currentPage === 'faq' ? (
-        <>
-          <SafeModeBanner />
-          <FAQ onClose={() => setCurrentPage('home')} />
-          <FeedbackButton context={{ page: 'faq' }} />
-        </>
-      ) : currentPage === 'help' ? (
-        <>
-          <SafeModeBanner />
-          <Help onClose={() => setCurrentPage('home')} />
-          <FeedbackButton context={{ page: 'help' }} />
-        </>
-      ) : currentPage === 'contact' ? (
-        <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 py-12 px-4">
-          <SafeModeBanner />
-          <button
-            onClick={() => setCurrentPage('home')}
-            className="mb-6 text-fdp-text-2 hover:text-fdp-text-1 transition-colors"
-          >
-            ← Back to Dashboard
-          </button>
-          <Contact />
-          <FeedbackButton context={{ page: 'contact' }} />
-        </div>
-      ) : (
-        <>
-          <SafeModeBanner />
-          <Dashboard onNavigate={setCurrentPage} />
-          <FeedbackButton context={{ page: 'dashboard' }} />
-        </>
-      )}
+      <>
+        <SafeModeBanner />
+        <Dashboard onNavigate={setCurrentPage} />
+        <FeedbackButton context={{ page: 'dashboard' }} />
+      </>
     </SubscriptionGate>
   );
 }
