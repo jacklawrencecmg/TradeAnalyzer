@@ -13,6 +13,8 @@ import { DynastyRankingsPage } from './components/DynastyRankingsPage';
 import { PlayerComparisonPage } from './components/PlayerComparisonPage';
 import { NewsArticlePage } from './components/NewsArticlePage';
 import { NewsIndexPage } from './components/NewsIndexPage';
+import { QuestionPageComponent } from './components/QuestionPage';
+import { QuestionsIndexPage } from './components/QuestionsIndexPage';
 import { SEOAdmin } from './components/SEOAdmin';
 import { RouterProvider } from './lib/seo/router';
 import SafeModeBanner from './components/SafeModeBanner';
@@ -25,7 +27,7 @@ import { Contact } from './components/Contact';
 import { FeedbackButton } from './components/FeedbackButton';
 import { LogIn } from 'lucide-react';
 
-type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000' | 'dynasty-rankings' | 'player-value' | 'player-comparison' | 'news-index' | 'news-article';
+type Page = 'home' | 'faq' | 'help' | 'contact' | 'top1000' | 'dynasty-rankings' | 'player-value' | 'player-comparison' | 'news-index' | 'news-article' | 'questions-index' | 'question-page';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -36,6 +38,7 @@ function AppContent() {
   const [playerSlug, setPlayerSlug] = useState<string | null>(null);
   const [comparisonSlug, setComparisonSlug] = useState<string | null>(null);
   const [newsSlug, setNewsSlug] = useState<string | null>(null);
+  const [questionSlug, setQuestionSlug] = useState<string | null>(null);
   const [showDoctorAdmin, setShowDoctorAdmin] = useState(false);
   const [showSEOAdmin, setShowSEOAdmin] = useState(false);
 
@@ -66,6 +69,18 @@ function AppContent() {
     if (newsArticleMatch) {
       setNewsSlug(newsArticleMatch[1]);
       setCurrentPage('news-article');
+      return;
+    }
+
+    if (path === '/questions') {
+      setCurrentPage('questions-index');
+      return;
+    }
+
+    const questionMatch = path.match(/^\/questions\/([a-z0-9-]+)$/);
+    if (questionMatch) {
+      setQuestionSlug(questionMatch[1]);
+      setCurrentPage('question-page');
       return;
     }
 
@@ -170,6 +185,28 @@ function AppContent() {
         <NewsArticlePage />
         <Footer />
         <FeedbackButton context={{ page: `news/${newsSlug}` }} />
+      </RouterProvider>
+    );
+  }
+
+  if (currentPage === 'questions-index') {
+    return (
+      <>
+        <SafeModeBanner />
+        <QuestionsIndexPage />
+        <Footer />
+        <FeedbackButton context={{ page: 'questions' }} />
+      </>
+    );
+  }
+
+  if (currentPage === 'question-page' && questionSlug) {
+    return (
+      <RouterProvider params={{ slug: questionSlug }}>
+        <SafeModeBanner />
+        <QuestionPageComponent />
+        <Footer />
+        <FeedbackButton context={{ page: `questions/${questionSlug}` }} />
       </RouterProvider>
     );
   }
