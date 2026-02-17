@@ -345,9 +345,15 @@ export function LandingPage() {
           </div>
 
           <div className="text-center mt-8">
-            <div className="inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold mb-4">
+            <button
+              onClick={() => {
+                const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK;
+                if (stripeLink) window.location.href = stripeLink;
+              }}
+              className="inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold mb-4 hover:bg-green-200 transition-colors cursor-pointer"
+            >
               Only $2.99/month - 7-Day Free Trial
-            </div>
+            </button>
             <p className="text-fdp-text-3">
               Cancel anytime. No long-term commitment.
             </p>
