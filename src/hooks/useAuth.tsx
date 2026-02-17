@@ -19,19 +19,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setLoading(false);
-    }, 5000);
+    let resolved = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(timeout);
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    }).catch(() => {
-      clearTimeout(timeout);
-      setLoading(false);
-    });
+    const finish = (sess: typeof session) => {
+      if (!resolved) {
+        resolved = true;
+        setSession(sess);
+        setUser(sess?.user ?? null);
+        setLoading(false);
+      }
+    };
+
+    const timeout = setTimeout(() => finish(null), 2000);
+
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        clearTimeout(timeout);
+        finish(session);
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        finish(null);
+      });
 
     const {
       data: { subscription },
