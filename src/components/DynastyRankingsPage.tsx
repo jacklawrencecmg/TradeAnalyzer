@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TrendingUp, Calendar, Search } from 'lucide-react';
+import { TrendingUp, Calendar, Search, AlertCircle } from 'lucide-react';
 import { Link } from '../lib/seo/router';
 import { supabase } from '../lib/supabase';
 import { generateRankingsMetaTags, generatePlayerSlug } from '../lib/seo/meta';
@@ -20,6 +20,7 @@ interface RankedPlayer {
 export function DynastyRankingsPage() {
   const [players, setPlayers] = useState<RankedPlayer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [positionFilter, setPositionFilter] = useState<string>('ALL');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -44,8 +45,8 @@ export function DynastyRankingsPage() {
 
       const { data, error } = await supabase
         .from('latest_player_values')
-        .select('player_id, player_name, position, team, base_value, adjusted_value, updated_at')
-        .in('position', ['QB', 'RB', 'WR', 'TE'])
+        .select('player_id, player_name, position, team, base_value, adjusted_value, rank_overall, updated_at')
+        .in('position', ['QB', 'RB', 'WR', 'TE', 'LB', 'DL', 'DB'])
         .order('base_value', { ascending: false })
         .limit(1000);
 
@@ -68,6 +69,7 @@ export function DynastyRankingsPage() {
       }
     } catch (err) {
       console.error('Error loading rankings:', err);
+      setError('Failed to load rankings. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -128,8 +130,8 @@ export function DynastyRankingsPage() {
               />
             </div>
 
-            <div className="flex gap-2">
-              {['ALL', 'QB', 'RB', 'WR', 'TE'].map(pos => (
+            <div className="flex flex-wrap gap-2">
+              {['ALL', 'QB', 'RB', 'WR', 'TE', 'LB', 'DL', 'DB'].map(pos => (
                 <button
                   key={pos}
                   onClick={() => setPositionFilter(pos)}
@@ -161,6 +163,30 @@ export function DynastyRankingsPage() {
                 </tr>
               </thead>
               <tbody>
+                {error ? (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <AlertCircle className="w-8 h-8 text-fdp-neg" />
+                        <p className="text-fdp-text-2">{error}</p>
+                        <button
+                          onClick={loadRankings}
+                          className="px-4 py-2 bg-fdp-accent-1 text-fdp-bg-0 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredPlayers.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-12 text-center text-fdp-text-3">
+                      {searchTerm || positionFilter !== 'ALL'
+                        ? 'No players match your filters.'
+                        : 'No rankings data available.'}
+                    </td>
+                  </tr>
+                ) : null}
                 {filteredPlayers.map((player, index) => (
                   <tr
                     key={player.player_id}
