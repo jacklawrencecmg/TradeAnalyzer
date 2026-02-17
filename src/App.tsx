@@ -172,7 +172,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <NewsIndexPage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: 'news' }} />
       </>
     );
@@ -183,7 +183,7 @@ function AppContent() {
       <RouterProvider params={{ slug: newsSlug }}>
         <SafeModeBanner />
         <NewsArticlePage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: `news/${newsSlug}` }} />
       </RouterProvider>
     );
@@ -194,7 +194,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <QuestionsIndexPage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: 'questions' }} />
       </>
     );
@@ -205,7 +205,7 @@ function AppContent() {
       <RouterProvider params={{ slug: questionSlug }}>
         <SafeModeBanner />
         <QuestionPageComponent />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: `questions/${questionSlug}` }} />
       </RouterProvider>
     );
@@ -216,7 +216,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <DynastyRankingsPage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: 'dynasty-rankings' }} />
       </>
     );
@@ -227,7 +227,7 @@ function AppContent() {
       <RouterProvider params={{ slug: playerSlug }}>
         <SafeModeBanner />
         <PlayerValuePage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: `player-value/${playerSlug}` }} />
       </RouterProvider>
     );
@@ -238,7 +238,7 @@ function AppContent() {
       <RouterProvider params={{ slug: comparisonSlug }}>
         <SafeModeBanner />
         <PlayerComparisonPage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: `comparison/${comparisonSlug}` }} />
       </RouterProvider>
     );
@@ -249,7 +249,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <Top1000Rankings />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: 'top1000' }} />
       </>
     );
@@ -260,7 +260,7 @@ function AppContent() {
       <>
         <SafeModeBanner />
         <LandingPage />
-        <Footer />
+        <Footer onNavigate={setCurrentPage} />
         <FeedbackButton context={{ page: 'landing' }} />
       </>
     );
