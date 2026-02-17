@@ -4,7 +4,6 @@ import { Link } from '../lib/seo/router';
 import { supabase } from '../lib/supabase';
 import { generateRankingsMetaTags, generatePlayerSlug } from '../lib/seo/meta';
 import { generateRankingsStructuredData, injectStructuredData } from '../lib/seo/structuredData';
-import { getFDPValue } from '../lib/fdp/getFDPValue';
 import { TableSkeleton } from './LoadingSkeleton';
 
 interface RankedPlayer {
@@ -44,22 +43,28 @@ export function DynastyRankingsPage() {
       setLoading(true);
 
       const { data, error } = await supabase
-        .rpc('get_latest_player_values', {})
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team, base_value, adjusted_value, updated_at')
+        .in('position', ['QB', 'RB', 'WR', 'TE'])
         .order('base_value', { ascending: false })
         .limit(1000);
 
       if (error) throw error;
 
-      const enriched = data.map((p: any, index: number) => ({
-        ...p,
-        fdp_value: getFDPValue(p),
-        dynasty_rank: index + 1
+      const enriched = (data || []).map((p: any, index: number) => ({
+        player_id: p.player_id,
+        full_name: p.player_name || 'Unknown',
+        position: p.position,
+        team: p.team,
+        fdp_value: p.adjusted_value || p.base_value || 0,
+        dynasty_rank: index + 1,
+        value_change_7d: undefined,
       }));
 
       setPlayers(enriched);
 
-      if (data.length > 0 && data[0].value_epoch) {
-        setLastUpdated(new Date(data[0].value_epoch));
+      if (data && data.length > 0 && data[0].updated_at) {
+        setLastUpdated(new Date(data[0].updated_at));
       }
     } catch (err) {
       console.error('Error loading rankings:', err);
