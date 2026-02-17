@@ -1,4 +1,4 @@
-import { Check, X, Sparkles, ArrowLeft } from 'lucide-react';
+import { Check, X, Sparkles, ArrowLeft, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { createCheckoutSession } from '../lib/subscription';
 import { useSubscription } from '../hooks/useSubscription';
@@ -11,6 +11,7 @@ interface PricingPageProps {
 
 export default function PricingPage({ onBack }: PricingPageProps) {
   const [loading, setLoading] = useState(false);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('yearly');
   const { subscription, isPro } = useSubscription();
 
   const handleUpgrade = () => {
@@ -78,9 +79,36 @@ export default function PricingPage({ onBack }: PricingPageProps) {
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
             Choose Your Plan
           </h1>
-          <p className="text-xl text-gray-600">
+          <p className="text-xl text-gray-600 mb-6">
             Start with our free tier or unlock premium features with Pro
           </p>
+
+          <div className="inline-flex items-center gap-2 bg-gray-100 rounded-xl p-1">
+            <button
+              onClick={() => setBillingCycle('monthly')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                billingCycle === 'monthly'
+                  ? 'bg-white text-gray-900 shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Monthly
+            </button>
+            <button
+              onClick={() => setBillingCycle('yearly')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all flex items-center gap-2 ${
+                billingCycle === 'yearly'
+                  ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Zap className="w-4 h-4" />
+              Yearly
+              <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-bold">
+                SAVE 40%
+              </span>
+            </button>
+          </div>
         </div>
 
         {isPro && !subscription?.is_trial && (
@@ -154,15 +182,30 @@ export default function PricingPage({ onBack }: PricingPageProps) {
                 <h2 className="text-2xl font-bold text-gray-900">Pro</h2>
                 <ProBadge size="md" />
               </div>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-4xl font-bold text-gray-900">$2.99</span>
-                <span className="text-gray-600">/month</span>
+              <div className="flex items-baseline gap-2 mb-2">
+                {billingCycle === 'monthly' ? (
+                  <>
+                    <span className="text-4xl font-bold text-gray-900">$4.99</span>
+                    <span className="text-gray-600">/month</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-4xl font-bold text-gray-900">$2.99</span>
+                    <span className="text-gray-600">/month</span>
+                  </>
+                )}
               </div>
+              {billingCycle === 'yearly' && (
+                <div className="text-sm text-gray-600 mb-4">
+                  <span className="line-through">$59.88/year</span>
+                  <span className="ml-2 font-bold text-green-600">$35.88/year</span>
+                </div>
+              )}
               <p className="text-gray-700">
                 For serious dynasty managers who want every edge
               </p>
               <div className="mt-4 inline-block px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-semibold">
-                7-Day Free Trial
+                {billingCycle === 'yearly' ? '24-Hour Free Trial' : '7-Day Free Trial'}
               </div>
             </div>
 

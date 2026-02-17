@@ -35,12 +35,43 @@ export const USAGE_LIMITS = {
   free: {
     trade_calc: 3,
     league_import: 1,
+    alerts: 5,
+    tracked_players: 3,
+    trade_saves: 5,
   },
   pro: {
     trade_calc: Infinity,
     league_import: Infinity,
+    alerts: Infinity,
+    tracked_players: Infinity,
+    trade_saves: Infinity,
   },
 } as const;
+
+export interface QuotaCheck {
+  allowed: boolean;
+  has_premium: boolean;
+  current_count: number;
+  limit: number | null;
+  remaining: number | null;
+}
+
+export interface MissedOpportunity {
+  opportunity_id: string;
+  opportunity_type: string;
+  player_id: string;
+  value_before: number;
+  value_after: number;
+  detected_at: string;
+  free_user_could_have_saved: string;
+}
+
+export interface ValueProof {
+  missed_opportunities_count: number;
+  total_value_change: number;
+  avg_hours_delayed: number;
+  top_opportunities: MissedOpportunity[];
+}
 
 export async function getUserSubscription(userId: string): Promise<UserSubscription | null> {
   try {
@@ -286,4 +317,156 @@ export function getFeatureDescription(feature: string): string {
   };
 
   return descriptions[feature] || 'Premium feature';
+}
+
+export async function checkQuota(
+  userId: string,
+  quotaType: string,
+  freeLimit: number
+): Promise<QuotaCheck> {
+  try {
+    const { data, error } = await supabase.rpc('check_usage_quota', {
+      p_user_id: userId,
+      p_quota_type: quotaType,
+      p_free_limit: freeLimit,
+    });
+
+    if (error) {
+      console.error('Error checking quota:', error);
+      return {
+        allowed: false,
+        has_premium: false,
+        current_count: 0,
+        limit: freeLimit,
+        remaining: freeLimit,
+      };
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error:', err);
+    return {
+      allowed: false,
+      has_premium: false,
+      current_count: 0,
+      limit: freeLimit,
+      remaining: freeLimit,
+    };
+  }
+}
+
+export async function incrementUsage(
+  userId: string,
+  actionType: string,
+  quotaType?: string
+): Promise<void> {
+  try {
+    await supabase.rpc('increment_usage', {
+      p_user_id: userId,
+      p_action_type: actionType,
+      p_quota_type: quotaType,
+    });
+  } catch (err) {
+    console.error('Error incrementing usage:', err);
+  }
+}
+
+export async function grantTrial(
+  userId: string,
+  triggerAction: string,
+  durationHours: number = 24
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('grant_trial', {
+      p_user_id: userId,
+      p_trigger_action: triggerAction,
+      p_duration_hours: durationHours,
+    });
+
+    if (error) {
+      console.error('Error granting trial:', error);
+      return null;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error:', err);
+    return null;
+  }
+}
+
+export async function recordMissedOpportunity(
+  userId: string,
+  opportunityType: string,
+  playerId: string,
+  valueBefore: number,
+  valueAfter: number,
+  benefitDescription: string
+): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.rpc('record_missed_opportunity', {
+      p_user_id: userId,
+      p_opportunity_type: opportunityType,
+      p_player_id: playerId,
+      p_value_before: valueBefore,
+      p_value_after: valueAfter,
+      p_benefit_description: benefitDescription,
+    });
+
+    if (error) {
+      console.error('Error recording missed opportunity:', error);
+      return null;
+    }
+
+    return data;
+  } catch (err) {
+    console.error('Error:', err);
+    return null;
+  }
+}
+
+export async function getValueProof(userId: string): Promise<ValueProof | null> {
+  try {
+    const { data, error } = await supabase.rpc('get_value_proof', {
+      p_user_id: userId,
+    });
+
+    if (error) {
+      console.error('Error getting value proof:', error);
+      return null;
+    }
+
+    if (!data || data.length === 0) {
+      return {
+        missed_opportunities_count: 0,
+        total_value_change: 0,
+        avg_hours_delayed: 0,
+        top_opportunities: [],
+      };
+    }
+
+    return data[0];
+  } catch (err) {
+    console.error('Error:', err);
+    return null;
+  }
+}
+
+export async function recordUpgradeTrigger(
+  userId: string,
+  triggerType: string,
+  context: Record<string, any> = {}
+): Promise<void> {
+  try {
+    await supabase
+      .from('upgrade_triggers')
+      .insert({
+        user_id: userId,
+        trigger_type: triggerType,
+        context,
+        shown_at: new Date().toISOString(),
+      });
+  } catch (err) {
+    console.error('Error recording upgrade trigger:', err);
+  }
 }
