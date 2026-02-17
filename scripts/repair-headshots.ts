@@ -7,150 +7,230 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase credentials');
+  console.error('❌ Missing Supabase credentials');
   process.exit(1);
 }
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-async function repairHeadshots() {
-  console.log('Starting headshot repair process...\n');
-
-  console.log('Step 1: Getting current headshot statistics...');
-  const { data: statsBefore, error: statsError } = await supabase.rpc('get_headshot_stats');
-
-  if (statsError) {
-    console.error('Error getting stats:', statsError);
-    process.exit(1);
-  }
-
-  if (statsBefore && statsBefore[0]) {
-    const stats = statsBefore[0];
-    console.log(`Current state:`);
-    console.log(`  Total players: ${stats.total_players}`);
-    console.log(`  With headshot: ${stats.with_headshot}`);
-    console.log(`  Missing headshot: ${stats.missing_headshot}`);
-    console.log(`  Verified headshot: ${stats.verified_headshot}`);
-    console.log(`  Percent complete: ${stats.percent_complete}%\n`);
-  }
-
-  console.log('Step 2: Detecting duplicate headshots...');
-  const { data: duplicates, error: duplicatesError } = await supabase.rpc(
-    'detect_duplicate_headshots'
-  );
-
-  if (duplicatesError) {
-    console.error('Error detecting duplicates:', duplicatesError);
-  } else if (duplicates && duplicates.length > 0) {
-    console.log(`Found ${duplicates.length} duplicate headshots:`);
-    duplicates.slice(0, 5).forEach((dup) => {
-      console.log(`  ${dup.headshot_url}`);
-      console.log(`    Used by ${dup.player_count} players: ${dup.player_names.join(', ')}`);
-    });
-    console.log();
-
-    console.log('Clearing duplicate headshots...');
-    for (const dup of duplicates) {
-      await supabase
-        .from('player_identity')
-        .update({
-          headshot_url: null,
-          headshot_source: null,
-          headshot_updated_at: null,
-          headshot_verified: false,
-        })
-        .eq('headshot_url', dup.headshot_url);
-    }
-    console.log('Cleared duplicate headshots\n');
-  } else {
-    console.log('No duplicate headshots found\n');
-  }
-
-  console.log('Step 3: Clearing non-verified headshots for re-sync...');
-  const { error: clearError } = await supabase
-    .from('player_identity')
-    .update({
-      headshot_url: null,
-      headshot_source: null,
-      headshot_updated_at: null,
-    })
-    .eq('headshot_verified', false)
-    .not('headshot_url', 'is', null);
-
-  if (clearError) {
-    console.error('Error clearing headshots:', clearError);
-  } else {
-    console.log('Cleared non-verified headshots\n');
-  }
-
-  console.log('Step 4: Syncing headshots from Sleeper...');
-  const syncUrl = `${supabaseUrl}/functions/v1/sync-player-headshots?force=false`;
-
-  try {
-    const response = await fetch(syncUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const result = await response.json();
-    console.log(`Sync result: ${result.message}`);
-    console.log(`  Synced: ${result.synced}`);
-    console.log(`  Skipped: ${result.skipped}`);
-    console.log(`  Errors: ${result.errors}\n`);
-  } catch (error) {
-    console.error('Error calling sync function:', error);
-  }
-
-  console.log('Step 5: Syncing missing headshots with fallback providers...');
-  const missingSyncUrl = `${supabaseUrl}/functions/v1/sync-player-headshots?missing_only=true`;
-
-  try {
-    const response = await fetch(missingSyncUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${supabaseServiceKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const result = await response.json();
-    console.log(`Missing sync result: ${result.message}`);
-    console.log(`  Synced: ${result.synced}\n`);
-  } catch (error) {
-    console.error('Error calling missing sync function:', error);
-  }
-
-  console.log('Step 6: Getting final headshot statistics...');
-  const { data: statsAfter, error: statsAfterError } = await supabase.rpc('get_headshot_stats');
-
-  if (statsAfterError) {
-    console.error('Error getting final stats:', statsAfterError);
-  } else if (statsAfter && statsAfter[0]) {
-    const stats = statsAfter[0];
-    console.log(`Final state:`);
-    console.log(`  Total players: ${stats.total_players}`);
-    console.log(`  With headshot: ${stats.with_headshot}`);
-    console.log(`  Missing headshot: ${stats.missing_headshot}`);
-    console.log(`  Verified headshot: ${stats.verified_headshot}`);
-    console.log(`  Percent complete: ${stats.percent_complete}%\n`);
-
-    const improvement =
-      statsBefore && statsBefore[0]
-        ? stats.percent_complete - statsBefore[0].percent_complete
-        : 0;
-
-    if (improvement > 0) {
-      console.log(`Improvement: +${improvement.toFixed(2)}%`);
-    }
-  }
-
-  console.log('\nHeadshot repair process complete!');
+interface PlayerIdentity {
+  player_id: string;
+  full_name: string;
+  position: string;
+  team: string | null;
+  sleeper_id: string | null;
+  espn_id: string | null;
+  gsis_id: string | null;
+  headshot_url: string | null;
 }
 
-repairHeadshots().catch((error) => {
-  console.error('Fatal error:', error);
-  process.exit(1);
-});
+const DEFAULT_SILHOUETTE = 'https://sleepercdn.com/images/v2/icons/player_default.webp';
+
+function buildSleeperHeadshot(sleeperId: string): string {
+  return `https://sleepercdn.com/content/nfl/players/thumb/${sleeperId}.jpg`;
+}
+
+function buildEspnHeadshot(espnId: string): string {
+  return `https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${espnId}.png&w=350&h=254`;
+}
+
+function buildGsisHeadshot(gsisId: string): string {
+  return `https://a.espncdn.com/combiner/i?img=/i/headshots/nfl/players/full/${gsisId}.png&w=350&h=254`;
+}
+
+async function verifyImageUrl(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveHeadshotUrl(player: PlayerIdentity): Promise<{
+  url: string;
+  source: 'sleeper' | 'espn' | 'gsis' | 'manual' | 'fallback';
+  confidence: number;
+}> {
+  if (player.sleeper_id) {
+    const url = buildSleeperHeadshot(player.sleeper_id);
+    const valid = await verifyImageUrl(url);
+    if (valid) {
+      return { url, source: 'sleeper', confidence: 95 };
+    }
+  }
+
+  if (player.espn_id) {
+    const url = buildEspnHeadshot(player.espn_id);
+    const valid = await verifyImageUrl(url);
+    if (valid) {
+      return { url, source: 'espn', confidence: 85 };
+    }
+  }
+
+  if (player.gsis_id) {
+    const url = buildGsisHeadshot(player.gsis_id);
+    const valid = await verifyImageUrl(url);
+    if (valid) {
+      return { url, source: 'gsis', confidence: 80 };
+    }
+  }
+
+  if (player.headshot_url && player.headshot_url !== DEFAULT_SILHOUETTE) {
+    const valid = await verifyImageUrl(player.headshot_url);
+    if (valid) {
+      return { url: player.headshot_url, source: 'manual', confidence: 70 };
+    }
+  }
+
+  return { url: DEFAULT_SILHOUETTE, source: 'fallback', confidence: 0 };
+}
+
+async function getAllRankedPlayers(): Promise<PlayerIdentity[]> {
+  console.log('📊 Fetching all ranked players...');
+
+  const { data: rankedPlayers, error } = await supabase
+    .from('ktc_value_snapshots')
+    .select('player_id')
+    .not('player_id', 'is', null);
+
+  if (error) {
+    throw new Error(`Failed to fetch ranked players: ${error.message}`);
+  }
+
+  const uniquePlayerIds = [...new Set(rankedPlayers.map(p => p.player_id))];
+  console.log(`✅ Found ${uniquePlayerIds.length} unique ranked players`);
+
+  const { data: players, error: identityError } = await supabase
+    .from('player_identity')
+    .select('player_id, full_name, position, team, sleeper_id, espn_id, gsis_id, headshot_url')
+    .in('player_id', uniquePlayerIds);
+
+  if (identityError) {
+    throw new Error(`Failed to fetch player identities: ${identityError.message}`);
+  }
+
+  console.log(`✅ Loaded ${players.length} player identities`);
+  return players;
+}
+
+async function detectDuplicates(): Promise<void> {
+  console.log('\n🔍 Checking for duplicate headshots...');
+
+  const { data: duplicates, error } = await supabase
+    .from('player_headshot_duplicates')
+    .select('*');
+
+  if (error) {
+    console.error('⚠️  Error checking duplicates:', error.message);
+    return;
+  }
+
+  if (!duplicates || duplicates.length === 0) {
+    console.log('✅ No duplicate headshots found');
+    return;
+  }
+
+  console.log(`⚠️  Found ${duplicates.length} duplicate headshots:`);
+  for (const dup of duplicates) {
+    console.log(`  - ${dup.headshot_url}`);
+    console.log(`    Used by ${dup.player_count} players: ${dup.player_ids.join(', ')}`);
+    console.log(`    Sources: ${dup.sources.join(', ')}`);
+    console.log(`    Min confidence: ${dup.min_confidence}`);
+  }
+}
+
+async function repairHeadshots(dryRun = false): Promise<void> {
+  console.log('\n🔧 Starting headshot repair...');
+  if (dryRun) {
+    console.log('📝 DRY RUN MODE - No changes will be made\n');
+  }
+
+  const players = await getAllRankedPlayers();
+
+  let processed = 0;
+  let resolved = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const player of players) {
+    processed++;
+
+    const { data: existing } = await supabase
+      .from('player_headshots')
+      .select('is_override, headshot_url, source, confidence')
+      .eq('player_id', player.player_id)
+      .eq('is_override', true)
+      .maybeSingle();
+
+    if (existing) {
+      skipped++;
+      if (processed % 100 === 0) {
+        console.log(`[${processed}/${players.length}] Skipped ${player.full_name} (manual override)`);
+      }
+      continue;
+    }
+
+    const result = await resolveHeadshotUrl(player);
+
+    if (result.source === 'fallback') {
+      failed++;
+      console.log(`⚠️  [${processed}/${players.length}] ${player.full_name} (${player.position}) - No valid headshot found`);
+      console.log(`    IDs: Sleeper=${player.sleeper_id || 'none'}, ESPN=${player.espn_id || 'none'}, GSIS=${player.gsis_id || 'none'}`);
+    } else {
+      resolved++;
+      if (processed % 100 === 0) {
+        console.log(`✅ [${processed}/${players.length}] ${player.full_name} - ${result.source} (${result.confidence})`);
+      }
+    }
+
+    if (!dryRun) {
+      const { error: upsertError } = await supabase
+        .from('player_headshots')
+        .upsert({
+          player_id: player.player_id,
+          headshot_url: result.url,
+          source: result.source,
+          confidence: result.confidence,
+          is_override: false,
+          verified_at: new Date().toISOString(),
+        }, {
+          onConflict: 'player_id',
+          ignoreDuplicates: false,
+        });
+
+      if (upsertError) {
+        console.error(`❌ Failed to upsert ${player.full_name}:`, upsertError.message);
+      }
+    }
+
+    if (processed % 50 === 0) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+
+  console.log('\n📊 Repair Summary:');
+  console.log(`  Total processed: ${processed}`);
+  console.log(`  ✅ Resolved: ${resolved} (${((resolved/processed)*100).toFixed(1)}%)`);
+  console.log(`  ⚠️  Failed (fallback): ${failed} (${((failed/processed)*100).toFixed(1)}%)`);
+  console.log(`  🔒 Skipped (override): ${skipped}`);
+
+  await detectDuplicates();
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const dryRun = args.includes('--dry-run');
+
+  console.log('🎯 Player Headshot Repair Tool\n');
+
+  try {
+    await repairHeadshots(dryRun);
+    console.log('\n✅ Headshot repair completed!');
+  } catch (error) {
+    console.error('\n❌ Error during repair:', error);
+    process.exit(1);
+  }
+}
+
+main();

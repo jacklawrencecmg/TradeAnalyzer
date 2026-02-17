@@ -48,6 +48,7 @@ import IDPAdminUpload from './IDPAdminUpload';
 import TeamAdvice from './TeamAdvice';
 import MarketTrends from './MarketTrends';
 import WatchlistPanel from './WatchlistPanel';
+import HeadshotAdmin from './HeadshotAdmin';
 import AlertsDropdown from './AlertsDropdown';
 import DynastyReportsIndex from './DynastyReportsIndex';
 import DynastyReportPage from './DynastyReportPage';
@@ -397,6 +398,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                     <NavButton icon={Calendar} label="Rookie Pick Values" shortLabel="Picks" tab="pickValues" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Shield} label="IDP Rankings" shortLabel="IDP" tab="idpRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Upload} label="IDP Upload" shortLabel="Upload" tab="idpUpload" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Users} label="Headshot Admin" shortLabel="Headshots" tab="headshotAdmin" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={RefreshCw} label="Multi-Position Sync" shortLabel="Multi" tab="ktcMultiSync" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={TrendingUp} label="All Rankings" shortLabel="Rankings" tab="unifiedRankings" activeTab={activeTab} onClick={setActiveTab} />
                   </div>
@@ -453,6 +455,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'pickValues' && <RookiePickValues />}
               {activeTab === 'idpRankings' && <IDPRankings />}
               {activeTab === 'idpUpload' && <IDPAdminUpload />}
+              {activeTab === 'headshotAdmin' && <HeadshotAdmin />}
               {activeTab === 'ktcMultiSync' && <KTCMultiPositionSync />}
               {activeTab === 'unifiedRankings' && <UnifiedRankings />}
               {activeTab === 'sleeperAnalysis' && <SleeperLeagueAnalysis />}
