@@ -412,8 +412,8 @@ export function LandingPage() {
           <div className="text-center mt-10">
             <button
               onClick={() => {
-                const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK;
-                if (stripeLink) window.location.href = stripeLink;
+                setMode('signup');
+                setShowAuth(true);
               }}
               className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full font-bold text-base shadow-md hover:shadow-lg transition-all cursor-pointer mb-3"
             >
