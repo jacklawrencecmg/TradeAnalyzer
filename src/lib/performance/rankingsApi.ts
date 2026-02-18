@@ -8,6 +8,10 @@
  */
 
 import { supabase } from '../supabase';
+import { cachedFetch, getCacheKey } from '../cache';
+
+const RANKINGS_CACHE_TTL = 5 * 60 * 1000;
+const STATS_CACHE_TTL = 10 * 60 * 1000;
 
 export interface RankingsQuery {
   leagueProfileId?: string | null;
@@ -144,6 +148,23 @@ export async function getPositionRankings(
 /**
  * Get player rank (single query)
  */
+async function getTotalPlayerCount(format: 'dynasty' | 'redraft'): Promise<number> {
+  const cacheKey = getCacheKey(['rankings-total-count', format]);
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      const { count } = await supabase
+        .from('latest_player_values')
+        .select('*', { count: 'exact', head: true })
+        .eq('format', format)
+        .is('league_profile_id', null)
+        .not('fdp_value', 'is', null);
+      return count || 0;
+    },
+    STATS_CACHE_TTL
+  );
+}
+
 export async function getPlayerRank(
   playerId: string,
   format: 'dynasty' | 'redraft'
@@ -153,28 +174,23 @@ export async function getPlayerRank(
   total: number;
 } | null> {
   try {
-    const { data, error } = await supabase
-      .from('latest_player_values')
-      .select('position_rank, fdp_value')
-      .eq('player_id', playerId)
-      .eq('format', format)
-      .is('league_profile_id', null)
-      .maybeSingle();
+    const [playerData, total] = await Promise.all([
+      supabase
+        .from('latest_player_values')
+        .select('position_rank, fdp_value')
+        .eq('player_id', playerId)
+        .eq('format', format)
+        .is('league_profile_id', null)
+        .maybeSingle(),
+      getTotalPlayerCount(format),
+    ]);
 
-    if (error || !data) return null;
-
-    // Get total count
-    const { count } = await supabase
-      .from('latest_player_values')
-      .select('*', { count: 'exact', head: true })
-      .eq('format', format)
-      .is('league_profile_id', null)
-      .not('fdp_value', 'is', null);
+    if (playerData.error || !playerData.data) return null;
 
     return {
-      rank: data.position_rank,
-      value: data.fdp_value,
-      total: count || 0,
+      rank: playerData.data.position_rank,
+      value: playerData.data.fdp_value,
+      total,
     };
   } catch (error) {
     console.error('Get player rank error:', error);
@@ -216,35 +232,42 @@ export async function getRankingsStats(
   valueEpoch: string | null;
   lastUpdated: string | null;
 }> {
-  try {
-    const { data } = await supabase
-      .from('latest_player_values')
-      .select('player_position, value_epoch, captured_at')
-      .eq('format', format)
-      .is('league_profile_id', null)
-      .not('fdp_value', 'is', null);
+  const cacheKey = getCacheKey(['rankings-stats', format]);
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      try {
+        const { data } = await supabase
+          .from('latest_player_values')
+          .select('player_position, value_epoch, captured_at')
+          .eq('format', format)
+          .is('league_profile_id', null)
+          .not('fdp_value', 'is', null);
 
-    if (!data) {
-      return { totalPlayers: 0, byPosition: {}, valueEpoch: null, lastUpdated: null };
-    }
+        if (!data) {
+          return { totalPlayers: 0, byPosition: {}, valueEpoch: null, lastUpdated: null };
+        }
 
-    const byPosition: Record<string, number> = {};
-    data.forEach((row) => {
-      const pos = row.player_position || 'UNKNOWN';
-      byPosition[pos] = (byPosition[pos] || 0) + 1;
-    });
+        const byPosition: Record<string, number> = {};
+        data.forEach((row) => {
+          const pos = row.player_position || 'UNKNOWN';
+          byPosition[pos] = (byPosition[pos] || 0) + 1;
+        });
 
-    const valueEpoch = data[0]?.value_epoch || null;
-    const lastUpdated = data[0]?.captured_at || null;
+        const valueEpoch = data[0]?.value_epoch || null;
+        const lastUpdated = data[0]?.captured_at || null;
 
-    return {
-      totalPlayers: data.length,
-      byPosition,
-      valueEpoch,
-      lastUpdated,
-    };
-  } catch (error) {
-    console.error('Get rankings stats error:', error);
-    return { totalPlayers: 0, byPosition: {}, valueEpoch: null, lastUpdated: null };
-  }
+        return {
+          totalPlayers: data.length,
+          byPosition,
+          valueEpoch,
+          lastUpdated,
+        };
+      } catch (error) {
+        console.error('Get rankings stats error:', error);
+        return { totalPlayers: 0, byPosition: {}, valueEpoch: null, lastUpdated: null };
+      }
+    },
+    STATS_CACHE_TTL
+  );
 }

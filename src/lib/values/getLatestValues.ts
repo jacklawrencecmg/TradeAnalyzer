@@ -168,36 +168,46 @@ export async function getLatestValueForPlayer(
   );
 }
 
+const HISTORY_CACHE_TTL = 24 * 60 * 60 * 1000;
+
 export async function getPlayerValueHistory(
   playerId: string,
   format: string = 'dynasty_sf',
   days: number = 180
 ): Promise<Array<{ captured_at: string; ktc_value: number; fdp_value: number | null }>> {
-  try {
-    const sinceDate = new Date();
-    sinceDate.setDate(sinceDate.getDate() - days);
+  const cacheKey = getCacheKey(['player-history', playerId, format, String(days)]);
 
-    const { data, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('captured_at, ktc_value, fdp_value')
-      .eq('player_id', playerId)
-      .eq('format', format)
-      .gte('captured_at', sinceDate.toISOString())
-      .order('captured_at', { ascending: true });
+  return cachedFetch(
+    cacheKey,
+    async () => {
+      try {
+        const sinceDate = new Date();
+        sinceDate.setDate(sinceDate.getDate() - days);
 
-    if (error || !data) {
-      return [];
-    }
+        const { data, error } = await supabase
+          .from('ktc_value_snapshots')
+          .select('captured_at, ktc_value, fdp_value')
+          .eq('player_id', playerId)
+          .eq('format', format)
+          .gte('captured_at', sinceDate.toISOString())
+          .order('captured_at', { ascending: true });
 
-    return data.map(row => ({
-      captured_at: row.captured_at,
-      ktc_value: row.ktc_value || 0,
-      fdp_value: row.fdp_value,
-    }));
-  } catch (err) {
-    console.error('Error in getPlayerValueHistory:', err);
-    return [];
-  }
+        if (error || !data) {
+          return [];
+        }
+
+        return data.map(row => ({
+          captured_at: row.captured_at,
+          ktc_value: row.ktc_value || 0,
+          fdp_value: row.fdp_value,
+        }));
+      } catch (err) {
+        console.error('Error in getPlayerValueHistory:', err);
+        return [];
+      }
+    },
+    HISTORY_CACHE_TTL
+  );
 }
 
 export async function getAllLatestValues(format: string = 'dynasty_sf'): Promise<PlayerValue[]> {
@@ -394,16 +404,8 @@ export async function searchPlayerValues(
 
     if (result.suggestions && result.suggestions.length > 0) {
       const playerIds = result.suggestions.map(s => s.player_id).slice(0, limit);
-      const values: PlayerValue[] = [];
-
-      for (const playerId of playerIds) {
-        const value = await getLatestValueForPlayer(playerId, format);
-        if (value) {
-          values.push(value);
-        }
-      }
-
-      return values;
+      const settled = await Promise.all(playerIds.map(id => getLatestValueForPlayer(id, format)));
+      return settled.filter((v): v is PlayerValue => v !== null);
     }
 
     return [];
