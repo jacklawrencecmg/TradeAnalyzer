@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import TradeAnalyzer from './TradeAnalyzer';
 import { TodayInDynasty } from './TodayInDynasty';
-import { LogIn, UserPlus, TrendingUp, Target, Bell } from 'lucide-react';
+import { LogIn, UserPlus, TrendingUp, Target, Bell, Users, BarChart2, Star, Shield, Zap, Trophy } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export function LandingPage() {
@@ -308,53 +308,118 @@ export function LandingPage() {
           </div>
         </div>
 
-        <div className="max-w-5xl mx-auto mb-12">
-          <h2 className="text-3xl font-bold text-fdp-text-1 text-center mb-8">
-            Unlock Pro Features
-          </h2>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-fdp-surface-1 rounded-lg p-6 border border-fdp-border-1">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <TrendingUp className="w-6 h-6 text-orange-600" />
+        <div className="max-w-6xl mx-auto mb-12">
+          <div className="text-center mb-10">
+            <span className="inline-block bg-orange-100 text-orange-700 text-sm font-semibold px-3 py-1 rounded-full mb-3">Pro Membership</span>
+            <h2 className="text-3xl font-bold text-fdp-text-1 mb-3">
+              Unlock Pro Features
+            </h2>
+            <p className="text-fdp-text-3 max-w-xl mx-auto">Everything you need to dominate your dynasty league — all in one place.</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-5">
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Users className="w-5 h-5 text-orange-600" />
               </div>
-              <h3 className="text-xl font-bold text-fdp-text-1 mb-2">AI Trade Suggestions</h3>
-              <p className="text-fdp-text-3">
-                Get smart trade recommendations based on your team needs and league dynamics.
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">League Import</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Connect your Sleeper, ESPN, or Yahoo league. Get instant roster grades and personalized advice.
               </p>
             </div>
 
-            <div className="bg-fdp-surface-1 rounded-lg p-6 border border-fdp-border-1">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <Target className="w-6 h-6 text-orange-600" />
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <TrendingUp className="w-5 h-5 text-orange-600" />
               </div>
-              <h3 className="text-xl font-bold text-fdp-text-1 mb-2">Team Strategy Advice</h3>
-              <p className="text-fdp-text-3">
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">AI Trade Suggestions</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Get smart trade recommendations based on your roster needs and league dynamics.
+              </p>
+            </div>
+
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Target className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Team Strategy Advice</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
                 Personalized rebuild or compete guidance to maximize your championship odds.
               </p>
             </div>
 
-            <div className="bg-fdp-surface-1 rounded-lg p-6 border border-fdp-border-1">
-              <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mb-4">
-                <Bell className="w-6 h-6 text-orange-600" />
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Trophy className="w-5 h-5 text-orange-600" />
               </div>
-              <h3 className="text-xl font-bold text-fdp-text-1 mb-2">Market Alerts</h3>
-              <p className="text-fdp-text-3">
-                Get notified when player values spike so you can buy low or sell high.
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Power Rankings</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                See how your team stacks up with weekly power rankings and playoff odds projections.
+              </p>
+            </div>
+
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Bell className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Market Alerts</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Get notified when player values spike so you can buy low or sell high at the right moment.
+              </p>
+            </div>
+
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <BarChart2 className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Player Trend Analytics</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Track value history, rising risers, falling fallers, and market consensus over time.
+              </p>
+            </div>
+
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Zap className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Waiver Wire Assistant</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Prioritized FAAB targets and streaming picks based on your roster's specific needs.
+              </p>
+            </div>
+
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Star className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Watchlist & Watchlist Alerts</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Save players you're targeting and get alerted the moment their value changes.
+              </p>
+            </div>
+
+            <div className="bg-fdp-surface-1 rounded-xl p-6 border border-fdp-border-1 hover:border-orange-300 transition-colors group">
+              <div className="w-11 h-11 bg-orange-50 rounded-lg flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
+                <Shield className="w-5 h-5 text-orange-600" />
+              </div>
+              <h3 className="text-lg font-bold text-fdp-text-1 mb-1.5">Advanced IDP Presets</h3>
+              <p className="text-fdp-text-3 text-sm leading-relaxed">
+                Accurate IDP values tuned to your scoring system with position-specific multipliers.
               </p>
             </div>
           </div>
 
-          <div className="text-center mt-8">
+          <div className="text-center mt-10">
             <button
               onClick={() => {
                 const stripeLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK;
                 if (stripeLink) window.location.href = stripeLink;
               }}
-              className="inline-block bg-green-100 text-green-800 px-4 py-2 rounded-full font-semibold mb-4 hover:bg-green-200 transition-colors cursor-pointer"
+              className="inline-block bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-full font-bold text-base shadow-md hover:shadow-lg transition-all cursor-pointer mb-3"
             >
-              Only $2.99/month - 7-Day Free Trial
+              Start 7-Day Free Trial — Only $2.99/mo
             </button>
-            <p className="text-fdp-text-3">
+            <p className="text-fdp-text-3 text-sm">
               Cancel anytime. No long-term commitment.
             </p>
           </div>
