@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase, UserLeague } from '../lib/supabase';
 import { SEASON_CONTEXT } from '../config/seasonContext';
-import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload, Radio, Zap, ChevronRight, AlertCircle, X } from 'lucide-react';
+import { LogOut, Plus, Settings, TrendingUp, Users, Trophy, Activity, History, Search, Shield, Clipboard, FileText, Swords, MessageCircle, Bell, Newspaper, Share2, ArrowLeftRight, ShoppingCart, RefreshCw, Calendar, DollarSign, Mail, Award, Edit, Sparkles, Target, Upload, Radio, Zap, ChevronRight, AlertCircle, X, Sliders } from 'lucide-react';
 import { LeagueManager } from './LeagueManager';
 import { useToast } from './Toast';
 import TradeAnalyzer from './TradeAnalyzer';
@@ -57,9 +57,10 @@ import PricingPage from './PricingPage';
 import UpgradeModal from './UpgradeModal';
 import SubscriptionBadge from './SubscriptionBadge';
 import UsageMeter from './UsageMeter';
+import ValueFineTuner from './ValueFineTuner';
 import { useSubscription } from '../hooks/useSubscription';
 
-type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'ktcWRRankings' | 'ktcTERankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing';
+type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'ktcWRRankings' | 'ktcTERankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing' | 'valueTuner';
 
 interface DashboardProps {
   onNavigate?: (page: 'home' | 'faq' | 'help' | 'contact') => void;
@@ -389,6 +390,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <NavButton icon={RefreshCw} label="System Admin" shortLabel="Admin" tab="adminSync" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Shield} label="FDP Admin Sync" shortLabel="FDP" tab="ktcAdmin" activeTab={activeTab} onClick={setActiveTab} />
+                    <NavButton icon={Sliders} label="Value Fine-Tuner" shortLabel="Fine-Tune" tab="valueTuner" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Trophy} label="QB Rankings" shortLabel="QBs" tab="ktcRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Award} label="RB Rankings" shortLabel="RBs" tab="ktcRBRankings" activeTab={activeTab} onClick={setActiveTab} />
                     <NavButton icon={Radio} label="WR Rankings" shortLabel="WRs" tab="ktcWRRankings" activeTab={activeTab} onClick={setActiveTab} />
@@ -477,6 +479,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'pricing' && (
                 <PricingPage onBack={() => setActiveTab('trade')} />
               )}
+              {activeTab === 'valueTuner' && <ValueFineTuner />}
             </div>
           </div>
         )}
