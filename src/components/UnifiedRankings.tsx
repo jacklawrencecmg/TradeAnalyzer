@@ -43,10 +43,6 @@ export default function UnifiedRankings() {
   const [teamFilter, setTeamFilter] = useState('');
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
 
-  if (selectedPlayer) {
-    return <PlayerDetail playerId={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
-  }
-
   useEffect(() => {
     loadRankings();
   }, [selectedPosition, selectedFormat]);
@@ -79,6 +75,10 @@ export default function UnifiedRankings() {
     const matchesTeam = !teamFilter || player.team === teamFilter;
     return matchesSearch && matchesTeam;
   });
+
+  if (selectedPlayer) {
+    return <PlayerDetail playerId={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
+  }
 
   const teams = Array.from(new Set(players.map((p) => p.team).filter(Boolean))).sort();
 
