@@ -13,10 +13,32 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function getInitialSession(): { user: User | null; session: Session | null; loading: boolean } {
+  try {
+    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    if (storageKey) {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const sess = parsed?.access_token ? parsed : null;
+        if (sess) {
+          const exp = sess.expires_at ?? 0;
+          if (exp > Date.now() / 1000) {
+            return { user: sess.user ?? null, session: sess, loading: false };
+          }
+        }
+      }
+    }
+  } catch {
+  }
+  return { user: null, session: null, loading: true };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initial = getInitialSession();
+  const [user, setUser] = useState<User | null>(initial.user);
+  const [session, setSession] = useState<Session | null>(initial.session);
+  const [loading, setLoading] = useState(initial.loading);
 
   useEffect(() => {
     let resolved = false;
@@ -30,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const timeout = setTimeout(() => finish(null), 2000);
+    const timeout = setTimeout(() => finish(null), 800);
 
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
