@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, Info, Share2, Check, Copy } from 'lucide-react';
 import {
   fetchAllPlayers,
+  fetchAllPlayersFromDatabase,
   analyzeTrade,
   getPlayerImageUrl,
   fetchLeagueRosters,
@@ -94,6 +95,17 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
 
   async function loadPlayers() {
     try {
+      const dbPlayers = await fetchAllPlayersFromDatabase();
+      if (Object.keys(dbPlayers).length > 0) {
+        setPlayers(dbPlayers);
+        setLoading(false);
+        fetchAllPlayers().then(allPlayers => {
+          if (Object.keys(allPlayers).length > 0) {
+            setPlayers(allPlayers);
+          }
+        }).catch(() => {});
+        return;
+      }
       const allPlayers = await fetchAllPlayers();
       setPlayers(allPlayers);
     } catch (error) {

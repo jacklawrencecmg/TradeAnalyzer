@@ -207,28 +207,76 @@ export async function fetchTradedPicks(leagueId: string): Promise<any[]> {
   return data;
 }
 
+export async function fetchAllPlayersFromDatabase(): Promise<Record<string, SleeperPlayer>> {
+  const cacheKey = 'all_players_db';
+  const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
+  if (cached) return cached;
+
+  try {
+    const enrichedMap = await getEnrichedPlayers();
+    if (enrichedMap.size === 0) return {};
+
+    const result: Record<string, SleeperPlayer> = {};
+    enrichedMap.forEach((player, playerId) => {
+      result[playerId] = {
+        player_id: player.player_id,
+        full_name: player.full_name,
+        first_name: player.full_name.split(' ')[0] || '',
+        last_name: player.full_name.split(' ').slice(1).join(' ') || '',
+        position: player.position,
+        team: player.team,
+        age: player.age || 0,
+        injury_status: player.injury_status,
+        status: player.status,
+        years_exp: player.years_exp || undefined,
+      };
+    });
+
+    setCachedData(cacheKey, result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching players from database:', error);
+    return {};
+  }
+}
+
 export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> {
   const cacheKey = 'all_players';
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
   if (cached) return cached;
 
-  const response = await fetch(`${SLEEPER_API_BASE}/players/nfl`);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch players: ${response.statusText}`);
+  const dbPlayers = await fetchAllPlayersFromDatabase();
+  if (Object.keys(dbPlayers).length > 0) {
+    setCachedData(cacheKey, dbPlayers);
+    return dbPlayers;
   }
 
-  const sleeperData = await response.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  // Merge with database to get current team data
-  // Database has more up-to-date team info from recent syncs
   try {
-    const merged = await mergeSleeperWithDatabase(sleeperData);
-    setCachedData(cacheKey, merged);
-    return merged;
+    const response = await fetch(`${SLEEPER_API_BASE}/players/nfl`, { signal: controller.signal });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch players: ${response.statusText}`);
+    }
+
+    const sleeperData = await response.json();
+
+    try {
+      const merged = await mergeSleeperWithDatabase(sleeperData);
+      setCachedData(cacheKey, merged);
+      return merged;
+    } catch (error) {
+      console.error('Error merging with database, using Sleeper data only:', error);
+      setCachedData(cacheKey, sleeperData);
+      return sleeperData;
+    }
   } catch (error) {
-    console.error('Error merging with database, using Sleeper data only:', error);
-    setCachedData(cacheKey, sleeperData);
-    return sleeperData;
+    clearTimeout(timeoutId);
+    console.error('Sleeper API unavailable:', error);
+    return {};
   }
 }
 
