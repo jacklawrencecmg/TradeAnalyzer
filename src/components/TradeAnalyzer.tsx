@@ -93,14 +93,42 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
   }, [leagueId]);
 
   async function loadPlayers() {
-    const timeout = new Promise<Record<string, SleeperPlayer>>((resolve) =>
-      setTimeout(() => resolve({}), 10000)
-    );
     try {
-      const dbPlayers = await Promise.race([fetchAllPlayersFromDatabase(), timeout]);
-      setPlayers(dbPlayers);
+      const { data, error } = await supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team');
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const result: Record<string, SleeperPlayer> = {};
+        data.forEach((p: any) => {
+          if (!p.player_id) return;
+          result[p.player_id] = {
+            player_id: p.player_id,
+            full_name: p.player_name,
+            first_name: (p.player_name || '').split(' ')[0] || '',
+            last_name: (p.player_name || '').split(' ').slice(1).join(' ') || '',
+            position: p.position,
+            team: p.team,
+            age: 0,
+            injury_status: null,
+            status: 'Active',
+          };
+        });
+        setPlayers(result);
+      } else {
+        const dbPlayers = await fetchAllPlayersFromDatabase();
+        setPlayers(dbPlayers);
+      }
     } catch (error) {
       console.error('Failed to load players:', error);
+      try {
+        const dbPlayers = await fetchAllPlayersFromDatabase();
+        setPlayers(dbPlayers);
+      } catch {
+        // leave players empty
+      }
     } finally {
       setLoading(false);
     }
