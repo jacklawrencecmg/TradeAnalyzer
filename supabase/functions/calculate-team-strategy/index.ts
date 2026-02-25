@@ -134,10 +134,10 @@ function calculateLeaguePercentile(starterValue: number, allTeamValues: number[]
   return (rank / sorted.length) * 100;
 }
 
-function determineWindow(analysis: RosterAnalysis, leaguePercentile: number, totalValue: number): { window: 'contend' | 'retool' | 'rebuild'; confidence: number } {
-  const starterRatio = analysis.starter_value / analysis.total_value;
-  const youngRatio = analysis.young_value / analysis.total_value;
-  const agingRatio = analysis.aging_value / analysis.total_value;
+function determineWindow(analysis: RosterAnalysis, leaguePercentile: number): { window: 'contend' | 'retool' | 'rebuild'; confidence: number } {
+  const starterRatio = analysis.total_value > 0 ? analysis.starter_value / analysis.total_value : 0;
+  const youngRatio = analysis.total_value > 0 ? analysis.young_value / analysis.total_value : 0;
+  const agingRatio = analysis.total_value > 0 ? analysis.aging_value / analysis.total_value : 0;
   let window: 'contend' | 'retool' | 'rebuild';
   let confidence = 50;
   if (leaguePercentile >= 70) {
@@ -181,10 +181,10 @@ function detectStrengthsWeaknesses(analysis: RosterAnalysis, allTeamAnalyses: Ro
       weaknesses.push(`${posName} (Bottom ${Math.round(percentile)}%)`);
     }
   });
-  const depthRatio = analysis.bench_value / analysis.total_value;
+  const depthRatio = analysis.total_value > 0 ? analysis.bench_value / analysis.total_value : 0;
   if (depthRatio > 0.4) strengths.push('Roster Depth');
   else if (depthRatio < 0.2) weaknesses.push('Lack of Depth');
-  const youngRatio = analysis.young_value / analysis.total_value;
+  const youngRatio = analysis.total_value > 0 ? analysis.young_value / analysis.total_value : 0;
   if (youngRatio > 0.4) strengths.push('Young Core (Age ≤24)');
   else if (youngRatio < 0.15) weaknesses.push('Aging Roster');
   return { strengths, weaknesses };
@@ -227,7 +227,7 @@ function evaluateTeamStrategy(roster: PlayerValue[], leagueSettings: LeagueSetti
   const allAnalyses = allTeamRosters.map(r => analyzeRoster(r, leagueSettings.roster_positions));
   const allStarterValues = allAnalyses.map(a => a.starter_value);
   const leaguePercentile = calculateLeaguePercentile(analysis.starter_value, allStarterValues);
-  const { window, confidence } = determineWindow(analysis, leaguePercentile, analysis.total_value);
+  const { window, confidence } = determineWindow(analysis, leaguePercentile);
   const { strengths, weaknesses } = detectStrengthsWeaknesses(analysis, allAnalyses);
   const recommendations = generateRecommendations(window, weaknesses, strengths, analysis);
   const positional_scores: Record<string, number> = {};
@@ -259,12 +259,11 @@ function evaluateTeamStrategy(roster: PlayerValue[], leagueSettings: LeagueSetti
   };
 }
 
+const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -281,32 +280,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    let league = null;
+    let league: any = null;
     let actualSleeperLeagueId = sleeper_league_id;
 
     if (league_id) {
-      const { data: leagueData } = await supabase
+      const { data } = await supabase
         .from('leagues')
         .select('*')
         .eq('id', league_id)
         .maybeSingle();
-
-      if (leagueData) {
-        league = leagueData;
-        actualSleeperLeagueId = leagueData.sleeper_league_id;
+      if (data) {
+        league = data;
+        actualSleeperLeagueId = data.sleeper_league_id;
       }
     }
 
     if (!league && sleeper_league_id) {
-      const { data: leagueData } = await supabase
+      const { data } = await supabase
         .from('leagues')
         .select('*')
         .eq('sleeper_league_id', sleeper_league_id)
         .maybeSingle();
-
-      if (leagueData) {
-        league = leagueData;
-      }
+      if (data) league = data;
     }
 
     if (!actualSleeperLeagueId) {
@@ -316,29 +311,91 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const rostersResponse = await fetch(
-      `https://api.sleeper.app/v1/league/${actualSleeperLeagueId}/rosters`
-    );
-    const rosters = await rostersResponse.json();
+    if (!force_refresh && roster_id) {
+      const { data: cached } = await supabase
+        .from('team_strategies')
+        .select('*')
+        .eq('league_id', league_id || null)
+        .eq('roster_id', roster_id)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
 
-    const usersResponse = await fetch(
-      `https://api.sleeper.app/v1/league/${actualSleeperLeagueId}/users`
-    );
-    const users = await usersResponse.json();
+      if (cached) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            league_id,
+            strategies: {
+              roster_id: cached.roster_id,
+              owner_name: cached.owner_name || `Team ${cached.roster_id}`,
+              window: cached.strategy_window,
+              confidence: cached.confidence,
+              strengths: cached.strengths,
+              weaknesses: cached.weaknesses,
+              recommendations: cached.recommendations,
+              metrics: cached.metrics,
+              calculated_at: cached.calculated_at,
+            },
+            calculated_at: cached.calculated_at,
+            cached: true,
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
-    const userMap = new Map();
+    if (!force_refresh && league_id) {
+      const { data: cachedAll } = await supabase
+        .from('team_strategies')
+        .select('*')
+        .eq('league_id', league_id)
+        .gt('expires_at', new Date().toISOString());
+
+      if (cachedAll && cachedAll.length > 0) {
+        const strategies = cachedAll.map((c: any) => ({
+          roster_id: c.roster_id,
+          owner_name: c.owner_name || `Team ${c.roster_id}`,
+          window: c.strategy_window,
+          confidence: c.confidence,
+          strengths: c.strengths,
+          weaknesses: c.weaknesses,
+          recommendations: c.recommendations,
+          metrics: c.metrics,
+          calculated_at: c.calculated_at,
+        }));
+        const result = roster_id ? strategies.find((s: any) => s.roster_id === roster_id) || strategies[0] : strategies;
+        return new Response(
+          JSON.stringify({ ok: true, league_id, strategies: result, calculated_at: cachedAll[0].calculated_at, cached: true }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    const [rostersResponse, usersResponse, playersResult] = await Promise.all([
+      fetch(`https://api.sleeper.app/v1/league/${actualSleeperLeagueId}/rosters`),
+      fetch(`https://api.sleeper.app/v1/league/${actualSleeperLeagueId}/users`),
+      supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, metadata, adjusted_value, team'),
+    ]);
+
+    const [rosters, users] = await Promise.all([
+      rostersResponse.json(),
+      usersResponse.json(),
+    ]);
+
+    const { data: allPlayers, error: playersError } = playersResult;
+    if (playersError) throw new Error(`Failed to fetch players: ${playersError.message}`);
+
+    const userMap = new Map<string, any>();
     users.forEach((user: any) => userMap.set(user.user_id, user));
 
-    const { data: allPlayers, error: playersError } = await supabase
-      .from('latest_player_values')
-      .select('player_id, player_name, position, metadata, adjusted_value, team');
-
-    if (playersError) {
-      throw new Error(`Failed to fetch players: ${playersError.message}`);
-    }
+    const allRosterPlayerIds = new Set<string>();
+    rosters.forEach((r: any) => (r.players || []).forEach((id: string) => allRosterPlayerIds.add(id)));
 
     const playerMap = new Map<string, PlayerValue>();
     allPlayers?.forEach((p: any) => {
+      if (!allRosterPlayerIds.has(p.player_id)) return;
       playerMap.set(p.player_id, {
         player_id: p.player_id,
         full_name: p.player_name,
@@ -349,71 +406,61 @@ Deno.serve(async (req: Request) => {
       });
     });
 
-    const leagueSettings = {
+    const leagueSettings: LeagueSettings = {
       total_rosters: rosters.length,
       roster_positions: league?.roster_settings || {
-        qb: 1,
-        rb: 2,
-        wr: 2,
-        te: 1,
-        flex: 2,
-        superflex: 0,
+        qb: 1, rb: 2, wr: 2, te: 1, flex: 2, superflex: 0,
       },
     };
 
-    const allTeamRosters = rosters.map((roster: any) => {
-      const players: PlayerValue[] = [];
-      (roster.players || []).forEach((playerId: string) => {
-        const player = playerMap.get(playerId);
-        if (player) {
-          players.push(player);
-        }
-      });
-      return players;
-    });
+    const allTeamRosters = rosters.map((roster: any) =>
+      (roster.players || []).reduce((acc: PlayerValue[], id: string) => {
+        const p = playerMap.get(id);
+        if (p) acc.push(p);
+        return acc;
+      }, [])
+    );
 
     const strategies = [];
+    const upserts = [];
+    const now = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + CACHE_TTL_MS).toISOString();
 
     for (let i = 0; i < rosters.length; i++) {
       const roster = rosters[i];
-
-      if (roster_id && roster.roster_id !== roster_id) {
-        continue;
-      }
+      if (roster_id && roster.roster_id !== roster_id) continue;
 
       const teamRoster = allTeamRosters[i];
       const strategy = evaluateTeamStrategy(teamRoster, leagueSettings, allTeamRosters);
-
       const owner = userMap.get(roster.owner_id);
-      const userId = null;
-
-      const { error: upsertError } = await supabase
-        .from('team_strategies')
-        .upsert({
-          league_id,
-          roster_id: roster.roster_id,
-          user_id: userId,
-          strategy_window: strategy.window,
-          confidence: strategy.confidence,
-          strengths: strategy.strengths,
-          weaknesses: strategy.weaknesses,
-          recommendations: strategy.recommendations,
-          metrics: strategy.metrics,
-          calculated_at: new Date().toISOString(),
-          expires_at: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
-        }, {
-          onConflict: 'league_id,roster_id'
-        });
-
-      if (upsertError) {
-        console.error('Error upserting strategy:', upsertError);
-      }
+      const ownerName = owner?.display_name || `Team ${roster.roster_id}`;
 
       strategies.push({
         roster_id: roster.roster_id,
-        owner_name: owner?.display_name || `Team ${roster.roster_id}`,
+        owner_name: ownerName,
         ...strategy,
       });
+
+      upserts.push({
+        league_id: league_id || null,
+        roster_id: roster.roster_id,
+        user_id: null,
+        owner_name: ownerName,
+        strategy_window: strategy.window,
+        confidence: strategy.confidence,
+        strengths: strategy.strengths,
+        weaknesses: strategy.weaknesses,
+        recommendations: strategy.recommendations,
+        metrics: strategy.metrics,
+        calculated_at: now,
+        expires_at: expiresAt,
+      });
+    }
+
+    if (upserts.length > 0) {
+      EdgeRuntime.waitUntil(
+        supabase.from('team_strategies').upsert(upserts, { onConflict: 'league_id,roster_id' })
+      );
     }
 
     return new Response(
@@ -421,7 +468,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         league_id,
         strategies: roster_id ? strategies[0] : strategies,
-        calculated_at: new Date().toISOString(),
+        calculated_at: now,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
