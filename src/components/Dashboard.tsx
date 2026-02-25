@@ -149,14 +149,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0">
-        <div className="text-fdp-text-1 text-xl">Loading...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0 flex flex-col">
       {/* Header */}
@@ -222,7 +214,9 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
             </div>
           </div>
 
-          {leagues.length === 0 ? (
+          {loading ? (
+            <div className="h-12 bg-fdp-surface-2 rounded-lg animate-pulse" />
+          ) : leagues.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-fdp-text-3 mb-4">No leagues saved yet. Add your first league to get started!</p>
               <button
