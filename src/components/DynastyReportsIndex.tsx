@@ -38,6 +38,7 @@ export default function DynastyReportsIndex({ onSelectReport }: DynastyReportsIn
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ p_limit: 50, p_offset: 0 }),
