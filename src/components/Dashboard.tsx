@@ -627,9 +627,10 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
         // fallback to username as team name
       }
 
-      onAdd(league.league_id, league.name, teamName, isSuperflex, 'sleeper');
+      await onAdd(league.league_id, league.name, teamName, isSuperflex, 'sleeper');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to add league. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
