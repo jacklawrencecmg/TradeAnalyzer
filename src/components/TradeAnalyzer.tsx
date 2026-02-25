@@ -107,14 +107,18 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
     try {
       const { data, error } = await supabase
         .from('latest_player_values')
-        .select('player_id, player_name, position, team')
+        .select('player_id, player_name, position, team, adjusted_value')
         .ilike('player_name', `%${term.trim()}%`)
         .eq('format', 'dynasty')
         .order('adjusted_value', { ascending: false })
         .limit(10);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Player search DB error:', error);
+        throw error;
+      }
 
+      console.log(`Player search "${term}" returned ${data?.length ?? 0} results`);
       const results: SleeperPlayer[] = (data || []).map((p: any) => ({
         player_id: p.player_id,
         full_name: p.player_name,
@@ -1301,7 +1305,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 {teamAName} Gives
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10" />
                 <input
                   type="text"
                   value={searchTermA}
@@ -1310,11 +1314,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
                 />
                 {searchLoadingA && (
-                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
+                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin z-10" />
                 )}
-              </div>
-              {searchTermA.length >= 2 && (
-                <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
+                {searchTermA.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto z-50 shadow-xl">
                   {searchResultsA.length === 0 && !searchLoadingA && (
                     <div className="px-4 py-3 text-sm text-gray-400">No players found</div>
                   )}
@@ -1357,7 +1360,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     );
                   })}
                 </div>
-              )}
+                )}
+              </div>
               <div className="mt-3 space-y-2">
                 {teamAGives.map((playerId) => {
                   const player = players[playerId];
@@ -1485,7 +1489,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 {teamAName} Gets
               </label>
               <div className="relative">
-                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+                <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400 z-10" />
                 <input
                   type="text"
                   value={searchTermB}
@@ -1494,11 +1498,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
                 />
                 {searchLoadingB && (
-                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
+                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin z-10" />
                 )}
-              </div>
-              {searchTermB.length >= 2 && (
-                <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
+                {searchTermB.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto z-50 shadow-xl">
                   {searchResultsB.length === 0 && !searchLoadingB && (
                     <div className="px-4 py-3 text-sm text-gray-400">No players found</div>
                   )}
@@ -1541,7 +1544,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     );
                   })}
                 </div>
-              )}
+                )}
+              </div>
               <div className="mt-3 space-y-2">
                 {teamAGets.map((playerId) => {
                   const player = players[playerId];
