@@ -28,53 +28,20 @@ export async function getPlayerHeadshot(playerId: string): Promise<PlayerHeadsho
     };
   }
 
-  try {
-    const { data, error } = await supabase.rpc('get_player_headshot', {
-      p_player_id: playerId,
-    });
+  const sleeperUrl = `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`;
 
-    if (error) {
-      console.error(`Error fetching headshot for ${playerId}:`, error);
-      return {
-        url: DEFAULT_HEADSHOT,
-        source: 'default',
-        last_verified: null,
-        is_verified: false,
-      };
-    }
+  headshotCache.set(playerId, {
+    url: sleeperUrl,
+    source: 'sleeper',
+    timestamp: Date.now(),
+  });
 
-    if (!data || data.length === 0 || !data[0].url) {
-      return {
-        url: DEFAULT_HEADSHOT,
-        source: 'default',
-        last_verified: null,
-        is_verified: false,
-      };
-    }
-
-    const headshot = data[0];
-
-    headshotCache.set(playerId, {
-      url: headshot.url,
-      source: headshot.source || 'unknown',
-      timestamp: Date.now(),
-    });
-
-    return {
-      url: headshot.url,
-      source: headshot.source,
-      last_verified: headshot.last_verified,
-      is_verified: headshot.is_verified || false,
-    };
-  } catch (error) {
-    console.error('Error:', error);
-    return {
-      url: DEFAULT_HEADSHOT,
-      source: 'default',
-      last_verified: null,
-      is_verified: false,
-    };
-  }
+  return {
+    url: sleeperUrl,
+    source: 'sleeper',
+    last_verified: null,
+    is_verified: true,
+  };
 }
 
 export async function getPlayerHeadshots(
