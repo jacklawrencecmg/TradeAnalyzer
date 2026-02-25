@@ -84,7 +84,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
 
   useEffect(() => {
     loadPlayers();
-    checkAndSyncPlayerValues();
   }, []);
 
   useEffect(() => {
@@ -96,24 +95,10 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
   async function loadPlayers() {
     try {
       const dbPlayers = await fetchAllPlayersFromDatabase();
-      if (Object.keys(dbPlayers).length > 0) {
-        setPlayers(dbPlayers);
-        setLoading(false);
-        fetchAllPlayers().then(allPlayers => {
-          if (Object.keys(allPlayers).length > 0) {
-            setPlayers(allPlayers);
-          }
-        }).catch(() => {});
-        return;
-      }
-      setLoading(false);
-      fetchAllPlayers().then(allPlayers => {
-        if (Object.keys(allPlayers).length > 0) {
-          setPlayers(allPlayers);
-        }
-      }).catch(err => console.error('Failed to load players from Sleeper:', err));
+      setPlayers(dbPlayers);
     } catch (error) {
       console.error('Failed to load players:', error);
+    } finally {
       setLoading(false);
     }
   }
@@ -1191,13 +1176,18 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 setSyncingValues(true);
                 showToast('Refreshing player values...', 'info');
                 clearPlayerValuesCache();
-                const synced = await syncPlayerValuesToDatabase(leagueSettings.isSuperflex);
-                setSyncingValues(false);
-                if (synced > 0) {
-                  showToast(`Successfully refreshed ${synced} player values!`, 'success');
-                  window.location.reload();
-                } else {
+                try {
+                  const dbPlayers = await fetchAllPlayersFromDatabase();
+                  if (Object.keys(dbPlayers).length > 0) {
+                    setPlayers(dbPlayers);
+                    showToast(`Loaded ${Object.keys(dbPlayers).length} player values!`, 'success');
+                  } else {
+                    showToast('No player values found in database', 'warning');
+                  }
+                } catch {
                   showToast('Failed to refresh player values', 'error');
+                } finally {
+                  setSyncingValues(false);
                 }
               }}
               disabled={syncingValues}
