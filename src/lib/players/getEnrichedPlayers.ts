@@ -36,16 +36,13 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
   }
 
   try {
-    // Query active and relevant players from database
     const { data, error } = await supabase
-      .from('nfl_players')
-      .select('external_id, full_name, player_position, team, status, rookie_year, metadata')
-      .in('status', ['Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR', 'Free Agent', 'Questionable', 'Doubtful', 'Out'])
-      .not('external_id', 'is', null);
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team')
+      .not('player_id', 'is', null);
 
     if (error) {
       console.error('Error fetching enriched players:', error);
-      // Return stale cache if available
       if (enrichedPlayersCache.data) {
         return enrichedPlayersCache.data;
       }
@@ -55,18 +52,16 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
     const playerMap = new Map<string, EnrichedPlayer>();
 
     data?.forEach((player) => {
-      const metadata = player.metadata as any || {};
-
-      playerMap.set(player.external_id, {
-        player_id: player.external_id,
-        full_name: player.full_name,
-        position: player.player_position,
+      playerMap.set(player.player_id, {
+        player_id: player.player_id,
+        full_name: player.player_name,
+        position: player.position,
         team: player.team,
-        status: player.status,
-        age: metadata.age || null,
-        years_exp: metadata.years_exp || null,
-        injury_status: metadata.injury_status || null,
-        rookie_year: player.rookie_year,
+        status: 'Active',
+        age: null,
+        years_exp: null,
+        injury_status: null,
+        rookie_year: null,
       });
     });
 
