@@ -13,13 +13,20 @@ const formatMultipliers: Record<string, Record<string, number>> = {
   dynasty_tep: { QB: 1.35, RB: 1.15, WR: 1.0, TE: 1.25 },
 };
 
-function calcFdpValue(ktcValue: number, position: string, format: string): number {
+function calcFdpValue(baseValue: number, position: string, format: string): number {
   const formatKey = format.replace(/-/g, '_');
   const multiplier = formatMultipliers[formatKey]?.[position] ?? 1;
-  return Math.round(ktcValue * multiplier);
+  return Math.round(baseValue * multiplier);
 }
 
-interface KTCPlayer {
+function rankToValue(rank: number, totalPlayers: number): number {
+  const maxValue = 9500;
+  const minValue = 500;
+  if (totalPlayers <= 1) return maxValue;
+  return Math.round(maxValue - ((rank - 1) / (totalPlayers - 1)) * (maxValue - minValue));
+}
+
+interface FDPPlayer {
   full_name: string;
   position: string;
   team: string | null;
@@ -27,109 +34,79 @@ interface KTCPlayer {
   value: number;
 }
 
-interface ScrapeResult {
+interface FetchResult {
   blocked: boolean;
   ok: boolean;
-  qbs: KTCPlayer[];
+  players: FDPPlayer[];
   count: number;
   minRank: number;
   maxRank: number;
   reason?: string;
 }
 
-async function scrapeKTCQBs(): Promise<ScrapeResult> {
-  const qbsMap = new Map<string, KTCPlayer>();
+async function fetchFantasyProsQBs(format: string): Promise<FetchResult> {
+  const rankingSlug = format.includes('1qb') ? 'dynasty-overall' : 'dynasty-superflex';
+  const url = `https://www.fantasypros.com/nfl/rankings/${rankingSlug}.php?export=xls`;
 
   try {
-    const ktcApiResponse = await fetch('https://keeptradecut.com/api/rankings/dynasty-superflex', {
+    const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Referer': 'https://www.fantasypros.com/',
       },
     });
 
-    if (!ktcApiResponse.ok) {
-      if (ktcApiResponse.status === 429 || ktcApiResponse.status === 403) {
-        return { blocked: true, ok: false, qbs: [], count: 0, minRank: 0, maxRank: 0, reason: 'blocked' };
+    if (!response.ok) {
+      if (response.status === 429 || response.status === 403) {
+        return { blocked: true, ok: false, players: [], count: 0, minRank: 0, maxRank: 0, reason: 'blocked' };
       }
-      throw new Error(`HTTP error! status: ${ktcApiResponse.status}`);
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const data = await ktcApiResponse.json();
+    const csvText = await response.text();
+    const lines = csvText.split('\n').filter(l => l.trim());
 
-    if (!Array.isArray(data)) {
-      return { blocked: false, ok: false, qbs: [], count: 0, minRank: 0, maxRank: 0, reason: 'invalid_data' };
+    if (lines.length < 2) {
+      return { blocked: false, ok: false, players: [], count: 0, minRank: 0, maxRank: 0, reason: 'no_data' };
     }
 
-    let qbRank = 1;
-    for (const player of data) {
-      if (player.position === 'QB' || player.pos === 'QB') {
-        const name = (player.playerName || player.name || '').trim();
-        const team = (player.team || '').trim() || null;
-        const value = parseInt(player.value || '0', 10);
+    const allPlayers: FDPPlayer[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split('\t');
+      const rankStr = (cols[0] || '').trim();
+      const nameRaw = (cols[1] || cols[2] || '').trim();
+      const teamRaw = (cols[3] || '').trim();
+      const posRaw = (cols[4] || '').trim().toUpperCase();
 
-        if (name && value > 0) {
-          const key = `${name}_${qbRank}`;
+      const rank = parseInt(rankStr.replace(/\D/g, ''), 10);
+      const name = nameRaw.replace(/\([^)]*\)/g, '').replace(/[*†‡]/g, '').trim();
 
-          if (!qbsMap.has(key)) {
-            qbsMap.set(key, {
-              full_name: name,
-              position: 'QB',
-              team: team,
-              position_rank: qbRank,
-              value: value,
-            });
-            qbRank++;
-          }
-        }
-      }
+      if (!name || !rank) continue;
+
+      const team = teamRaw.length >= 2 && teamRaw.length <= 3 ? teamRaw.toUpperCase() : null;
+      allPlayers.push({ full_name: name, position: posRaw || 'QB', team, position_rank: rank, value: 0 });
     }
 
-    const qbs = Array.from(qbsMap.values());
+    const qbs = allPlayers.filter(p => p.position === 'QB');
 
-    if (qbs.length < 80) {
-      return {
-        blocked: false,
-        ok: false,
-        qbs: [],
-        count: qbs.length,
-        minRank: qbs.length > 0 ? 1 : 0,
-        maxRank: qbs.length,
-        reason: 'too_few_rows',
-      };
+    if (qbs.length < 10) {
+      return { blocked: false, ok: false, players: [], count: qbs.length, minRank: 0, maxRank: 0, reason: 'too_few_rows' };
     }
 
-    const minRank = qbs.length > 0 ? Math.min(...qbs.map(q => q.position_rank)) : 0;
-    const maxRank = qbs.length > 0 ? Math.max(...qbs.map(q => q.position_rank)) : 0;
+    qbs.forEach((p, i) => { p.position_rank = i + 1; p.value = rankToValue(i + 1, qbs.length); });
 
-    return {
-      blocked: false,
-      ok: true,
-      qbs,
-      count: qbs.length,
-      minRank,
-      maxRank,
-    };
+    return { blocked: false, ok: true, players: qbs, count: qbs.length, minRank: 1, maxRank: qbs.length };
   } catch (error) {
-    console.error('Scraping error:', error);
-    return {
-      blocked: true,
-      ok: false,
-      qbs: [],
-      count: 0,
-      minRank: 0,
-      maxRank: 0,
-      reason: error instanceof Error ? error.message : 'unknown_error',
-    };
+    console.error('Fetch error:', error);
+    return { blocked: true, ok: false, players: [], count: 0, minRank: 0, maxRank: 0, reason: error instanceof Error ? error.message : 'unknown_error' };
   }
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { status: 200, headers: corsHeaders });
   }
 
   try {
@@ -140,49 +117,33 @@ Deno.serve(async (req: Request) => {
     const adminSecret = Deno.env.get('ADMIN_SYNC_SECRET');
 
     if (!authHeader || authHeader !== `Bearer ${adminSecret}`) {
-      return new Response(
-        JSON.stringify({ ok: false, error: 'Unauthorized' }),
-        {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      return new Response(JSON.stringify({ ok: false, error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const scrapeResult = await scrapeKTCQBs();
+    const fetchResult = await fetchFantasyProsQBs(format);
 
-    if (scrapeResult.blocked) {
-      return new Response(
-        JSON.stringify({ ok: false, blocked: true, error: 'KTC blocked the request', reason: scrapeResult.reason }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (fetchResult.blocked) {
+      return new Response(JSON.stringify({ ok: false, blocked: true, error: 'Request blocked', reason: fetchResult.reason }), {
+        status: 429,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    if (!scrapeResult.ok) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          error: 'Failed to scrape QB data',
-          reason: scrapeResult.reason,
-          count: scrapeResult.count,
-          maxRank: scrapeResult.maxRank,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+    if (!fetchResult.ok) {
+      return new Response(JSON.stringify({ ok: false, error: 'Failed to fetch QB data', reason: fetchResult.reason, count: fetchResult.count }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const qbs = scrapeResult.qbs;
-
+    const qbs = fetchResult.players;
     let successCount = 0;
     let quarantinedCount = 0;
     let aliasesCreated = 0;
@@ -194,24 +155,18 @@ Deno.serve(async (req: Request) => {
         name: qb.full_name,
         position: 'QB',
         team: qb.team || undefined,
-        source: 'ktc',
+        source: 'fantasypros',
         autoQuarantine: true,
       });
 
       if (!resolveResult.success) {
-        console.warn(`Could not resolve QB: ${qb.full_name} (quarantined: ${resolveResult.quarantined})`);
-        if (resolveResult.quarantined) {
-          quarantinedCount++;
-        }
+        if (resolveResult.quarantined) quarantinedCount++;
         continue;
       }
 
       const playerId = resolveResult.player_id!;
-
-      const aliasAdded = await addPlayerAlias(supabase, playerId, qb.full_name, 'ktc');
-      if (aliasAdded) {
-        aliasesCreated++;
-      }
+      const aliasAdded = await addPlayerAlias(supabase, playerId, qb.full_name, 'fantasypros');
+      if (aliasAdded) aliasesCreated++;
 
       const fdpValue = calcFdpValue(qb.value, 'QB', format);
 
@@ -226,7 +181,7 @@ Deno.serve(async (req: Request) => {
           base_value: qb.value,
           fdp_value: fdpValue,
           format: formatKey,
-          source: 'KTC',
+          source: 'FDP',
           captured_at: capturedAt,
         });
 
@@ -237,34 +192,25 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        position: 'QB',
-        count: successCount,
-        total: qbs.length,
-        quarantined: quarantinedCount,
-        aliases_created: aliasesCreated,
-        minRank: scrapeResult.minRank,
-        maxRank: scrapeResult.maxRank,
-        timestamp: capturedAt,
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(JSON.stringify({
+      ok: true,
+      position: 'QB',
+      count: successCount,
+      total: qbs.length,
+      quarantined: quarantinedCount,
+      aliases_created: aliasesCreated,
+      minRank: fetchResult.minRank,
+      maxRank: fetchResult.maxRank,
+      timestamp: capturedAt,
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
     console.error('Error in sync function:', error);
-    return new Response(
-      JSON.stringify({
-        ok: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    return new Response(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
