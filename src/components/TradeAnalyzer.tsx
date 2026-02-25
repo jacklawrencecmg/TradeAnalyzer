@@ -106,11 +106,14 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
         }).catch(() => {});
         return;
       }
-      const allPlayers = await fetchAllPlayers();
-      setPlayers(allPlayers);
+      setLoading(false);
+      fetchAllPlayers().then(allPlayers => {
+        if (Object.keys(allPlayers).length > 0) {
+          setPlayers(allPlayers);
+        }
+      }).catch(err => console.error('Failed to load players from Sleeper:', err));
     } catch (error) {
       console.error('Failed to load players:', error);
-    } finally {
       setLoading(false);
     }
   }
@@ -730,14 +733,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-lg text-gray-400">Loading players...</div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       {user && !isPro && (
@@ -1260,9 +1255,13 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                   type="text"
                   value={searchTermA}
                   onChange={(e) => setSearchTermA(e.target.value)}
-                  placeholder="Search players or draft picks..."
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
+                  placeholder={loading ? "Loading players..." : "Search players or draft picks..."}
+                  disabled={loading}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors disabled:opacity-60 disabled:cursor-wait"
                 />
+                {loading && (
+                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
+                )}
               </div>
               {searchTermA.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
@@ -1458,9 +1457,13 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                   type="text"
                   value={searchTermB}
                   onChange={(e) => setSearchTermB(e.target.value)}
-                  placeholder="Search players or draft picks..."
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
+                  placeholder={loading ? "Loading players..." : "Search players or draft picks..."}
+                  disabled={loading}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors disabled:opacity-60 disabled:cursor-wait"
                 />
+                {loading && (
+                  <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
+                )}
               </div>
               {searchTermB.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
