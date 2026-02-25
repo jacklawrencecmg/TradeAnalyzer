@@ -36,10 +36,16 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
   }
 
   try {
-    const { data, error } = await supabase
+    const queryPromise = supabase
       .from('latest_player_values')
       .select('player_id, player_name, position, team')
       .not('player_id', 'is', null);
+
+    const timeoutPromise = new Promise<{ data: null; error: Error }>((resolve) =>
+      setTimeout(() => resolve({ data: null, error: new Error('Query timeout') }), 8000)
+    );
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]) as { data: any; error: any };
 
     if (error) {
       console.error('Error fetching enriched players:', error);

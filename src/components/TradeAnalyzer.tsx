@@ -93,8 +93,11 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
   }, [leagueId]);
 
   async function loadPlayers() {
+    const timeout = new Promise<Record<string, SleeperPlayer>>((resolve) =>
+      setTimeout(() => resolve({}), 10000)
+    );
     try {
-      const dbPlayers = await fetchAllPlayersFromDatabase();
+      const dbPlayers = await Promise.race([fetchAllPlayersFromDatabase(), timeout]);
       setPlayers(dbPlayers);
     } catch (error) {
       console.error('Failed to load players:', error);
