@@ -607,15 +607,31 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
   };
 
   const handleLeagueSelect = async (league: any) => {
-    const isSuperflex = league.roster_positions?.filter((pos: string) => pos === 'SUPER_FLEX').length > 0;
+    setLoading(true);
+    setError(null);
+    try {
+      const isSuperflex = league.roster_positions?.filter((pos: string) => pos === 'SUPER_FLEX').length > 0;
 
-    const userRoster = await fetch(`https://api.sleeper.app/v1/league/${league.league_id}/users`)
-      .then(res => res.json())
-      .then(users => users.find((u: any) => u.display_name?.toLowerCase() === username.toLowerCase() || u.username?.toLowerCase() === username.toLowerCase()));
+      let teamName = username;
+      try {
+        const usersRes = await fetch(`https://api.sleeper.app/v1/league/${league.league_id}/users`);
+        if (usersRes.ok) {
+          const users = await usersRes.json();
+          const userRoster = users.find((u: any) =>
+            u.display_name?.toLowerCase() === username.toLowerCase() ||
+            u.username?.toLowerCase() === username.toLowerCase()
+          );
+          teamName = userRoster?.metadata?.team_name || userRoster?.display_name || username;
+        }
+      } catch {
+        // fallback to username as team name
+      }
 
-    const teamName = userRoster?.metadata?.team_name || userRoster?.display_name || username;
-
-    onAdd(league.league_id, league.name, teamName, isSuperflex, 'sleeper');
+      onAdd(league.league_id, league.name, teamName, isSuperflex, 'sleeper');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add league. Please try again.');
+      setLoading(false);
+    }
   };
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -774,7 +790,8 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
                 <button
                   key={league.league_id}
                   onClick={() => handleLeagueSelect(league)}
-                  className="w-full p-4 border border-fdp-border-1 rounded-lg hover:border-fdp-accent-1 hover:bg-fdp-surface-2 transition-all text-left"
+                  disabled={loading}
+                  className="w-full p-4 border border-fdp-border-1 rounded-lg hover:border-fdp-accent-1 hover:bg-fdp-surface-2 transition-all text-left disabled:opacity-60 disabled:cursor-wait"
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
