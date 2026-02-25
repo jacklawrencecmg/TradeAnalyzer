@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, TrendingUp, TrendingDown, Minus, Plus, X, Calendar, DollarSign, Settings, Info, Share2, Check, Copy } from 'lucide-react';
 import {
   fetchAllPlayers,
@@ -48,6 +48,12 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
   const [players, setPlayers] = useState<Record<string, SleeperPlayer>>({});
   const [searchTermA, setSearchTermA] = useState('');
   const [searchTermB, setSearchTermB] = useState('');
+  const [searchResultsA, setSearchResultsA] = useState<SleeperPlayer[]>([]);
+  const [searchResultsB, setSearchResultsB] = useState<SleeperPlayer[]>([]);
+  const [searchLoadingA, setSearchLoadingA] = useState(false);
+  const [searchLoadingB, setSearchLoadingB] = useState(false);
+  const searchTimerA = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchTimerB = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [teamAGives, setTeamAGives] = useState<string[]>([]);
   const [teamAGets, setTeamAGets] = useState<string[]>([]);
   const [teamAGivesPicks, setTeamAGivesPicks] = useState<DraftPick[]>([]);
@@ -56,7 +62,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
   const [teamAGetsFAAB, setTeamAGetsFAAB] = useState<number>(0);
   const [analysis, setAnalysis] = useState<TradeAnalysis | null>(null);
   const [fairnessEvaluation, setFairnessEvaluation] = useState<TradeEvaluationResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
@@ -83,55 +89,75 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   useEffect(() => {
-    loadPlayers();
-  }, []);
-
-  useEffect(() => {
     if (leagueId) {
       loadLeagueData();
     }
   }, [leagueId]);
 
-  async function loadPlayers() {
+  const searchPlayers = useCallback(async (term: string, side: 'A' | 'B') => {
+    const setResults = side === 'A' ? setSearchResultsA : setSearchResultsB;
+    const setSearching = side === 'A' ? setSearchLoadingA : setSearchLoadingB;
+
+    if (!term || term.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+
+    setSearching(true);
     try {
       const { data, error } = await supabase
         .from('latest_player_values')
-        .select('player_id, player_name, position, team');
+        .select('player_id, player_name, position, team')
+        .ilike('player_name', `%${term.trim()}%`)
+        .eq('format', 'dynasty')
+        .order('adjusted_value', { ascending: false })
+        .limit(10);
 
       if (error) throw error;
 
-      if (data && data.length > 0) {
-        const result: Record<string, SleeperPlayer> = {};
-        data.forEach((p: any) => {
-          if (!p.player_id) return;
-          result[p.player_id] = {
-            player_id: p.player_id,
-            full_name: p.player_name,
-            first_name: (p.player_name || '').split(' ')[0] || '',
-            last_name: (p.player_name || '').split(' ').slice(1).join(' ') || '',
-            position: p.position,
-            team: p.team,
-            age: 0,
-            injury_status: null,
-            status: 'Active',
-          };
-        });
-        setPlayers(result);
-      } else {
-        const dbPlayers = await fetchAllPlayersFromDatabase();
-        setPlayers(dbPlayers);
-      }
-    } catch (error) {
-      console.error('Failed to load players:', error);
-      try {
-        const dbPlayers = await fetchAllPlayersFromDatabase();
-        setPlayers(dbPlayers);
-      } catch {
-        // leave players empty
-      }
+      const results: SleeperPlayer[] = (data || []).map((p: any) => ({
+        player_id: p.player_id,
+        full_name: p.player_name,
+        first_name: (p.player_name || '').split(' ')[0] || '',
+        last_name: (p.player_name || '').split(' ').slice(1).join(' ') || '',
+        position: p.position,
+        team: p.team,
+        age: 0,
+        injury_status: null,
+        status: 'Active',
+      }));
+
+      setResults(results);
+
+      const newPlayers: Record<string, SleeperPlayer> = {};
+      results.forEach(p => { newPlayers[p.player_id] = p; });
+      setPlayers(prev => ({ ...prev, ...newPlayers }));
+    } catch (err) {
+      console.error('Player search error:', err);
+      setResults([]);
     } finally {
-      setLoading(false);
+      setSearching(false);
     }
+  }, []);
+
+  function handleSearchA(value: string) {
+    setSearchTermA(value);
+    if (searchTimerA.current) clearTimeout(searchTimerA.current);
+    if (!value || value.trim().length < 2) {
+      setSearchResultsA([]);
+      return;
+    }
+    searchTimerA.current = setTimeout(() => searchPlayers(value, 'A'), 200);
+  }
+
+  function handleSearchB(value: string) {
+    setSearchTermB(value);
+    if (searchTimerB.current) clearTimeout(searchTimerB.current);
+    if (!value || value.trim().length < 2) {
+      setSearchResultsB([]);
+      return;
+    }
+    searchTimerB.current = setTimeout(() => searchPlayers(value, 'B'), 200);
   }
 
   async function checkAndSyncPlayerValues() {
@@ -334,6 +360,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
     }
     setSearchTermA('');
     setSearchTermB('');
+    setSearchResultsA([]);
+    setSearchResultsB([]);
   }
 
   function addPickFromSearch(year: number, round: number, pickNumber: number | undefined, displayName: string, team: 'A' | 'B', type: 'gives' | 'gets') {
@@ -353,6 +381,8 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
 
     setSearchTermA('');
     setSearchTermB('');
+    setSearchResultsA([]);
+    setSearchResultsB([]);
   }
 
   function removePlayer(playerId: string, team: 'A' | 'B', type: 'gives' | 'gets') {
@@ -1275,74 +1305,56 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 <input
                   type="text"
                   value={searchTermA}
-                  onChange={(e) => setSearchTermA(e.target.value)}
-                  placeholder={loading ? "Loading players..." : "Search players or draft picks..."}
-                  disabled={loading}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors disabled:opacity-60 disabled:cursor-wait"
+                  onChange={(e) => handleSearchA(e.target.value)}
+                  placeholder="Search players or draft picks..."
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
                 />
-                {loading && (
+                {searchLoadingA && (
                   <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
                 )}
               </div>
               {searchTermA.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
-                  {getFilteredResults(searchTermA).map((result, idx) => {
-                    const isPlayerSelected = result.type === 'player' && result.player && teamAGives.includes(result.player.player_id);
-                    return result.type === 'player' && result.player ? (
+                  {searchResultsA.length === 0 && !searchLoadingA && (
+                    <div className="px-4 py-3 text-sm text-gray-400">No players found</div>
+                  )}
+                  {searchResultsA.map((player) => {
+                    const isSelected = teamAGives.includes(player.player_id);
+                    return (
                       <button
-                        key={result.player.player_id}
-                        onClick={() => addPlayer(result.player!.player_id, 'A', 'gives')}
+                        key={player.player_id}
+                        onClick={() => addPlayer(player.player_id, 'A', 'gives')}
                         className={`w-full px-4 py-2 text-left transition-colors flex items-center gap-3 group ${
-                          isPlayerSelected
+                          isSelected
                             ? 'bg-[#00d4ff]/20 border-l-4 border-[#00d4ff] hover:bg-[#00d4ff]/30'
                             : 'hover:bg-gray-700'
                         }`}
                       >
-                        <div className="relative w-12 h-12 flex-shrink-0">
+                        <div className="relative w-10 h-10 flex-shrink-0">
                           <img
-                            src={getPlayerImageUrl(result.player.player_id)}
-                            alt={result.player.full_name}
-                            className="w-12 h-12 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                            src={getPlayerImageUrl(player.player_id)}
+                            alt={player.full_name}
+                            className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc]"
                             onError={(e) => {
-                              const target = e.currentTarget;
-                              target.style.display = 'none';
-                              const parent = target.parentElement;
-                              if (parent && result.player) {
-                                const fallback = document.createElement('div');
-                                fallback.className = 'w-12 h-12 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold ring-2 ring-gray-700';
-                                fallback.textContent = result.player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                parent.appendChild(fallback);
+                              const t = e.currentTarget;
+                              t.style.display = 'none';
+                              const parent = t.parentElement;
+                              if (parent) {
+                                const fb = document.createElement('div');
+                                fb.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm';
+                                fb.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                parent.appendChild(fb);
                               }
                             }}
                           />
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">{result.player.full_name}</span>
-                            {getInjuryStatusBadge(result.player)}
-                          </div>
-                          <div className="text-sm text-gray-400">
-                            {result.player.position} - {result.player.team || 'FA'}
-                          </div>
+                          <span className="text-white font-medium">{player.full_name}</span>
+                          <div className="text-sm text-gray-400">{player.position} - {player.team || 'FA'}</div>
                         </div>
                         <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
                       </button>
-                    ) : result.type === 'pick' && result.pick ? (
-                      <button
-                        key={`pick-${result.pick.year}-${result.pick.round}-${result.pick.pickNumber}-${idx}`}
-                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, result.pick!.pickNumber, result.pick!.displayName, 'A', 'gives')}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-[#00d4ff]" />
-                          <div>
-                            <div className="text-white font-medium">{result.pick.displayName}</div>
-                            <div className="text-sm text-gray-400">Draft Pick</div>
-                          </div>
-                        </div>
-                        <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
-                      </button>
-                    ) : null
+                    );
                   })}
                 </div>
               )}
@@ -1477,74 +1489,56 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 <input
                   type="text"
                   value={searchTermB}
-                  onChange={(e) => setSearchTermB(e.target.value)}
-                  placeholder={loading ? "Loading players..." : "Search players or draft picks..."}
-                  disabled={loading}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors disabled:opacity-60 disabled:cursor-wait"
+                  onChange={(e) => handleSearchB(e.target.value)}
+                  placeholder="Search players or draft picks..."
+                  className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#00d4ff] transition-colors"
                 />
-                {loading && (
+                {searchLoadingB && (
                   <div className="absolute right-3 top-3 w-5 h-5 border-2 border-[#00d4ff] border-t-transparent rounded-full animate-spin" />
                 )}
               </div>
               {searchTermB.length >= 2 && (
                 <div className="mt-2 bg-gray-800 border border-gray-700 rounded-lg max-h-60 overflow-y-auto">
-                  {getFilteredResults(searchTermB).map((result, idx) => {
-                    const isPlayerSelected = result.type === 'player' && result.player && teamAGets.includes(result.player.player_id);
-                    return result.type === 'player' && result.player ? (
+                  {searchResultsB.length === 0 && !searchLoadingB && (
+                    <div className="px-4 py-3 text-sm text-gray-400">No players found</div>
+                  )}
+                  {searchResultsB.map((player) => {
+                    const isSelected = teamAGets.includes(player.player_id);
+                    return (
                       <button
-                        key={result.player.player_id}
-                        onClick={() => addPlayer(result.player!.player_id, 'A', 'gets')}
+                        key={player.player_id}
+                        onClick={() => addPlayer(player.player_id, 'A', 'gets')}
                         className={`w-full px-4 py-2 text-left transition-colors flex items-center gap-3 group ${
-                          isPlayerSelected
+                          isSelected
                             ? 'bg-[#00d4ff]/20 border-l-4 border-[#00d4ff] hover:bg-[#00d4ff]/30'
                             : 'hover:bg-gray-700'
                         }`}
                       >
-                        <div className="relative w-12 h-12 flex-shrink-0">
+                        <div className="relative w-10 h-10 flex-shrink-0">
                           <img
-                            src={getPlayerImageUrl(result.player.player_id)}
-                            alt={result.player.full_name}
-                            className="w-12 h-12 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
+                            src={getPlayerImageUrl(player.player_id)}
+                            alt={player.full_name}
+                            className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc]"
                             onError={(e) => {
-                              const target = e.currentTarget;
-                              target.style.display = 'none';
-                              const parent = target.parentElement;
-                              if (parent && result.player) {
-                                const fallback = document.createElement('div');
-                                fallback.className = 'w-12 h-12 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold ring-2 ring-gray-700';
-                                fallback.textContent = result.player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                parent.appendChild(fallback);
+                              const t = e.currentTarget;
+                              t.style.display = 'none';
+                              const parent = t.parentElement;
+                              if (parent) {
+                                const fb = document.createElement('div');
+                                fb.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm';
+                                fb.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+                                parent.appendChild(fb);
                               }
                             }}
                           />
                         </div>
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-white font-medium">{result.player.full_name}</span>
-                            {getInjuryStatusBadge(result.player)}
-                          </div>
-                          <div className="text-sm text-gray-400">
-                            {result.player.position} - {result.player.team || 'FA'}
-                          </div>
+                          <span className="text-white font-medium">{player.full_name}</span>
+                          <div className="text-sm text-gray-400">{player.position} - {player.team || 'FA'}</div>
                         </div>
                         <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
                       </button>
-                    ) : result.type === 'pick' && result.pick ? (
-                      <button
-                        key={`pick-${result.pick.year}-${result.pick.round}-${result.pick.pickNumber}-${idx}`}
-                        onClick={() => addPickFromSearch(result.pick!.year, result.pick!.round, result.pick!.pickNumber, result.pick!.displayName, 'A', 'gets')}
-                        className="w-full px-4 py-2 text-left hover:bg-gray-700 transition-colors flex items-center justify-between group"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-[#00d4ff]" />
-                          <div>
-                            <div className="text-white font-medium">{result.pick.displayName}</div>
-                            <div className="text-sm text-gray-400">Draft Pick</div>
-                          </div>
-                        </div>
-                        <Plus className="w-5 h-5 text-gray-500 group-hover:text-[#00d4ff]" />
-                      </button>
-                    ) : null
+                    );
                   })}
                 </div>
               )}
