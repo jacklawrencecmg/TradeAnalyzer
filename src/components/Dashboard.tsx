@@ -313,7 +313,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
         ) : (
           <>
             {/* Main Content */}
-            {currentLeague && (
           <div className="space-y-6">
             {/* Tab Navigation */}
             <div className="bg-fdp-surface-1 border border-fdp-border-1 rounded-lg shadow-lg p-4">
@@ -476,7 +475,6 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'valueTuner' && <ValueFineTuner />}
             </div>
           </div>
-        )}
           </>
         )}
 
