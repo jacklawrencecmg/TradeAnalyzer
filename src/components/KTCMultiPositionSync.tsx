@@ -122,7 +122,7 @@ export default function KTCMultiPositionSync() {
       <div className="flex items-center gap-3 mb-6">
         <Shield className="w-8 h-8 text-blue-600" />
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">KTC Multi-Position Sync</h2>
+          <h2 className="text-2xl font-bold text-gray-900">FDP Multi-Position Sync</h2>
           <p className="text-sm text-gray-600">Sync QB, RB, WR, and TE dynasty rankings</p>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function KTCMultiPositionSync() {
                             )}
                           </div>
                         ) : result.blocked ? (
-                          <p className="text-yellow-700">KTC blocked the request</p>
+                          <p className="text-yellow-700">Request was blocked. Try again later.</p>
                         ) : (
                           <p className="text-red-700">{result.error}</p>
                         )}
@@ -263,7 +263,7 @@ export default function KTCMultiPositionSync() {
         <div className="border-t pt-4 mt-6">
           <h3 className="font-semibold text-gray-900 mb-2">How it works:</h3>
           <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-            <li>Fetches the latest rankings from KeepTradeCut for each position</li>
+            <li>Fetches the latest rankings from FantasyDraftPros for each position</li>
             <li>Supports Superflex, 1QB, and TE Premium formats</li>
             <li>Updates player values and creates historical snapshots</li>
             <li>Sync all positions at once or individually</li>

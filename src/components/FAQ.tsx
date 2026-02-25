@@ -165,7 +165,7 @@ export function FAQ({ onClose }: FAQProps) {
             <>
               <p>Our Trade Analyzer uses real-time player values from multiple sources including:</p>
               <ul className="list-disc pl-5 mt-2 space-y-1">
-                <li>KeepTradeCut dynasty rankings</li>
+                <li>FantasyDraftPros dynasty rankings</li>
                 <li>SportsData.io projections and statistics</li>
                 <li>Our proprietary algorithms adjusting for age, injury, and league settings</li>
               </ul>

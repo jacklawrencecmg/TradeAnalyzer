@@ -119,7 +119,7 @@ export default function FormatMultiplierEditor() {
         <div>
           <h3 className="text-base font-semibold text-fdp-text-1">Format Multipliers</h3>
           <p className="text-sm text-fdp-text-3 mt-0.5">
-            Controls how much each position's KTC base value is scaled per league format. WR at 1.00 = baseline.
+            Controls how much each position's base value is scaled per league format. WR at 1.00 = baseline.
           </p>
         </div>
         <div className="flex gap-2 shrink-0">
@@ -204,7 +204,7 @@ export default function FormatMultiplierEditor() {
       <div className="flex items-start gap-2 px-3 py-2.5 bg-fdp-surface-2 rounded-lg border border-fdp-border text-xs text-fdp-text-3">
         <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
         <span>
-          Multipliers apply directly to the KTC base value. Example: a QB with KTC=7000 in Superflex (1.35×) = 9,450 FDP.
+          Multipliers apply directly to the base value. Example: a QB with base value 7000 in Superflex (1.35×) = 9,450 FDP.
           Changes here are saved to the database but <strong className="text-fdp-text-2">do not automatically rebuild all player values</strong> — trigger a rebuild from Admin Sync after saving.
         </span>
       </div>

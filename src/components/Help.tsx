@@ -259,7 +259,7 @@ export function Help({ onClose }: HelpProps) {
             <div>
               <h4 className="font-semibold text-fdp-text-1 mb-1">Player Values</h4>
               <p className="text-sm">
-                Values are aggregated from KeepTradeCut, SportsData.io, and our proprietary algorithms. They adjust for:
+                Values are aggregated from FantasyDraftPros, SportsData.io, and our proprietary algorithms. They adjust for:
               </p>
               <ul className="list-disc pl-5 mt-2 space-y-1 text-sm">
                 <li>League format (Superflex, TE Premium, IDP)</li>

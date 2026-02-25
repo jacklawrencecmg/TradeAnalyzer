@@ -309,7 +309,7 @@ export function AdminSyncHub() {
             <TrendingUp className="w-8 h-8 text-green-600" />
             <div className="text-center">
               <h3 className="font-semibold text-gray-900">Sync Values</h3>
-              <p className="text-sm text-gray-600 mt-1">Scrape KTC rankings</p>
+              <p className="text-sm text-gray-600 mt-1">Sync FantasyDraftPros rankings</p>
             </div>
             {syncing === 'values' && (
               <Loader2 className="w-5 h-5 animate-spin text-green-600" />

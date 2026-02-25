@@ -176,7 +176,7 @@ export default function FDPAdminSync() {
         <div className="border-t pt-4 mt-6">
           <h3 className="font-semibold text-gray-900 mb-2">How it works:</h3>
           <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-            <li>Fetches the latest QB rankings from KeepTradeCut</li>
+            <li>Fetches the latest QB rankings from FantasyDraftPros</li>
             <li>Updates player values in the database</li>
             <li>Creates historical snapshots for trend analysis</li>
             <li>Supports dynasty superflex format</li>

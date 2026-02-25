@@ -29,7 +29,7 @@ const FORMAT_OPTIONS = [
 
 const VALUE_SOURCE_OPTIONS = [
   { value: 'fdp', label: 'FDP Values' },
-  { value: 'ktc', label: 'KTC Values' },
+  { value: 'ktc', label: 'FDP Values (Base)' },
 ];
 
 export default function UnifiedRankings() {
@@ -126,7 +126,7 @@ export default function UnifiedRankings() {
               <h1 className="text-4xl font-bold text-white">Dynasty Rankings</h1>
             </div>
             <p className="text-blue-100 text-lg">
-              KeepTradeCut player values and rankings
+              FantasyDraftPros player values and rankings
             </p>
           </div>
 
@@ -354,7 +354,7 @@ export default function UnifiedRankings() {
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-gray-600 mb-4">
             <div>
               <p className="font-medium text-gray-700 mb-1">Data Source</p>
-              <p>Rankings from KeepTradeCut dynasty values</p>
+              <p>Rankings from FantasyDraftPros dynasty values</p>
             </div>
             <div>
               <p className="font-medium text-gray-700 mb-1">Update Frequency</p>
@@ -366,13 +366,13 @@ export default function UnifiedRankings() {
             </div>
             <div>
               <p className="font-medium text-gray-700 mb-1">Value Types</p>
-              <p>KTC (raw) and FDP (format-adjusted)</p>
+              <p>FDP Base and FDP (format-adjusted)</p>
             </div>
           </div>
           <div className="border-t pt-4">
             <p className="font-medium text-gray-700 mb-2">FDP Value Adjustments</p>
             <p className="text-sm text-gray-600 mb-2">
-              FantasyDraftPros (FDP) values apply format-specific multipliers to KTC base values:
+              FantasyDraftPros (FDP) values apply format-specific multipliers to base values:
             </p>
             <div className="grid md:grid-cols-3 gap-3 text-xs text-gray-600">
               <div className="bg-gray-50 p-2 rounded">

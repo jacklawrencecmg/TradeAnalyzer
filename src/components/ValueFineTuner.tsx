@@ -22,7 +22,7 @@ const PANELS: PanelDef[] = [
     label: 'Format Multipliers',
     shortLabel: 'Multipliers',
     icon: Sliders,
-    description: 'Edit per-format, per-position KTC multipliers (SF, 1QB, TEP)',
+    description: 'Edit per-format, per-position FDP multipliers (SF, 1QB, TEP)',
   },
   {
     id: 'tiers',
@@ -81,7 +81,7 @@ export default function ValueFineTuner() {
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-fdp-text-3 px-3 py-2.5 bg-fdp-surface-2 rounded-xl border border-fdp-border">
         <Info className="w-3.5 h-3.5 shrink-0 text-fdp-text-3" />
         <span className="font-medium text-fdp-text-2">Calculation order:</span>
-        <span className="px-2 py-0.5 bg-fdp-surface-3 rounded text-fdp-text-2">KTC Base</span>
+        <span className="px-2 py-0.5 bg-fdp-surface-3 rounded text-fdp-text-2">FDP Base</span>
         <span>→</span>
         <span className="px-2 py-0.5 bg-orange-500/15 text-orange-400 border border-orange-500/20 rounded font-medium">Format ×</span>
         <span>→</span>

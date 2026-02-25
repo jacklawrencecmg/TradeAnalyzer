@@ -213,7 +213,7 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
               <p className="text-3xl font-bold text-blue-600">{data.latest.fdp_value.toLocaleString()}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-sm text-gray-600 mb-1">KTC Value</p>
+              <p className="text-sm text-gray-600 mb-1">Base Value</p>
               <p className="text-3xl font-bold text-gray-700">{data.latest.ktc_value.toLocaleString()}</p>
             </div>
             <div className="bg-purple-50 rounded-lg p-4">
@@ -279,7 +279,7 @@ export default function PlayerDetail({ playerId, onBack }: PlayerDetailProps) {
           <div className="grid md:grid-cols-2 gap-4 text-sm text-gray-600">
             <div>
               <p className="font-medium text-gray-700 mb-1">Value Sources</p>
-              <p>KTC values from KeepTradeCut, FDP values use format-adjusted multipliers</p>
+              <p>Base values from FantasyDraftPros, FDP values use format-adjusted multipliers</p>
             </div>
             <div>
               <p className="font-medium text-gray-700 mb-1">History Range</p>

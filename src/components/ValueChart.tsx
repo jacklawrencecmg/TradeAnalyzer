@@ -33,7 +33,7 @@ export default function ValueChart({ data, height = 400 }: ValueChartProps) {
       month: 'short',
       day: 'numeric',
     }),
-    'KTC Value': point.ktc,
+    'Base Value': point.ktc,
     'FDP Value': point.fdp,
     fullDate: point.date,
   }));
