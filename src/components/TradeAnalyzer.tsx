@@ -105,25 +105,23 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
 
     setSearching(true);
     try {
-      const { data, error } = await supabase
-        .from('latest_player_values')
-        .select('player_id, player_name, position, team, adjusted_value')
-        .ilike('player_name', `%${term.trim()}%`)
-        .eq('format', 'dynasty')
-        .order('adjusted_value', { ascending: false })
-        .limit(10);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const url = `${supabaseUrl}/functions/v1/player-search?q=${encodeURIComponent(term.trim())}&limit=10`;
 
-      if (error) {
-        console.error('Player search DB error:', error);
-        throw error;
-      }
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${supabaseKey}` },
+      });
 
-      console.log(`Player search "${term}" returned ${data?.length ?? 0} results`);
-      const results: SleeperPlayer[] = (data || []).map((p: any) => ({
-        player_id: p.player_id,
-        full_name: p.player_name,
-        first_name: (p.player_name || '').split(' ')[0] || '',
-        last_name: (p.player_name || '').split(' ').slice(1).join(' ') || '',
+      if (!response.ok) throw new Error(`Search failed: ${response.status}`);
+
+      const data = await response.json();
+
+      const results: SleeperPlayer[] = (data.results || []).map((p: any) => ({
+        player_id: p.id,
+        full_name: p.name,
+        first_name: (p.name || '').split(' ')[0] || '',
+        last_name: (p.name || '').split(' ').slice(1).join(' ') || '',
         position: p.position,
         team: p.team,
         age: 0,
@@ -1333,24 +1331,13 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                             : 'hover:bg-gray-700'
                         }`}
                       >
-                        <div className="relative w-10 h-10 flex-shrink-0">
-                          <img
-                            src={getPlayerImageUrl(player.player_id)}
-                            alt={player.full_name}
-                            className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc]"
-                            onError={(e) => {
-                              const t = e.currentTarget;
-                              t.style.display = 'none';
-                              const parent = t.parentElement;
-                              if (parent) {
-                                const fb = document.createElement('div');
-                                fb.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm';
-                                fb.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                parent.appendChild(fb);
-                              }
-                            }}
-                          />
-                        </div>
+                        <PlayerAvatar
+                          playerName={player.full_name}
+                          team={player.team}
+                          position={player.position}
+                          size="md"
+                          playerId={player.player_id}
+                        />
                         <div className="flex-1">
                           <span className="text-white font-medium">{player.full_name}</span>
                           <div className="text-sm text-gray-400">{player.position} - {player.team || 'FA'}</div>
@@ -1517,24 +1504,13 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                             : 'hover:bg-gray-700'
                         }`}
                       >
-                        <div className="relative w-10 h-10 flex-shrink-0">
-                          <img
-                            src={getPlayerImageUrl(player.player_id)}
-                            alt={player.full_name}
-                            className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc]"
-                            onError={(e) => {
-                              const t = e.currentTarget;
-                              t.style.display = 'none';
-                              const parent = t.parentElement;
-                              if (parent) {
-                                const fb = document.createElement('div');
-                                fb.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm';
-                                fb.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                parent.appendChild(fb);
-                              }
-                            }}
-                          />
-                        </div>
+                        <PlayerAvatar
+                          playerName={player.full_name}
+                          team={player.team}
+                          position={player.position}
+                          size="md"
+                          playerId={player.player_id}
+                        />
                         <div className="flex-1">
                           <span className="text-white font-medium">{player.full_name}</span>
                           <div className="text-sm text-gray-400">{player.position} - {player.team || 'FA'}</div>
