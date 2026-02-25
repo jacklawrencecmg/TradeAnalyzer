@@ -8,7 +8,7 @@ const corsHeaders = {
 
 interface ValueSnapshot {
   fdp_value: number;
-  snapshot_date: string;
+  captured_at: string;
 }
 
 function calculateVolatility(values: number[]): number {
@@ -29,11 +29,11 @@ function interpolateValue(snapshots: ValueSnapshot[], daysAgo: number): number {
   targetDate.setHours(0, 0, 0, 0);
 
   const sorted = [...snapshots].sort(
-    (a, b) => new Date(a.snapshot_date).getTime() - new Date(b.snapshot_date).getTime()
+    (a, b) => new Date(a.captured_at).getTime() - new Date(b.captured_at).getTime()
   );
 
   const exactMatch = sorted.find(s => {
-    const snapDate = new Date(s.snapshot_date);
+    const snapDate = new Date(s.captured_at);
     snapDate.setHours(0, 0, 0, 0);
     return snapDate.getTime() === targetDate.getTime();
   });
@@ -44,7 +44,7 @@ function interpolateValue(snapshots: ValueSnapshot[], daysAgo: number): number {
   let after: ValueSnapshot | null = null;
 
   for (const snapshot of sorted) {
-    const snapDate = new Date(snapshot.snapshot_date);
+    const snapDate = new Date(snapshot.captured_at);
     snapDate.setHours(0, 0, 0, 0);
 
     if (snapDate.getTime() <= targetDate.getTime()) {
@@ -56,8 +56,8 @@ function interpolateValue(snapshots: ValueSnapshot[], daysAgo: number): number {
   }
 
   if (before && after) {
-    const beforeDate = new Date(before.snapshot_date).getTime();
-    const afterDate = new Date(after.snapshot_date).getTime();
+    const beforeDate = new Date(before.captured_at).getTime();
+    const afterDate = new Date(after.captured_at).getTime();
     const targetTime = targetDate.getTime();
 
     const ratio = (targetTime - beforeDate) / (afterDate - beforeDate);
@@ -107,10 +107,10 @@ Deno.serve(async (req: Request) => {
 
       const { data: snapshots, error: snapshotsError } = await supabase
         .from('ktc_value_snapshots')
-        .select('player_id, fdp_value, snapshot_date')
+        .select('player_id, fdp_value, captured_at')
         .in('player_id', playerIds)
-        .gte('snapshot_date', thirtyDaysAgo.toISOString())
-        .order('snapshot_date', { ascending: false });
+        .gte('captured_at', thirtyDaysAgo.toISOString())
+        .order('captured_at', { ascending: false });
 
       if (snapshotsError) {
         console.error('Error fetching snapshots:', snapshotsError);
@@ -124,7 +124,7 @@ Deno.serve(async (req: Request) => {
         }
         snapshotsByPlayer.get(s.player_id)!.push({
           fdp_value: s.fdp_value,
-          snapshot_date: s.snapshot_date,
+          captured_at: s.captured_at,
         });
       });
 
@@ -134,7 +134,7 @@ Deno.serve(async (req: Request) => {
         if (playerSnapshots.length === 0) continue;
 
         const sorted = [...playerSnapshots].sort(
-          (a, b) => new Date(b.snapshot_date).getTime() - new Date(a.snapshot_date).getTime()
+          (a, b) => new Date(b.captured_at).getTime() - new Date(a.captured_at).getTime()
         );
 
         const valueNow = sorted.length > 0 ? sorted[0].fdp_value : player.adjusted_value;
