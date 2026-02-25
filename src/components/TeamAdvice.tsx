@@ -74,7 +74,8 @@ export default function TeamAdvice({ leagueId, sleeperLeagueId, rosterId }: Team
         throw new Error(data.error || 'Failed to calculate strategy');
       }
 
-      setStrategy(data.strategies || data.strategy);
+      const raw = data.strategies ?? data.strategy;
+      setStrategy(Array.isArray(raw) ? raw[0] : raw);
     } catch (err) {
       console.error('Error fetching team strategy:', err);
       setError(err instanceof Error ? err.message : 'Failed to load team advice');
