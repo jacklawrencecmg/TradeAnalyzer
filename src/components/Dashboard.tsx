@@ -122,6 +122,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   ) => {
     if (!user) return;
 
+    setShowAddLeague(false);
+
     try {
       const { error } = await supabase.from('user_leagues')
         .upsert({
@@ -140,9 +142,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
       if (error) throw error;
 
-      await loadLeagues();
-      setShowAddLeague(false);
       showToast(`${platform.charAt(0).toUpperCase() + platform.slice(1)} league added successfully!`, 'success');
+      await loadLeagues();
     } catch (error: any) {
       console.error('Error adding league:', error);
       showToast('Failed to add league. Please try again.', 'error');
@@ -785,6 +786,13 @@ function AddLeagueModal({ onClose, onAdd }: AddLeagueModalProps) {
                 Change Username
               </button>
             </div>
+
+            {loading && (
+              <div className="flex items-center justify-center gap-3 py-4 text-fdp-text-2">
+                <RefreshCw className="w-5 h-5 animate-spin text-fdp-accent-1" />
+                <span>Adding league...</span>
+              </div>
+            )}
 
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {leagues.map((league) => (
