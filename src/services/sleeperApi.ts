@@ -248,14 +248,8 @@ export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> 
   const cached = getCachedData(cacheKey, PLAYER_CACHE_DURATION);
   if (cached) return cached;
 
-  const dbPlayers = await fetchAllPlayersFromDatabase();
-  if (Object.keys(dbPlayers).length > 0) {
-    setCachedData(cacheKey, dbPlayers);
-    return dbPlayers;
-  }
-
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch(`${SLEEPER_API_BASE}/players/nfl`, { signal: controller.signal });
@@ -278,7 +272,11 @@ export async function fetchAllPlayers(): Promise<Record<string, SleeperPlayer>> 
     }
   } catch (error) {
     clearTimeout(timeoutId);
-    console.error('Sleeper API unavailable:', error);
+    console.error('Sleeper API unavailable, falling back to database players:', error);
+    const dbPlayers = await fetchAllPlayersFromDatabase();
+    if (Object.keys(dbPlayers).length > 0) {
+      return dbPlayers;
+    }
     return {};
   }
 }
