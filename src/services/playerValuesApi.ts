@@ -468,20 +468,30 @@ class PlayerValuesApi {
     scoringFormat: 'ppr' | 'half-ppr' = 'ppr'
   ): Promise<PlayerValue[]> {
     try {
-      let query = supabase
-        .from('latest_player_values')
-        .select('*')
-        .order('adjusted_value', { ascending: false })
-        .limit(limit);
-
-      if (position) {
-        query = query.eq('position', position);
-      }
-
-      const { data, error } = await query;
+      const format = leagueFormat === 'redraft' ? 'redraft' : 'dynasty_sf';
+      const { data, error } = await supabase.rpc('get_latest_values', {
+        p_format: format,
+        p_position: position || null,
+        p_limit: limit,
+      });
 
       if (error) throw error;
-      return (data || []).map(normalizePlayerValue);
+
+      return (data || []).map((p: any) => normalizePlayerValue({
+        player_id: p.player_id,
+        player_name: p.full_name || p.player_name,
+        position: p.pos,
+        team: p.team,
+        base_value: p.ktc_value || 0,
+        adjusted_value: p.fdp_value || p.ktc_value || 0,
+        fdp_value: p.fdp_value || p.ktc_value || 0,
+        updated_at: p.captured_at,
+        last_updated: p.captured_at,
+        rank_overall: p.position_rank,
+        rank_position: p.position_rank,
+        format: p.format,
+        metadata: p.metadata,
+      }));
     } catch (error) {
       console.error('Error fetching player values:', error);
       return [];
@@ -490,14 +500,32 @@ class PlayerValuesApi {
 
   async getPlayerValue(playerId: string): Promise<PlayerValue | null> {
     try {
-      const { data, error } = await supabase
-        .from('latest_player_values')
-        .select('*')
-        .eq('player_id', playerId)
-        .maybeSingle();
+      const { data, error } = await supabase.rpc('get_latest_values', {
+        p_format: 'dynasty_sf',
+        p_position: null,
+        p_limit: 500,
+      });
 
       if (error) throw error;
-      return data ? normalizePlayerValue(data) : null;
+
+      const match = (data || []).find((p: any) => p.player_id === playerId);
+      if (!match) return null;
+
+      return normalizePlayerValue({
+        player_id: match.player_id,
+        player_name: match.full_name || match.player_name,
+        position: match.pos,
+        team: match.team,
+        base_value: match.ktc_value || 0,
+        adjusted_value: match.fdp_value || match.ktc_value || 0,
+        fdp_value: match.fdp_value || match.ktc_value || 0,
+        updated_at: match.captured_at,
+        last_updated: match.captured_at,
+        rank_overall: match.position_rank,
+        rank_position: match.position_rank,
+        format: match.format,
+        metadata: match.metadata,
+      });
     } catch (error) {
       console.error('Error fetching player value:', error);
       return null;

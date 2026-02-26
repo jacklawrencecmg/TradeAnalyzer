@@ -43,29 +43,30 @@ export function DynastyRankingsPage() {
     try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('latest_player_values')
-        .select('player_id, player_name, position, team, base_value, adjusted_value, rank_overall, updated_at')
-        .in('position', ['QB', 'RB', 'WR', 'TE', 'LB', 'DL', 'DB'])
-        .order('base_value', { ascending: false })
-        .limit(1000);
+      const { data, error } = await supabase.rpc('get_latest_values', {
+        p_format: 'dynasty_sf',
+        p_position: null,
+        p_limit: 1000,
+      });
 
       if (error) throw error;
 
-      const enriched = (data || []).map((p: any, index: number) => ({
-        player_id: p.player_id,
-        full_name: p.player_name || 'Unknown',
-        position: p.position,
-        team: p.team,
-        fdp_value: p.adjusted_value || p.base_value || 0,
-        dynasty_rank: index + 1,
-        value_change_7d: undefined,
-      }));
+      const enriched = (data || [])
+        .filter((p: any) => ['QB', 'RB', 'WR', 'TE', 'LB', 'DL', 'DB'].includes(p.pos))
+        .map((p: any, index: number) => ({
+          player_id: p.player_id,
+          full_name: p.full_name || p.player_name || 'Unknown',
+          position: p.pos,
+          team: p.team,
+          fdp_value: p.fdp_value || p.ktc_value || 0,
+          dynasty_rank: index + 1,
+          value_change_7d: undefined,
+        }));
 
       setPlayers(enriched);
 
-      if (data && data.length > 0 && data[0].updated_at) {
-        setLastUpdated(new Date(data[0].updated_at));
+      if (data && data.length > 0 && data[0].captured_at) {
+        setLastUpdated(new Date(data[0].captured_at));
       }
     } catch (err) {
       console.error('Error loading rankings:', err);
