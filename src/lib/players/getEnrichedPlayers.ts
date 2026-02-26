@@ -14,23 +14,23 @@ export interface EnrichedPlayer {
 
 const enrichedPlayersCache: {
   data: Map<string, EnrichedPlayer> | null;
+  byName: Map<string, EnrichedPlayer> | null;
   timestamp: number;
 } = {
   data: null,
+  byName: null,
   timestamp: 0,
 };
 
-// Cache for 5 minutes (much shorter than 24 hours)
 const ENRICHED_CACHE_DURATION = 5 * 60 * 1000;
 
-/**
- * Fetches enriched player data from database with current team info
- * This ensures team data is always up-to-date, unlike the 24-hour Sleeper API cache
- */
+function normalizeName(name: string): string {
+  return name.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ');
+}
+
 export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>> {
   const now = Date.now();
 
-  // Return cached data if fresh
   if (enrichedPlayersCache.data && now - enrichedPlayersCache.timestamp < ENRICHED_CACHE_DURATION) {
     return enrichedPlayersCache.data;
   }
@@ -56,9 +56,10 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
     }
 
     const playerMap = new Map<string, EnrichedPlayer>();
+    const byNameMap = new Map<string, EnrichedPlayer>();
 
     data?.forEach((player: any) => {
-      playerMap.set(player.player_id, {
+      const enriched: EnrichedPlayer = {
         player_id: player.player_id,
         full_name: player.player_name,
         position: player.position,
@@ -68,18 +69,21 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
         years_exp: null,
         injury_status: null,
         rookie_year: null,
-      });
+      };
+      playerMap.set(player.player_id, enriched);
+      if (player.player_name) {
+        byNameMap.set(normalizeName(player.player_name), enriched);
+      }
     });
 
-    // Update cache
     enrichedPlayersCache.data = playerMap;
+    enrichedPlayersCache.byName = byNameMap;
     enrichedPlayersCache.timestamp = now;
 
     console.log(`Loaded ${playerMap.size} enriched players from database`);
     return playerMap;
   } catch (error) {
     console.error('Error in getEnrichedPlayers:', error);
-    // Return stale cache if available
     if (enrichedPlayersCache.data) {
       return enrichedPlayersCache.data;
     }
@@ -87,48 +91,46 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
   }
 }
 
-/**
- * Gets a single enriched player by ID
- */
+export async function getEnrichedPlayerByName(name: string): Promise<EnrichedPlayer | null> {
+  await getEnrichedPlayers();
+  return enrichedPlayersCache.byName?.get(normalizeName(name)) || null;
+}
+
 export async function getEnrichedPlayer(playerId: string): Promise<EnrichedPlayer | null> {
   const players = await getEnrichedPlayers();
   return players.get(playerId) || null;
 }
 
-/**
- * Invalidates the enriched players cache
- * Call this after syncing Sleeper players to force a refresh
- */
 export function invalidateEnrichedPlayersCache(): void {
   enrichedPlayersCache.data = null;
+  enrichedPlayersCache.byName = null;
   enrichedPlayersCache.timestamp = 0;
   console.log('Enriched players cache invalidated');
 }
 
-/**
- * Merges Sleeper API data with database team data
- * Prefers database team data which is more current
- */
 export async function mergeSleeperWithDatabase(
   sleeperPlayers: Record<string, any>
 ): Promise<Record<string, any>> {
-  const enrichedMap = await getEnrichedPlayers();
+  await getEnrichedPlayers();
+  const enrichedMap = enrichedPlayersCache.data!;
+  const byNameMap = enrichedPlayersCache.byName!;
 
   const merged: Record<string, any> = {};
 
   for (const [playerId, sleeperData] of Object.entries(sleeperPlayers)) {
-    const enriched = enrichedMap.get(playerId);
+    const enrichedById = enrichedMap.get(playerId);
+    const sleeperName = sleeperData.full_name || `${sleeperData.first_name || ''} ${sleeperData.last_name || ''}`.trim();
+    const enrichedByName = sleeperName ? byNameMap.get(normalizeName(sleeperName)) : undefined;
+    const enriched = enrichedById || enrichedByName;
 
     if (enriched) {
-      // Use database team data (more current) but keep other Sleeper data
       merged[playerId] = {
         ...sleeperData,
-        team: enriched.team, // Database team is authoritative
+        team: enriched.team,
         status: enriched.status,
         injury_status: enriched.injury_status,
       };
     } else {
-      // Player not in database, use Sleeper data as-is
       merged[playerId] = sleeperData;
     }
   }

@@ -35,6 +35,7 @@ export function clearPlayerValuesCache(): void {
   }
   keysToDelete.forEach(key => cache.delete(key));
   dbPlayerValues = new Map();
+  dbPlayerValuesByName = new Map();
   fdpValues = {};
   fdpSuperflexValues = {};
   console.log(`Cleared ${keysToDelete.length} player value cache entries`);
@@ -43,6 +44,7 @@ export function clearPlayerValuesCache(): void {
 export function clearAllCaches(): void {
   cache.clear();
   dbPlayerValues = new Map();
+  dbPlayerValuesByName = new Map();
   fdpValues = {};
   fdpSuperflexValues = {};
   console.log('All caches cleared');
@@ -302,6 +304,7 @@ const VALUE_SCALE_FACTOR = 1.0;
 let fdpValues: Record<string, number> = {};
 let fdpSuperflexValues: Record<string, number> = {};
 let dbPlayerValues: Map<string, PlayerValue> = new Map();
+let dbPlayerValuesByName: Map<string, PlayerValue> = new Map();
 
 const KNOWN_BACKUP_QBS = [
   'joe milton', 'joe milton iii', 'trey lance', 'sam howell', 'tyler huntley',
@@ -343,8 +346,10 @@ export async function fetchPlayerValues(
     const dbValues = await playerValuesApi.getPlayerValues(undefined, 10000, leagueFormat, dbScoringFormat);
     if (dbValues && dbValues.length > 0) {
       dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
+      dbPlayerValuesByName = new Map(
+        dbValues.map(v => [v.player_name?.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '') ?? '', v])
+      );
       setCachedData(dbCacheKey, dbPlayerValues);
-      console.log(`Loaded ${dbValues.length} player values from database (SportsData.io enhanced) - values range from ${Math.min(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : (v.fdp_value ?? 0)))} to ${Math.max(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : (v.fdp_value ?? 0)))}`);
     } else {
       console.warn('No player values found in database, falling back to FDP API values');
     }
@@ -541,7 +546,8 @@ export function getPlayerValue(
 
   const finalSettings = { ...defaultSettings, ...settings };
 
-  const dbValue = dbPlayerValues.get(player.player_id);
+  const normalizedName = (player.full_name || '').toLowerCase().trim().replace(/[^a-z0-9 ]/g, '');
+  const dbValue = dbPlayerValues.get(player.player_id) || dbPlayerValuesByName.get(normalizedName);
   if (dbValue) {
     const rawFdpValue = typeof dbValue.fdp_value === 'string' ? parseFloat(dbValue.fdp_value) : (dbValue.fdp_value ?? 0);
     let value: number = rawFdpValue;
