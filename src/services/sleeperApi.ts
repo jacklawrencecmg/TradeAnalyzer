@@ -1,6 +1,7 @@
 import { playerValuesApi, type PlayerValue } from './playerValuesApi';
 import { getEnrichedPlayers, mergeSleeperWithDatabase } from '../lib/players/getEnrichedPlayers';
 import { SEASON_CONTEXT } from '../config/seasonContext';
+import { supabase } from '../lib/supabase';
 
 const SLEEPER_API_BASE = 'https://api.sleeper.app/v1';
 
@@ -342,16 +343,47 @@ export async function fetchPlayerValues(
   }
 
   try {
-    const dbScoringFormat = scoringFormat === 'standard' ? 'ppr' : scoringFormat;
-    const dbValues = await playerValuesApi.getPlayerValues(undefined, 10000, leagueFormat, dbScoringFormat);
-    if (dbValues && dbValues.length > 0) {
-      dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
+    const rpcFormat = leagueFormat === 'redraft' ? 'redraft' : (isSuperflex ? 'dynasty_sf' : 'dynasty');
+    const { data: rpcValues, error: rpcError } = await supabase.rpc('get_latest_values', {
+      p_format: rpcFormat,
+      p_position: null,
+      p_limit: 2000,
+    });
+
+    if (!rpcError && rpcValues && rpcValues.length > 0) {
+      const mapped: PlayerValue[] = rpcValues.map((v: any) => ({
+        player_id: v.player_id,
+        player_name: v.full_name || v.player_name,
+        position: v.pos || v.position,
+        team: v.team,
+        base_value: v.ktc_value || 0,
+        fdp_value: v.fdp_value || v.ktc_value || 0,
+        adjusted_value: v.fdp_value || v.ktc_value || 0,
+        market_value: v.ktc_value || 0,
+        updated_at: v.captured_at,
+        last_updated: v.captured_at,
+        rank_overall: v.position_rank,
+        rank_position: v.position_rank,
+        format: v.format,
+        metadata: v.metadata,
+      }));
+      dbPlayerValues = new Map(mapped.map(v => [v.player_id, v]));
       dbPlayerValuesByName = new Map(
-        dbValues.map(v => [v.player_name?.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '') ?? '', v])
+        mapped.map(v => [v.player_name?.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '') ?? '', v])
       );
       setCachedData(dbCacheKey, dbPlayerValues);
     } else {
-      console.warn('No player values found in database, falling back to FDP API values');
+      const dbScoringFormat = scoringFormat === 'standard' ? 'ppr' : scoringFormat;
+      const dbValues = await playerValuesApi.getPlayerValues(undefined, 10000, leagueFormat, dbScoringFormat);
+      if (dbValues && dbValues.length > 0) {
+        dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
+        dbPlayerValuesByName = new Map(
+          dbValues.map(v => [v.player_name?.toLowerCase().trim().replace(/[^a-z0-9 ]/g, '') ?? '', v])
+        );
+        setCachedData(dbCacheKey, dbPlayerValues);
+      } else {
+        console.warn('No player values found in database, falling back to FDP API values');
+      }
     }
   } catch (error) {
     console.warn('Failed to fetch player values from database:', error);
