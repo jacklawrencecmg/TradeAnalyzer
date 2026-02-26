@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Trophy, Users, TrendingUp, ArrowLeft, Loader, AlertCircle, Award, Target } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface Player {
   player_id: string;
@@ -9,6 +10,7 @@ interface Player {
   team: string | null;
   fdp_value: number;
   is_starter: boolean;
+  headshot_url?: string;
 }
 
 interface Roster {
@@ -294,13 +296,24 @@ export default function LeagueDashboard({ leagueId, leagueName, onBack }: League
                             className="flex items-center justify-between p-2 bg-white border border-gray-200 rounded"
                           >
                             <div className="flex items-center gap-2 flex-1 min-w-0">
-                              <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getPositionColor(player.position)}`}>
-                                {player.position}
-                              </span>
-                              <span className="text-sm text-gray-900 truncate">{player.name}</span>
+                              <PlayerAvatar
+                                playerId={player.player_id}
+                                playerName={player.name}
+                                team={player.team || undefined}
+                                position={player.position}
+                                size="sm"
+                                showTeamLogo={false}
+                                headshotUrl={player.headshot_url}
+                              />
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0 ${getPositionColor(player.position)}`}>
+                                  {player.position}
+                                </span>
+                                <span className="text-sm text-gray-900 truncate">{player.name}</span>
+                              </div>
                             </div>
                             <span className="text-sm font-medium text-gray-900 ml-2">
-                              {player.fdp_value.toLocaleString()}
+                              {player.fdp_value > 0 ? player.fdp_value.toLocaleString() : '—'}
                             </span>
                           </div>
                         ))}

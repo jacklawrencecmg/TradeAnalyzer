@@ -8,6 +8,27 @@ const corsHeaders = {
 
 const SLEEPER_BASE_URL = 'https://api.sleeper.app/v1';
 
+let sleeperPlayersCache: Record<string, any> | null = null;
+let sleeperPlayersCacheTime = 0;
+const SLEEPER_CACHE_TTL = 60 * 60 * 1000;
+
+async function getSleeperPlayers(): Promise<Record<string, any>> {
+  const now = Date.now();
+  if (sleeperPlayersCache && now - sleeperPlayersCacheTime < SLEEPER_CACHE_TTL) {
+    return sleeperPlayersCache;
+  }
+  try {
+    const res = await fetch(`${SLEEPER_BASE_URL}/players/nfl`);
+    if (!res.ok) return {};
+    const data = await res.json();
+    sleeperPlayersCache = data;
+    sleeperPlayersCacheTime = now;
+    return data;
+  } catch {
+    return {};
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -49,13 +70,16 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: dbPlayers } = await supabase
-      .from('latest_player_values')
-      .select('player_id, player_name, position, team, adjusted_value')
-      .in('player_id', playerIdList);
+    const [dbResult, sleeperPlayers] = await Promise.all([
+      supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team, adjusted_value')
+        .in('player_id', playerIdList),
+      getSleeperPlayers(),
+    ]);
 
     const playerMap = new Map<string, any>();
-    for (const p of dbPlayers || []) {
+    for (const p of dbResult.data || []) {
       playerMap.set(p.player_id, p);
     }
 
@@ -65,13 +89,42 @@ Deno.serve(async (req: Request) => {
       const owner = userMap.get(roster.owner_id);
       const players = (roster.players || []).map((playerId: string) => {
         const dbPlayer = playerMap.get(playerId);
+
+        if (dbPlayer) {
+          return {
+            player_id: playerId,
+            name: dbPlayer.player_name,
+            position: dbPlayer.position,
+            team: dbPlayer.team || null,
+            fdp_value: dbPlayer.adjusted_value || 0,
+            is_starter: (roster.starters || []).includes(playerId),
+            headshot_url: `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`,
+          };
+        }
+
+        const sleeperPlayer = sleeperPlayers[playerId];
+        if (sleeperPlayer) {
+          const fullName = sleeperPlayer.full_name ||
+            `${sleeperPlayer.first_name || ''} ${sleeperPlayer.last_name || ''}`.trim();
+          return {
+            player_id: playerId,
+            name: fullName || playerId,
+            position: sleeperPlayer.position || 'N/A',
+            team: sleeperPlayer.team || null,
+            fdp_value: 0,
+            is_starter: (roster.starters || []).includes(playerId),
+            headshot_url: `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`,
+          };
+        }
+
         return {
-          player_id: dbPlayer?.player_id || playerId,
-          name: dbPlayer?.player_name || playerId,
-          position: dbPlayer?.position || 'NA',
-          team: dbPlayer?.team || null,
-          fdp_value: dbPlayer?.adjusted_value || 0,
+          player_id: playerId,
+          name: 'Unknown Player',
+          position: 'N/A',
+          team: null,
+          fdp_value: 0,
           is_starter: (roster.starters || []).includes(playerId),
+          headshot_url: `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`,
         };
       });
 
