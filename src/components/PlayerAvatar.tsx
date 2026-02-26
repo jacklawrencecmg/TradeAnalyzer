@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
-import { getPlayerHeadshot } from '../lib/players/getPlayerHeadshot';
 
 interface PlayerAvatarProps {
   playerId?: string;
@@ -71,6 +70,17 @@ const teamLogoSize = {
   xl: 'w-7 h-7 text-base',
 };
 
+function buildFallbackChain(playerId: string, providedUrl?: string): string[] {
+  const fullSize = `https://sleepercdn.com/content/nfl/players/${playerId}.jpg`;
+  const thumb = `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`;
+  const chain: string[] = [fullSize];
+  if (providedUrl && providedUrl !== fullSize && providedUrl !== thumb) {
+    chain.push(providedUrl);
+  }
+  chain.push(thumb);
+  return chain;
+}
+
 export function PlayerAvatar({
   playerId,
   playerName,
@@ -83,8 +93,27 @@ export function PlayerAvatar({
   className = '',
   headshotUrl: providedHeadshotUrl,
 }: PlayerAvatarProps) {
-  const [imageError, setImageError] = useState(false);
-  const [canonicalHeadshotUrl, setCanonicalHeadshotUrl] = useState<string | null>(providedHeadshotUrl || null);
+  const fallbackUrls = playerId
+    ? buildFallbackChain(playerId, providedHeadshotUrl || undefined)
+    : providedHeadshotUrl ? [providedHeadshotUrl] : [];
+
+  const [fallbackIndex, setFallbackIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+  const currentUrl = failed ? null : (fallbackUrls[fallbackIndex] ?? null);
+
+  useEffect(() => {
+    setFallbackIndex(0);
+    setFailed(false);
+  }, [playerId, providedHeadshotUrl]);
+
+  function handleError() {
+    const next = fallbackIndex + 1;
+    if (next < fallbackUrls.length) {
+      setFallbackIndex(next);
+    } else {
+      setFailed(true);
+    }
+  }
 
   const initials = playerName
     .split(' ')
@@ -94,43 +123,19 @@ export function PlayerAvatar({
     .slice(0, 2);
 
   const teamColor = team ? teamColors[team] || 'bg-gray-600' : 'bg-gray-600';
-
-  useEffect(() => {
-    if (providedHeadshotUrl) {
-      setCanonicalHeadshotUrl(providedHeadshotUrl);
-      return;
-    }
-
-    if (!playerId) {
-      return;
-    }
-
-    let isMounted = true;
-
-    getPlayerHeadshot(playerId).then((headshot) => {
-      if (isMounted) {
-        setCanonicalHeadshotUrl(headshot.url);
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [playerId, providedHeadshotUrl]);
-
-  const playerImageUrl = canonicalHeadshotUrl;
+  const showImage = !failed && currentUrl;
 
   return (
     <div className={`relative inline-block ${className}`}>
       <div
-        className={`${sizeClasses[size]} rounded-full ${!imageError && playerImageUrl ? 'bg-gray-800' : teamColor} flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-gray-700/50 transition-all duration-300 hover:ring-cyan-500/50 hover:shadow-cyan-500/20 hover:shadow-xl overflow-hidden`}
+        className={`${sizeClasses[size]} rounded-full ${showImage ? 'bg-gray-800' : teamColor} flex items-center justify-center text-white font-bold shadow-lg ring-2 ring-gray-700/50 transition-all duration-300 hover:ring-cyan-500/50 hover:shadow-cyan-500/20 hover:shadow-xl overflow-hidden`}
       >
-        {!imageError && playerImageUrl ? (
+        {showImage ? (
           <img
-            src={playerImageUrl}
+            src={currentUrl!}
             alt={playerName}
             className="w-full h-full object-cover"
-            onError={() => setImageError(true)}
+            onError={handleError}
           />
         ) : playerName ? (
           <span className={size === 'sm' ? 'text-xs' : size === 'lg' || size === 'xl' ? 'text-lg' : 'text-sm'}>

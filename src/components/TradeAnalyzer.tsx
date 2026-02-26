@@ -1360,6 +1360,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                       className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700 hover-lift card-enter"
                     >
                       <PlayerAvatar
+                        playerId={playerId}
                         playerName={player.full_name}
                         team={player.team ?? undefined}
                         position={player.position}
@@ -1533,6 +1534,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                       className="flex items-center gap-3 bg-gray-800 px-4 py-3 rounded-lg border border-gray-700 hover-lift card-enter"
                     >
                       <PlayerAvatar
+                        playerId={playerId}
                         playerName={player.full_name}
                         team={player.team ?? undefined}
                         position={player.position}
