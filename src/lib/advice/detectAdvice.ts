@@ -326,7 +326,7 @@ export function detectWaiverTarget(
   position: PlayerMarketPosition,
   replacementLevel: number
 ): AdviceRecommendation | null {
-  if (position.rosteredPercent !== null && position.rosteredPercent >= 60) {
+  if (position.rosteredPercent != null && position.rosteredPercent >= 60) {
     return null; // Too widely rostered
   }
 
@@ -362,7 +362,7 @@ function calculateWaiverConfidence(
   const valueAboveReplacement = position.modelValue - replacementLevel;
   confidence += Math.min(25, valueAboveReplacement / 40);
 
-  if (position.rosteredPercent !== null && position.rosteredPercent < 30) {
+  if (position.rosteredPercent != null && position.rosteredPercent < 30) {
     confidence += 15; // Very low rostered = hidden gem
   }
 

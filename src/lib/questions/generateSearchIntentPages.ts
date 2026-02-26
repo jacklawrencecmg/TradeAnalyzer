@@ -1,5 +1,4 @@
 import { supabase } from '../supabase';
-import { getFDPValue } from '../fdp/getFDPValue';
 import {
   generateBuyLowQuestion,
   generateTradeComparisonQuestion,
@@ -50,7 +49,7 @@ export async function generateAllSearchIntentPages(): Promise<void> {
 
 async function generatePlayerQuestions(player: any): Promise<void> {
   const playerId = player.player_id;
-  const currentValue = getFDPValue(player);
+  const currentValue = player.fdp_value || player.value || 0;
 
   const { data: marketData } = await supabase
     .from('market_consensus')

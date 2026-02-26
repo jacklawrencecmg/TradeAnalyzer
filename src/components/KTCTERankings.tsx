@@ -50,7 +50,7 @@ export default function KTCTERankings() {
       if (data && data.length > 0) {
         const playerIds = data
           .map((te: TEValue) => te.player_id)
-          .filter((id): id is string => !!id);
+          .filter((id: string | undefined): id is string => !!id);
 
         const { data: identities } = await supabase
           .from('player_identity')

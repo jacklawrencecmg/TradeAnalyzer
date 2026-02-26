@@ -135,6 +135,9 @@ export interface TradeItem {
   name: string;
   position?: string;
   value: number;
+  tier?: string;
+  round?: number;
+  year?: number;
 }
 
 export interface TradeAnalysis {
@@ -313,7 +316,7 @@ const KNOWN_BACKUP_QBS = [
 export async function fetchPlayerValues(
   isSuperflex: boolean = false,
   leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
-  scoringFormat: 'ppr' | 'half' | 'standard' = 'ppr'
+  scoringFormat: 'ppr' | 'half-ppr' | 'standard' = 'ppr'
 ): Promise<void> {
   // Use the current league year from SEASON_CONTEXT
   const targetYear = SEASON_CONTEXT.league_year;
@@ -338,11 +341,12 @@ export async function fetchPlayerValues(
   }
 
   try {
-    const dbValues = await playerValuesApi.getPlayerValues(undefined, 10000, leagueFormat, scoringFormat);
+    const dbScoringFormat = scoringFormat === 'standard' ? 'ppr' : scoringFormat;
+    const dbValues = await playerValuesApi.getPlayerValues(undefined, 10000, leagueFormat, dbScoringFormat);
     if (dbValues && dbValues.length > 0) {
       dbPlayerValues = new Map(dbValues.map(v => [v.player_id, v]));
       setCachedData(dbCacheKey, dbPlayerValues);
-      console.log(`Loaded ${dbValues.length} player values from database (SportsData.io enhanced) - values range from ${Math.min(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : v.fdp_value))} to ${Math.max(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : v.fdp_value))}`);
+      console.log(`Loaded ${dbValues.length} player values from database (SportsData.io enhanced) - values range from ${Math.min(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : (v.fdp_value ?? 0)))} to ${Math.max(...dbValues.map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : (v.fdp_value ?? 0)))}`);
     } else {
       console.warn('No player values found in database, falling back to FDP API values');
     }
@@ -541,8 +545,8 @@ export function getPlayerValue(
 
   const dbValue = dbPlayerValues.get(player.player_id);
   if (dbValue) {
-    const rawFdpValue = typeof dbValue.fdp_value === 'string' ? parseFloat(dbValue.fdp_value) : dbValue.fdp_value;
-    let value = rawFdpValue;
+    const rawFdpValue = typeof dbValue.fdp_value === 'string' ? parseFloat(dbValue.fdp_value) : (dbValue.fdp_value ?? 0);
+    let value: number = rawFdpValue;
 
     // Apply backup QB penalty if not already applied in metadata
     if (player.position === 'QB' && !dbValue.metadata?.backup_qb_applied) {
@@ -551,8 +555,8 @@ export function getPlayerValue(
 
       // Get all QB values from database to calculate relative value
       const allQBValues = Array.from(dbPlayerValues.values())
-        .map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : v.fdp_value)
-        .filter(v => v > 100)
+        .map(v => typeof v.fdp_value === 'string' ? parseFloat(v.fdp_value) : (v.fdp_value ?? 0))
+        .filter((v): v is number => v > 100)
         .sort((a, b) => b - a);
 
       const topQBValue = allQBValues[0] || 10000;
@@ -764,7 +768,7 @@ export async function analyzeTrade(
   teamAGetsFAAB: number = 0,
   leagueSettings?: Partial<LeagueSettings>,
   leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
-  scoringFormat: 'ppr' | 'half' | 'standard' = 'ppr'
+  scoringFormat: 'ppr' | 'half-ppr' | 'standard' = 'ppr'
 ): Promise<TradeAnalysis> {
   let settings: LeagueSettings | Partial<LeagueSettings>;
 

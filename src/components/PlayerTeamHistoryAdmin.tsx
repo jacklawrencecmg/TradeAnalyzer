@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, Edit2, Trash2, Plus, Clock, CheckCircle, AlertCircle, Calendar, ArrowRight } from 'lucide-react';
+import { Search, Edit2, Trash2, Plus, Clock, CheckCircle, AlertCircle, Calendar, ArrowRight, Activity } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   getPlayerTeamHistory,

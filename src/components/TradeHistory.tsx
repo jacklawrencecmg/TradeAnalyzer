@@ -78,7 +78,7 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
     return players[playerId]?.full_name || 'Unknown Player';
   }
 
-  function getWinnerIcon(winner: string) {
+  function getWinnerIcon(winner: string | undefined) {
     if (winner === 'Fair') {
       return <Minus className="w-5 h-5 text-yellow-400" />;
     } else if (winner === 'A') {
@@ -248,7 +248,7 @@ export default function TradeHistory({ leagueId }: TradeHistoryProps) {
                       {trade.trade_result?.team_a_name || 'Team A'} Gets
                     </div>
                     <div className="space-y-1">
-                      {trade.trade_result.team_b_items.map((item) => (
+                      {(trade.trade_result?.team_b_items || []).map((item) => (
                         <div
                           key={item.id}
                           className="text-sm bg-gray-900 px-3 py-2 rounded border border-gray-700 text-white flex items-center justify-between"

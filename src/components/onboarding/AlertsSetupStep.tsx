@@ -8,7 +8,7 @@
 import React, { useState } from 'react';
 import { Bell, TrendingUp, Target, Star } from 'lucide-react';
 
-export function AlertsSetupStep({ onNext }: { onNext: () => void }) {
+export function AlertsSetupStep({ onNext }: { onNext: (data?: Record<string, unknown>) => void }) {
   const [enableAlerts, setEnableAlerts] = useState(true);
 
   function handleContinue() {

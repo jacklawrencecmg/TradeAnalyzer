@@ -279,7 +279,7 @@ async function checkMissingTeamHistory(): Promise<HealthCheckResult> {
 
 async function checkUnresolvedPlayersQueue(): Promise<HealthCheckResult> {
   try {
-    const { data: unresolvedData, error: unresolvedError } = await supabase
+    const { count: unresolvedCountRaw, error: unresolvedError } = await supabase
       .from('unresolved_entities')
       .select('id', { count: 'exact', head: true });
 
@@ -292,7 +292,7 @@ async function checkUnresolvedPlayersQueue(): Promise<HealthCheckResult> {
       };
     }
 
-    const unresolvedCount = unresolvedData || 0;
+    const unresolvedCount: number = unresolvedCountRaw || 0;
 
     if (unresolvedCount > 100) {
       return {

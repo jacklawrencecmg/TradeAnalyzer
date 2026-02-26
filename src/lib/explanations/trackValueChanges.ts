@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '../supabase';
-import { buildValueReasoning, buildBasicReasoning, type ValueContext } from './buildValueReasoning';
+import { buildValueReasoning, buildBasicReasoning, type ValueContext, type ValueReasoning } from './buildValueReasoning';
 import { renderExplanation } from './renderExplanation';
 
 export interface ValueChangeRecord {
@@ -70,7 +70,7 @@ export async function trackValueChanges(
       reasoning.position = change.position;
       reasoning.format = change.format;
 
-      const explanationText = renderExplanation(reasoning);
+      const explanationText = renderExplanation(reasoning as ValueReasoning);
 
       return {
         player_id: change.playerId,
@@ -208,7 +208,7 @@ export async function computeDailyChanges(
     reasoning.position = change.position;
     reasoning.format = change.format;
 
-    const explanationText = renderExplanation(reasoning);
+    const explanationText = renderExplanation(reasoning as ValueReasoning);
 
     const percentChange =
       change.oldValue > 0 ? (change.delta / change.oldValue) * 100 : 0;

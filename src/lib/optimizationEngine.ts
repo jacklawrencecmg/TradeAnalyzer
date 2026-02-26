@@ -165,7 +165,7 @@ export async function shouldShowUpgradeTrigger(
 
   return {
     shouldShow: true,
-    timing: triggerOpt.recommendedTiming,
+    timing: triggerOpt.recommendedTiming === 'default' ? 'immediate' : triggerOpt.recommendedTiming,
     confidence: triggerOpt.confidence,
   };
 }

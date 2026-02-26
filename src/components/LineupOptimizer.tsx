@@ -260,7 +260,7 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
 
   const renderLineupSlot = (slot: LineupSlot, index: number, isOptimal = false) => {
     const isDifferent = isOptimal && slot.player && lineup[index]?.player?.player_id !== slot.player.player_id;
-    const hasInjury = slot.player?.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(slot.player.injury_status);
+    const hasInjury = !!(slot.player?.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(slot.player.injury_status));
 
     return (
       <div
@@ -447,7 +447,7 @@ export default function LineupOptimizer({ leagueId, rosterId }: LineupOptimizerP
                   .filter(p => !optimalLineup.some(slot => slot.player?.player_id === p.player_id))
                   .sort((a, b) => b.value - a.value)
                   .map(player => {
-                    const hasInjury = player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status);
+                    const hasInjury = !!(player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status));
                     return (
                       <div key={player.player_id} className="bg-fdp-surface-1 backdrop-blur-sm rounded-lg border border-fdp-border-1 p-4 hover:border-fdp-accent-1 transition hover-lift card-enter">
                         <div className="flex items-center gap-3 mb-2">

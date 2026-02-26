@@ -50,7 +50,7 @@ export default function KTCQBRankings() {
       if (data && data.length > 0) {
         const playerIds = data
           .map((qb: QBValue) => qb.player_id)
-          .filter((id): id is string => !!id);
+          .filter((id: string | undefined): id is string => !!id);
 
         const { data: identities } = await supabase
           .from('player_identity')
@@ -98,7 +98,7 @@ export default function KTCQBRankings() {
     setCurrentPage(1);
   };
 
-  const uniqueTeams = Array.from(new Set(qbs.map((qb) => qb.team).filter(Boolean))).sort();
+  const uniqueTeams = Array.from(new Set(qbs.map((qb) => qb.team).filter((t): t is string => !!t))).sort();
 
   const paginatedQbs = filteredQbs.slice(
     (currentPage - 1) * itemsPerPage,

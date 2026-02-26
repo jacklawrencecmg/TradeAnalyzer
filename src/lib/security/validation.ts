@@ -93,7 +93,7 @@ export const LeagueProfileCreateSchema = z.object({
   profileName: z.string().min(1).max(100),
   format: FormatSchema,
   scoringPreset: z.string().optional(),
-  multipliers: z.record(z.number()).optional(),
+  multipliers: z.record(z.string(), z.number()).optional(),
 });
 
 /**
@@ -103,7 +103,7 @@ export const LeagueProfileUpdateSchema = z.object({
   profileId: UUIDSchema,
   profileName: z.string().min(1).max(100).optional(),
   scoringPreset: z.string().optional(),
-  multipliers: z.record(z.number()).optional(),
+  multipliers: z.record(z.string(), z.number()).optional(),
 });
 
 /**
@@ -172,7 +172,7 @@ export function validateInput<T>(
     return { success: true, data };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessage = error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join('; ');
+      const errorMessage = error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join('; ');
       return { success: false, error: errorMessage };
     }
     return { success: false, error: 'Validation failed' };

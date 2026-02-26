@@ -91,9 +91,9 @@ export async function generatePowerRankings(
         schedule_strength: scheduleStrength,
         recent_performance: recentPerformance,
         metadata: {
-          wins: team.settings?.wins || 0,
-          losses: team.settings?.losses || 0,
-          points_for: team.settings?.fpts || 0,
+          wins: (team as any).settings?.wins || 0,
+          losses: (team as any).settings?.losses || 0,
+          points_for: (team as any).settings?.fpts || 0,
         },
       });
     }

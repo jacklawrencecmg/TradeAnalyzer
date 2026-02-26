@@ -4,7 +4,6 @@ import { useParams, Link } from '../lib/seo/router';
 import { supabase } from '../lib/supabase';
 import { generatePlayerMetaTags, parsePlayerSlug, generatePlayerSlug } from '../lib/seo/meta';
 import { generatePlayerStructuredData, injectMultipleStructuredData } from '../lib/seo/structuredData';
-import { getFDPValue } from '../lib/fdp/getFDPValue';
 import ValueChart from './ValueChart';
 import { ListSkeleton } from './LoadingSkeleton';
 
@@ -72,8 +71,8 @@ export function PlayerValuePage() {
       }
 
       const enrichedPlayer: PlayerData = {
-        ...playerData,
-        fdp_value: getFDPValue(playerData)
+        ...(playerData as any),
+        fdp_value: (playerData as any).fdp_value || (playerData as any).base_value || 0
       };
 
       setPlayer(enrichedPlayer);
@@ -82,7 +81,7 @@ export function PlayerValuePage() {
       document.title = metaTags.title;
       document.querySelector('meta[name="description"]')?.setAttribute('content', metaTags.description);
 
-      const structuredData = generatePlayerStructuredData(enrichedPlayer, slug!);
+      const structuredData = generatePlayerStructuredData(enrichedPlayer, slug || '');
       injectMultipleStructuredData([structuredData.sportsPerson, structuredData.faqPage]);
 
       loadSimilarPlayers(enrichedPlayer);
@@ -111,7 +110,7 @@ export function PlayerValuePage() {
 
       const enriched = data.map((p: any) => ({
         ...p,
-        fdp_value: getFDPValue(p)
+        fdp_value: p.fdp_value || p.base_value || 0
       }));
 
       setSimilarPlayers(enriched);
@@ -247,7 +246,8 @@ export function PlayerValuePage() {
             <ValueChart
               data={valueHistory.map(h => ({
                 date: h.date,
-                value: h.value
+                ktc: h.value,
+                fdp: h.value
               }))}
             />
           </div>

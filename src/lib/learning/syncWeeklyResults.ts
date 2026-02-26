@@ -71,7 +71,8 @@ export async function syncWeeklyResults(
         // Resolve player ID
         let playerId = outcome.player_id;
         if (!playerId) {
-          playerId = await resolvePlayerId(outcome.player_name, outcome.position);
+          const resolveResult = await resolvePlayerId({ name: outcome.player_name, position: outcome.position });
+          playerId = resolveResult.player_id;
         }
 
         if (!playerId) {

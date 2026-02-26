@@ -88,7 +88,7 @@ export default function UnifiedRankings() {
     return <PlayerDetail playerId={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
   }
 
-  const teams = Array.from(new Set(players.map((p) => p.team).filter(Boolean))).sort();
+  const teams = Array.from(new Set(players.map((p) => p.team).filter((t): t is string => !!t))).sort();
 
   const getValueColor = (value: number): string => {
     if (value >= 8000) return 'text-green-600';
@@ -101,11 +101,11 @@ export default function UnifiedRankings() {
     if (!trend) return null;
     switch (trend) {
       case 'up':
-        return <TrendingUp className="w-4 h-4 text-green-600" title="Rising (last 7 days)" />;
+        return <TrendingUp className="w-4 h-4 text-green-600" aria-label="Rising (last 7 days)" />;
       case 'down':
-        return <TrendingDown className="w-4 h-4 text-red-600" title="Falling (last 7 days)" />;
+        return <TrendingDown className="w-4 h-4 text-red-600" aria-label="Falling (last 7 days)" />;
       case 'stable':
-        return <Minus className="w-4 h-4 text-gray-400" title="Stable (last 7 days)" />;
+        return <Minus className="w-4 h-4 text-gray-400" aria-label="Stable (last 7 days)" />;
     }
   };
 

@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase';
 
 describe('FDP Contract Tests - API Endpoints', () => {
   let testPlayerIds: string[] = [];
-  let canonicalValues: Map<string, any>;
+  let canonicalValues: ReadonlyMap<string, any>;
 
   beforeAll(async () => {
     const { data } = await supabase

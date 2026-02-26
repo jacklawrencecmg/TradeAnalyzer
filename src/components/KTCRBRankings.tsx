@@ -78,7 +78,7 @@ export default function KTCRBRankings() {
 
         const playerIds = data
           .map((rb: RBValue) => rb.player_id)
-          .filter((id): id is string => !!id);
+          .filter((id: string | undefined): id is string => !!id);
 
         const { data: identities } = await supabase
           .from('player_identity')
@@ -126,7 +126,7 @@ export default function KTCRBRankings() {
     setCurrentPage(1);
   };
 
-  const uniqueTeams = Array.from(new Set(rbs.map((rb) => rb.team).filter(Boolean))).sort();
+  const uniqueTeams = Array.from(new Set(rbs.map((rb) => rb.team).filter((t): t is string => !!t))).sort();
 
   const paginatedRbs = filteredRbs.slice(
     (currentPage - 1) * itemsPerPage,

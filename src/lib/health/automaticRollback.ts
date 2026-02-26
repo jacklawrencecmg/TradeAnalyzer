@@ -424,7 +424,7 @@ export async function compareToSnapshot(snapshotId: string): Promise<{
       .select('fdp_value, position')
       .not('fdp_value', 'is', null);
 
-    const currentAvg = values?.reduce((sum, v) => sum + (v.fdp_value || 0), 0) / (values?.length || 1) || 0;
+    const currentAvg = (values?.reduce((sum, v) => sum + (v.fdp_value || 0), 0) ?? 0) / (values?.length || 1) || 0;
 
     const currentPositions: Record<string, number> = {};
     values?.forEach((v) => {

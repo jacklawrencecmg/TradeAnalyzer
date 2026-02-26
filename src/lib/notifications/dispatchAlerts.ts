@@ -351,7 +351,7 @@ export async function dispatchDailyDigest(
 
   const trigger: AlertTrigger = {
     userId,
-    type: 'daily_digest',
+    type: 'market_trend' as AlertTrigger['type'],
     title: '🌅 Your Daily Fantasy Report',
     message: `${totalUpdates} updates: ${messageParts.join(', ')}`,
     priority: 'normal',

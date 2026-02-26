@@ -215,7 +215,7 @@ describe('FDP Canonical Value Invariants', () => {
         return;
       }
 
-      expect(Math.abs(value1.value_epoch - value2.value_epoch)).toBeLessThan(60000);
+      expect(Math.abs(new Date(value1.value_epoch).getTime() - new Date(value2.value_epoch).getTime())).toBeLessThan(60000);
     });
 
     it('should include updated_at timestamp', async () => {

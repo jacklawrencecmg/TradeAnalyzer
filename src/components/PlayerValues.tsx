@@ -211,7 +211,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
   };
 
   const getAdjustedValue = (player: PlayerValue): number => {
-    let value = player.fdp_value;
+    let value: number = typeof player.fdp_value === 'string' ? parseFloat(player.fdp_value) : (player.fdp_value ?? 0);
 
     if (leagueFormat === 'redraft') {
       if (player.years_experience !== null && player.years_experience !== undefined) {
@@ -299,7 +299,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
     return diff > 0 ? `+${playerValuesApi.formatValue(diff)}` : playerValuesApi.formatValue(diff);
   };
 
-  const getTrendIcon = (trend: string) => {
+  const getTrendIcon = (trend: string | undefined) => {
     switch (trend) {
       case 'up':
         return <TrendingUp className="w-4 h-4 text-fdp-pos" />;

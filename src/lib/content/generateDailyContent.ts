@@ -1,5 +1,4 @@
 import { supabase } from '../supabase';
-import { getFDPValue } from '../fdp/getFDPValue';
 import {
   generateRiserArticle,
   generateFallerArticle,
@@ -68,10 +67,10 @@ async function detectRisers(): Promise<PlayerMovement[]> {
       .maybeSingle();
 
     if (historicalValue) {
-      const currentValue = getFDPValue(player);
-      const previousValue = historicalValue.fdp_value;
+      const currentValue = player.fdp_value || player.base_value || 0;
+      const previousValue = Number(historicalValue.fdp_value) || 0;
       const change = currentValue - previousValue;
-      const changePercent = (change / previousValue) * 100;
+      const changePercent = previousValue ? (change / previousValue) * 100 : 0;
 
       if (change > 100) {
         const { data: rankData } = await supabase
@@ -121,10 +120,10 @@ async function detectFallers(): Promise<PlayerMovement[]> {
       .maybeSingle();
 
     if (historicalValue) {
-      const currentValue = getFDPValue(player);
-      const previousValue = historicalValue.fdp_value;
+      const currentValue = player.fdp_value || player.base_value || 0;
+      const previousValue = Number(historicalValue.fdp_value) || 0;
       const change = currentValue - previousValue;
-      const changePercent = (change / previousValue) * 100;
+      const changePercent = previousValue ? (change / previousValue) * 100 : 0;
 
       if (change < -100) {
         const { data: rankData } = await supabase
@@ -161,7 +160,7 @@ async function detectBuyLows(): Promise<PlayerMovement[]> {
   const buyLows: PlayerMovement[] = [];
 
   for (const player of currentValues) {
-    const currentValue = getFDPValue(player);
+    const currentValue = (player as any).fdp_value || (player as any).base_value || 0;
 
     const { data: consensusData } = await supabase
       .from('market_consensus')
@@ -170,7 +169,7 @@ async function detectBuyLows(): Promise<PlayerMovement[]> {
       .maybeSingle();
 
     if (consensusData && consensusData.data_points >= 3) {
-      const marketValue = consensusData.consensus_value;
+      const marketValue = Number(consensusData.consensus_value) || 0;
       const valueGap = currentValue - marketValue;
 
       if (valueGap < -200) {

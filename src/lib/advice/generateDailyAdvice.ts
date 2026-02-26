@@ -15,7 +15,7 @@ import {
 import { detectAllAdvice, type AdviceRecommendation } from './detectAdvice';
 
 export interface AdviceGenerationOptions {
-  format: 'dynasty' | 'redraft';
+  format?: 'dynasty' | 'redraft';
   leagueProfileId?: string | null;
   playerLimit?: number;
   minConfidence?: number;

@@ -138,12 +138,12 @@ export async function evaluatePlayerMarketPosition(
     recentChange7d,
     recentChange24h,
     recentChangePercent7d,
-    modelRank,
-    marketRank,
+    modelRank: modelRank ?? undefined,
+    marketRank: marketRank ?? undefined,
     rankDelta,
     usageTrend,
     availabilityStatus,
-    rosteredPercent,
+    rosteredPercent: rosteredPercent ?? undefined,
     injuryStatus,
     confidence,
     dataQuality,
@@ -287,7 +287,7 @@ async function getMarketRank(
     .limit(1)
     .maybeSingle();
 
-  if (!latestSnapshot) {
+  if (!latestSnapshot || !latestSnapshot.data) {
     return null;
   }
 

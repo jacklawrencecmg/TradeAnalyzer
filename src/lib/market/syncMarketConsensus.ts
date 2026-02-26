@@ -68,7 +68,8 @@ export async function syncMarketConsensus(
   // Step 1: Match players to nfl_players registry
   for (const ranking of rankings) {
     try {
-      const playerId = await resolvePlayerId(ranking.player_name, ranking.position);
+      const resolveResult = await resolvePlayerId({ name: ranking.player_name, position: ranking.position });
+      const playerId = resolveResult.player_id;
 
       if (playerId) {
         consensusRecords.push({

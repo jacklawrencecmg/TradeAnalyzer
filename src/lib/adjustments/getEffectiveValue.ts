@@ -237,7 +237,7 @@ export async function getAdjustmentStats() {
   }
 
   return {
-    active_count: active?.count || 0,
+    active_count: (active as any)?.count || 0,
     by_source: sourceCount,
   };
 }

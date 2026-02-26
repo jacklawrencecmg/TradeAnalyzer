@@ -141,7 +141,7 @@ export default function KeeperCalculator({ leagueId, rosterId }: KeeperCalculato
           ...p,
           cost: newCost,
           surplus,
-          recommendation: surplus > 500 ? 'keep' : 'cut'
+          recommendation: (surplus > 500 ? 'keep' : 'cut') as 'keep' | 'cut'
         };
       }
       return p;

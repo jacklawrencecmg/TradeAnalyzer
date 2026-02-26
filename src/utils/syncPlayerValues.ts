@@ -46,7 +46,7 @@ async function fetchFDPValues(isSuperflex: boolean = false): Promise<Record<stri
               value: rawValue,
               position: item.position,
               name: item.player,
-              team: item.team || null,
+              team: item.team ?? '',
             });
           }
         }
@@ -93,7 +93,7 @@ async function fetchFDPValues(isSuperflex: boolean = false): Promise<Record<stri
               value: rawValue,
               position: item.position,
               name: item.player,
-              team: item.team || null,
+              team: item.team ?? '',
             });
           }
         }

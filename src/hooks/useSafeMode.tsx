@@ -30,10 +30,11 @@ export function useSafeMode() {
         },
         (payload) => {
           if (payload.new) {
+            const newData = payload.new as any;
             setSafeMode({
-              enabled: payload.new.enabled,
-              reason: payload.new.reason,
-              since: payload.new.enabled_at,
+              enabled: newData.enabled,
+              reason: newData.reason,
+              since: newData.enabled_at,
             });
           }
         }

@@ -298,9 +298,8 @@ export default function WaiverAssistant({ leagueId, rosterId, userId }: WaiverAs
                         showBadge={(player as WaiverPlayer).injury_status !== undefined}
                         badgeContent={(player as WaiverPlayer).injury_status ? (
                           <AchievementBadge
-                            icon="injury"
-                            color="red"
-                            tooltip={`Injury: ${(player as WaiverPlayer).injury_status}`}
+                            type="injury"
+                            label={`Injury: ${(player as WaiverPlayer).injury_status}`}
                           />
                         ) : undefined}
                       />

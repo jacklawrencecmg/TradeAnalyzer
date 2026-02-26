@@ -31,7 +31,7 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
     async function checkSubscription() {
       try {
         const { data, error } = await supabase
-          .rpc('get_user_subscription', { p_user_id: user.id });
+          .rpc('get_user_subscription', { p_user_id: user!.id });
 
         if (error) throw error;
 

@@ -316,7 +316,13 @@ export async function searchAuditLogs(
       return [];
     }
 
-    return data || [];
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      action: row.action,
+      actor: row.actor,
+      metadata: row.metadata,
+      createdAt: row.created_at,
+    }));
   } catch (error) {
     console.error('Error searching audit logs:', error);
     return [];

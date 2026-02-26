@@ -15,7 +15,7 @@
 import { supabase } from '../supabase';
 import { enableSafeMode } from './safeMode';
 import { logAdminAction, alertCriticalEvent } from '../security/auditLog';
-import { rollbackSnapshot } from '../versioning/rollbackSnapshot';
+import { rollbackToSnapshot } from '../versioning/rollbackSnapshot';
 
 export interface RollbackTrigger {
   type: 'error_rate' | 'value_mismatch' | 'rebuild_failure' | 'manual';
@@ -196,7 +196,7 @@ export async function executeAutomaticRollback(
     // 4. Restore snapshot
     console.log(`   Restoring snapshot: ${lastSnapshot.id}`);
 
-    await rollbackSnapshot(lastSnapshot.id);
+    await rollbackToSnapshot(lastSnapshot.id, trigger.message);
 
     // 5. Log success
     const duration = Date.now() - startTime;
@@ -304,7 +304,7 @@ export async function manualRollback(
   if (snapshotId) {
     await enableSafeMode(trigger.message);
 
-    await rollbackSnapshot(snapshotId);
+    await rollbackToSnapshot(snapshotId, reason);
 
     await logAdminAction({
       action: 'rollback',

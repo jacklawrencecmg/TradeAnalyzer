@@ -180,7 +180,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
         if (synced > 0) {
           showToast(`Successfully loaded ${synced} player values!`, 'success');
         } else {
-          showToast('Failed to load player values, using fallback values', 'warning');
+          showToast('Failed to load player values, using fallback values', 'info');
         }
         setSyncingValues(false);
       }
@@ -478,7 +478,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
         teamAGetsFAAB,
         !leagueId ? leagueSettings : undefined,
         leagueFormat,
-        scoringFormat
+        scoringFormat === 'half' ? 'half-ppr' : scoringFormat
       );
       setAnalysis(result);
 
@@ -494,7 +494,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
             player_name: item.name,
             position: item.position || 'PICK',
             value: item.value,
-            tier: item.tier,
+            tier: item.tier !== undefined ? Number(item.tier) : undefined,
             is_pick: item.type === 'pick',
           });
         }
@@ -506,7 +506,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
             player_name: item.name,
             position: item.position || 'PICK',
             value: item.value,
-            tier: item.tier,
+            tier: item.tier !== undefined ? Number(item.tier) : undefined,
             is_pick: item.type === 'pick',
           });
         }
@@ -1245,7 +1245,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     setPlayers(dbPlayers);
                     showToast(`Loaded ${Object.keys(dbPlayers).length} player values!`, 'success');
                   } else {
-                    showToast('No player values found in database', 'warning');
+                    showToast('No player values found in database', 'info');
                   }
                 } catch {
                   showToast('Failed to refresh player values', 'error');
@@ -1333,7 +1333,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                       >
                         <PlayerAvatar
                           playerName={player.full_name}
-                          team={player.team}
+                          team={player.team ?? undefined}
                           position={player.position}
                           size="md"
                           playerId={player.player_id}
@@ -1353,7 +1353,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 {teamAGives.map((playerId) => {
                   const player = players[playerId];
                   const enhanced = enhancedPlayerData[playerId];
-                  const hasInjury = player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status);
+                  const hasInjury = !!(player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status));
                   return (
                     <div
                       key={playerId}
@@ -1361,7 +1361,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     >
                       <PlayerAvatar
                         playerName={player.full_name}
-                        team={player.team}
+                        team={player.team ?? undefined}
                         position={player.position}
                         size="lg"
                         showTeamLogo={true}
@@ -1506,7 +1506,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                       >
                         <PlayerAvatar
                           playerName={player.full_name}
-                          team={player.team}
+                          team={player.team ?? undefined}
                           position={player.position}
                           size="md"
                           playerId={player.player_id}
@@ -1526,7 +1526,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                 {teamAGets.map((playerId) => {
                   const player = players[playerId];
                   const enhanced = enhancedPlayerData[playerId];
-                  const hasInjury = player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status);
+                  const hasInjury = !!(player.injury_status && ['Out', 'Doubtful', 'Questionable', 'IR', 'PUP'].includes(player.injury_status));
                   return (
                     <div
                       key={playerId}
@@ -1534,7 +1534,7 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     >
                       <PlayerAvatar
                         playerName={player.full_name}
-                        team={player.team}
+                        team={player.team ?? undefined}
                         position={player.position}
                         size="lg"
                         showTeamLogo={true}

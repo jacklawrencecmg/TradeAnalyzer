@@ -435,27 +435,27 @@ class PlayerValuesApi {
     let adjustedValue = baseValue;
 
     if (factors.superflex_boost && isSuperflex) {
-      adjustedValue *= (1 + factors.superflex_boost);
+      adjustedValue *= (1 + Number(factors.superflex_boost));
     }
 
     if (factors.playoff_schedule) {
-      adjustedValue *= (1 + factors.playoff_schedule);
+      adjustedValue *= (1 + Number(factors.playoff_schedule));
     }
 
     if (factors.recent_performance) {
-      adjustedValue *= (1 + factors.recent_performance);
+      adjustedValue *= (1 + Number(factors.recent_performance));
     }
 
     if (factors.age_factor) {
-      adjustedValue *= (1 + factors.age_factor);
+      adjustedValue *= (1 + Number(factors.age_factor));
     }
 
     if (factors.team_situation) {
-      adjustedValue *= (1 + factors.team_situation);
+      adjustedValue *= (1 + Number(factors.team_situation));
     }
 
     if (factors.injury_risk) {
-      adjustedValue *= (1 + factors.injury_risk);
+      adjustedValue *= (1 + Number(factors.injury_risk));
     }
 
     return parseFloat(adjustedValue.toFixed(1));
@@ -568,7 +568,7 @@ class PlayerValuesApi {
         .from('latest_player_values')
         .select('*')
         .or(`player_name.ilike.%${searchTerm}%,team.ilike.%${searchTerm}%`)
-        .order('adjusted_value', { ascending: false, nullsLast: true })
+        .order('adjusted_value', { ascending: false, nullsFirst: false })
         .limit(limit);
 
       if (error) {
@@ -703,7 +703,7 @@ class PlayerValuesApi {
 
       if (changesError) throw changesError;
 
-      const playerIds = changes?.map(c => c.player_id) || [];
+      const playerIds = changes?.map(c => (c as any).player_id) || [];
       if (playerIds.length === 0) return { risers: [], fallers: [] };
 
       const { data: players, error: playersError } = await supabase
@@ -718,14 +718,14 @@ class PlayerValuesApi {
       const risers = changes
         ?.filter(c => (c as any)[changeColumn] > 0)
         .slice(0, limit)
-        .map(c => playerMap.get(c.player_id))
+        .map(c => playerMap.get((c as any).player_id))
         .filter(p => p !== undefined) as PlayerValue[] || [];
 
       const fallers = changes
         ?.filter(c => (c as any)[changeColumn] < 0)
         .slice(-limit)
         .reverse()
-        .map(c => playerMap.get(c.player_id))
+        .map(c => playerMap.get((c as any).player_id))
         .filter(p => p !== undefined) as PlayerValue[] || [];
 
       return { risers, fallers };

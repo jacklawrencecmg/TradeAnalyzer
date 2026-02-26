@@ -50,7 +50,7 @@ export default function KTCWRRankings() {
       if (data && data.length > 0) {
         const playerIds = data
           .map((wr: WRValue) => wr.player_id)
-          .filter((id): id is string => !!id);
+          .filter((id: string | undefined): id is string => !!id);
 
         const { data: identities } = await supabase
           .from('player_identity')

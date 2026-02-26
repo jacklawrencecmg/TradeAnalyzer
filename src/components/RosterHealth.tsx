@@ -49,8 +49,8 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
         sportsDataAPI.getInjuries().catch(() => [])
       ]);
 
-      const healthData: PlayerHealth[] = (userRoster.players || []).map((playerId: string) => {
-        const player = allPlayers[playerId];
+      const healthData = ((userRoster.players || []) as string[]).map((playerId: string) => {
+        const player = allPlayers[playerId] as any;
         if (!player) return null;
 
         const playerName = player.full_name || `${player.first_name} ${player.last_name}`;
@@ -77,7 +77,7 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
           injury_body_part: sportsDataInjury?.InjuryBodyPart,
           sportsdata_injury_notes: sportsDataInjury?.InjuryNotes
         };
-      }).filter((p): p is PlayerHealth => p !== null);
+      }).filter(Boolean) as PlayerHealth[];
 
       setPlayers(healthData);
     } catch (error) {
@@ -202,9 +202,8 @@ export default function RosterHealth({ leagueId, rosterId }: RosterHealthProps) 
                         showBadge={player.status !== 'Healthy'}
                         badgeContent={player.status !== 'Healthy' ? (
                           <AchievementBadge
-                            icon="injury"
-                            color="red"
-                            tooltip={`${player.status}${player.injury_body_part ? ` - ${player.injury_body_part}` : ''}`}
+                            type="injury"
+                            label={`${player.status}${player.injury_body_part ? ` - ${player.injury_body_part}` : ''}`}
                           />
                         ) : undefined}
                       />

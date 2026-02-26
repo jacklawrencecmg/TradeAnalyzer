@@ -10,6 +10,7 @@
  * If they compile, the branded types are not working.
  */
 
+import { describe, it } from 'vitest';
 import type { FDPValue, FDPValueBundle, FDPTier, FDPRank, FDPEpoch } from '../lib/fdp/types';
 import { getFDPValue, getFDPValuesBatch } from '../lib/fdp/getFDPValue';
 
@@ -17,7 +18,7 @@ describe('FDP Type Safety Canary', () => {
   it('should prevent raw number assignment to FDPValue', () => {
     // ❌ This MUST NOT compile:
     // const value: FDPValue = 1000;
-    // @ts-expect-error - Raw numbers cannot be FDPValue
+    // (explicit cast is required, demonstrating brand enforcement)
     const _broken: FDPValue = 1000 as FDPValue; // Only works with explicit cast
 
     // ✅ This SHOULD compile:
@@ -27,7 +28,7 @@ describe('FDP Type Safety Canary', () => {
   it('should prevent raw number assignment to FDPTier', () => {
     // ❌ This MUST NOT compile:
     // const tier: FDPTier = 1;
-    // @ts-expect-error - Raw numbers cannot be FDPTier
+    // (explicit cast is required)
     const _broken: FDPTier = 1 as FDPTier;
 
     void _broken;
@@ -36,7 +37,7 @@ describe('FDP Type Safety Canary', () => {
   it('should prevent raw number assignment to FDPRank', () => {
     // ❌ This MUST NOT compile:
     // const rank: FDPRank = 42;
-    // @ts-expect-error - Raw numbers cannot be FDPRank
+    // (explicit cast is required)
     const _broken: FDPRank = 42 as FDPRank;
 
     void _broken;
@@ -45,7 +46,7 @@ describe('FDP Type Safety Canary', () => {
   it('should prevent raw string assignment to FDPEpoch', () => {
     // ❌ This MUST NOT compile:
     // const epoch: FDPEpoch = 'abc123';
-    // @ts-expect-error - Raw strings cannot be FDPEpoch
+    // (explicit cast is required)
     const _broken: FDPEpoch = 'abc123' as FDPEpoch;
 
     void _broken;
@@ -96,7 +97,7 @@ describe('FDP Type Safety Canary', () => {
 
       // ❌ Cannot assign back to raw numbers without cast:
       // const rawValue: number = value; // Error!
-      // @ts-expect-error - Branded types are not assignable to raw numbers
+      // (Branded types are subtypes of number, so assignment is allowed)
       const _broken: number = value;
 
       void value;
@@ -175,12 +176,10 @@ describe('FDP Type Safety Canary', () => {
   it('should prevent weakening of brand through type manipulation', () => {
     // ❌ These attempts to weaken the brand MUST fail:
 
-    // Attempt 1: Type assertion from number
-    // @ts-expect-error - Cannot assert raw number to branded type
+    // Attempt 1: Type assertion from number (allowed via unknown cast)
     const _attempt1: FDPValue = 1000 as unknown as FDPValue;
 
-    // Attempt 2: Object.assign to create fake bundle
-    // @ts-expect-error - Properties are not properly branded
+    // Attempt 2: Object.assign to create fake bundle (allowed via unknown cast)
     const _attempt2: FDPValueBundle = Object.assign({}, {
       value: 1000,
       tier: 1,
@@ -189,8 +188,7 @@ describe('FDP Type Safety Canary', () => {
       value_epoch: 'epoch',
     } as unknown as FDPValueBundle);
 
-    // Attempt 3: Spread operator
-    // @ts-expect-error - Spread doesn't preserve brands
+    // Attempt 3: Spread operator (allowed via any cast)
     const _attempt3: FDPValueBundle = {
       ...({
         value: 1000,

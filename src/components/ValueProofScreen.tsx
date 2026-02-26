@@ -135,11 +135,11 @@ export function ValueProofScreen() {
                   className="flex items-start gap-4 p-4 bg-fdp-surface-2 rounded-lg border border-fdp-border-1"
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    opp.value_change > 0
+                    (opp.value_change ?? 0) > 0
                       ? 'bg-green-500/20'
                       : 'bg-red-500/20'
                   }`}>
-                    {opp.value_change > 0 ? (
+                    {(opp.value_change ?? 0) > 0 ? (
                       <TrendingUp className="w-5 h-5 text-green-500" />
                     ) : (
                       <TrendingDown className="w-5 h-5 text-red-500" />
@@ -158,9 +158,9 @@ export function ValueProofScreen() {
                         Value: {opp.value_before} → {opp.value_after}
                       </span>
                       <span className={`font-bold ${
-                        opp.value_change > 0 ? 'text-green-500' : 'text-red-500'
+                        (opp.value_change ?? 0) > 0 ? 'text-green-500' : 'text-red-500'
                       }`}>
-                        {opp.value_change > 0 ? '+' : ''}{opp.value_change}
+                        {(opp.value_change ?? 0) > 0 ? '+' : ''}{opp.value_change ?? 0}
                       </span>
                       <span className="text-fdp-text-3">
                         {new Date(opp.detected_at).toLocaleDateString()}

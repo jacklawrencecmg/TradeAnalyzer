@@ -64,6 +64,8 @@ export interface MissedOpportunity {
   value_after: number;
   detected_at: string;
   free_user_could_have_saved: string;
+  value_change?: number;
+  player_name?: string;
 }
 
 export interface ValueProof {
@@ -92,6 +94,7 @@ export async function getUserSubscription(userId: string): Promise<UserSubscript
         is_trial: false,
         trial_days_left: 0,
         period_end: null,
+        cancel_at_period_end: false,
       };
     }
 

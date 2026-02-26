@@ -426,7 +426,7 @@ export async function resetAllParameters(): Promise<number> {
   const { data, error } = await supabase
     .from('model_tuning_parameters')
     .update({
-      value: supabase.raw('default_value'),
+      value: null, // reset to default
       last_adjustment: 0,
       last_adjusted_at: new Date().toISOString(),
       last_adjusted_by: 'manual_reset',
@@ -438,7 +438,7 @@ export async function resetAllParameters(): Promise<number> {
     return 0;
   }
 
-  return data?.length || 0;
+  return (data as unknown as any[])?.length || 0;
 }
 
 /**

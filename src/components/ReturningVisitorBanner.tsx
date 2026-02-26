@@ -11,7 +11,8 @@ interface ValueChange {
 }
 
 export function ReturningVisitorBanner() {
-  const { isReturningVisitor, visitCount, loading } = useVisitorTracking();
+  const { isReturningVisitor, intent, loading } = useVisitorTracking();
+  const visitCount = intent.visitCount;
   const [dismissed, setDismissed] = useState(false);
   const [valueChanges, setValueChanges] = useState<ValueChange[]>([]);
 

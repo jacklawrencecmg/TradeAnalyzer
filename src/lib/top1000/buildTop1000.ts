@@ -27,6 +27,7 @@ export interface Top1000Player {
   age: number | null;
   source: string;
   captured_at: string;
+  notes?: string;
 }
 
 /**

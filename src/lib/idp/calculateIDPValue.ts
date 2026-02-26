@@ -58,7 +58,7 @@ export function calculateIDPValue(
     scoring_style_multiplier: 1.0,
     total_multiplier: totalMultiplier,
     idp_adjustments: adjustmentResult.total,
-    fdp_value,
+    fdp_value: fdpValue,
     breakdown: adjustmentResult.breakdown,
   };
 }

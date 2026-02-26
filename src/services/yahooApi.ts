@@ -131,7 +131,7 @@ export async function fetchYahooTeams(
   const data = await response.json();
   const teams = data.fantasy_content?.league?.[1]?.teams || [];
   setCachedData(cacheKey, teams);
-  return Object.values(teams).filter((t: any) => t.team);
+  return Object.values(teams).filter((t: any) => t.team) as YahooTeam[];
 }
 
 export function getYahooLeagueSettings(league: YahooLeague): LeagueSettings {

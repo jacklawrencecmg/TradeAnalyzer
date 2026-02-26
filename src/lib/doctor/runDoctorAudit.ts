@@ -651,13 +651,13 @@ async function check8_CoverageByPosition(): Promise<DoctorFinding[]> {
       `,
     });
 
-    const coverageMap = new Map(coverage?.map((c: any) => [c.position, parseInt(c.count)]) || []);
+    const coverageMap = new Map<string, number>(coverage?.map((c: any) => [c.position, parseInt(c.count)]) || []);
 
     let hasIssues = false;
     const issues: string[] = [];
 
-    for (const [pos, threshold] of Object.entries(thresholds)) {
-      const count = coverageMap.get(pos) || 0;
+    for (const [pos, threshold] of Object.entries(thresholds) as [string, number][]) {
+      const count: number = coverageMap.get(pos) || 0;
       if (count < threshold) {
         hasIssues = true;
         issues.push(`${pos}: ${count}/${threshold}`);

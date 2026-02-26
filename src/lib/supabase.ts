@@ -64,6 +64,8 @@ export interface SavedTrade {
     fairness?: string;
     team_a_items?: TradeItemData[];
     team_b_items?: TradeItemData[];
+    team_a_name?: string;
+    team_b_name?: string;
   };
   team_a_gives?: string[];
   team_a_gets?: string[];

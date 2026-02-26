@@ -65,11 +65,12 @@ export async function syncAdp(sourceUrl?: string): Promise<SyncResult> {
         }
 
         const normalizedName = normalizeName(entry.player_name);
-        const playerId = await resolvePlayerId(
-          normalizedName,
-          entry.position || null,
-          entry.team || null
-        );
+        const resolveResult = await resolvePlayerId({
+          name: normalizedName,
+          position: entry.position || undefined,
+          team: entry.team || undefined,
+        });
+        const playerId = resolveResult.player_id;
 
         if (playerId) {
           const { error } = await supabase.from('player_adp').upsert(

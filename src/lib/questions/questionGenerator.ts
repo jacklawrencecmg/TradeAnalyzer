@@ -1,5 +1,3 @@
-import { getFDPValue } from '../fdp/getFDPValue';
-
 export interface QuestionData {
   question: string;
   question_type: string;
@@ -40,7 +38,7 @@ export interface PlayerValueData {
 export async function generateBuyLowQuestion(player: any, marketData: any): Promise<QuestionData> {
   const fullName = player.full_name;
   const position = player.position;
-  const currentValue = getFDPValue(player);
+  const currentValue = player.fdp_value || player.value || 0;
   const marketValue = marketData?.consensus_value || currentValue;
   const valueGap = currentValue - marketValue;
   const isBuyLow = valueGap < -100;
@@ -122,8 +120,8 @@ export async function generateTradeComparisonQuestion(
 ): Promise<QuestionData> {
   const nameA = playerA.full_name;
   const nameB = playerB.full_name;
-  const valueA = getFDPValue(playerA);
-  const valueB = getFDPValue(playerB);
+  const valueA = playerA.fdp_value || playerA.value || 0;
+  const valueB = playerB.fdp_value || playerB.value || 0;
   const difference = valueA - valueB;
   const percentDiff = Math.abs((difference / valueB) * 100);
 
@@ -209,7 +207,7 @@ export async function generateTradeComparisonQuestion(
 export async function generateDynastyOutlookQuestion(player: any, tier: string): Promise<QuestionData> {
   const fullName = player.full_name;
   const position = player.position;
-  const currentValue = getFDPValue(player);
+  const currentValue = player.fdp_value || player.value || 0;
   const age = player.age || 25;
 
   const question = `What is ${fullName}'s dynasty outlook?`;

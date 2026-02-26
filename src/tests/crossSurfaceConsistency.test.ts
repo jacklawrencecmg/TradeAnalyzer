@@ -297,9 +297,10 @@ describe('Cross-Surface Value Consistency', () => {
       // Compare
       for (const individual of individualValues) {
         if (!individual.data) continue;
+        const indData = individual.data;
 
         const batch = batchValues.find(
-          (b) => b.player_id === individual.data.player_id
+          (b) => b.player_id === indData.player_id
         );
 
         expect(batch).toBeDefined();

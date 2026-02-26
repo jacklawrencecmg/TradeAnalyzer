@@ -57,7 +57,7 @@ export async function getEnrichedPlayers(): Promise<Map<string, EnrichedPlayer>>
 
     const playerMap = new Map<string, EnrichedPlayer>();
 
-    data?.forEach((player) => {
+    data?.forEach((player: any) => {
       playerMap.set(player.player_id, {
         player_id: player.player_id,
         full_name: player.player_name,
