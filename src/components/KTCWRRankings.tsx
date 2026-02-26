@@ -46,7 +46,8 @@ export default function KTCWRRankings() {
         throw new Error(rpcError.message);
       }
 
-      setWrs(data || []);
+      const sorted = (data || []).sort((a: WRValue, b: WRValue) => (b.fdp_value || b.ktc_value) - (a.fdp_value || a.ktc_value));
+      setWrs(sorted);
 
       setError(null);
     } catch (err) {
@@ -194,18 +195,20 @@ export default function KTCWRRankings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {paginatedWrs.map((wr) => (
+              {paginatedWrs.map((wr, idx) => {
+                const displayRank = (currentPage - 1) * itemsPerPage + idx + 1;
+                return (
                 <tr
-                  key={`${wr.full_name}-${wr.position_rank}`}
+                  key={`${wr.full_name}-${displayRank}`}
                   className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-6 py-4">
                     <div
                       className={`inline-flex items-center justify-center w-10 h-10 rounded-full border-2 font-bold ${getRankBadgeColor(
-                        wr.position_rank
+                        displayRank
                       )}`}
                     >
-                      {wr.position_rank}
+                      {displayRank}
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -231,7 +234,7 @@ export default function KTCWRRankings() {
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-sm font-medium text-gray-700">
-                      {getTierLabel(wr.position_rank)}
+                      {getTierLabel(displayRank)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -240,7 +243,7 @@ export default function KTCWRRankings() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

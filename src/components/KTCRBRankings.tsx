@@ -71,12 +71,13 @@ export default function KTCRBRankings() {
         throw new Error(rpcError.message);
       }
 
-      if (data && data.length > 0) {
-        const latest = new Date(data[0].captured_at);
+      const sorted = (data || []).sort((a: RBValue, b: RBValue) => (b.fdp_value || b.ktc_value) - (a.fdp_value || a.ktc_value));
+      if (sorted.length > 0) {
+        const latest = new Date(sorted[0].captured_at);
         setLastUpdated(latest.toLocaleString());
       }
 
-      setRbs(data || []);
+      setRbs(sorted);
 
       setError(null);
     } catch (err) {
@@ -229,14 +230,16 @@ export default function KTCRBRankings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {paginatedRbs.map((rb) => (
-                <tr key={`${rb.full_name}-${rb.position_rank}`} className="hover:bg-gray-50 transition-colors">
+              {paginatedRbs.map((rb, idx) => {
+                const displayRank = (currentPage - 1) * itemsPerPage + idx + 1;
+                return (
+                <tr key={`${rb.full_name}-${displayRank}`} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3">
-                    <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold border ${getRankBadgeColor(rb.position_rank)}`}>
-                      {rb.position_rank === 1 && '🥇'}
-                      {rb.position_rank === 2 && '🥈'}
-                      {rb.position_rank === 3 && '🥉'}
-                      {rb.position_rank > 3 && `#${rb.position_rank}`}
+                    <span className={`inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-semibold border ${getRankBadgeColor(displayRank)}`}>
+                      {displayRank === 1 && '#1'}
+                      {displayRank === 2 && '#2'}
+                      {displayRank === 3 && '#3'}
+                      {displayRank > 3 && `#${displayRank}`}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -283,7 +286,7 @@ export default function KTCRBRankings() {
                     </span>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

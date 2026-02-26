@@ -46,7 +46,8 @@ export default function KTCTERankings() {
         throw new Error(rpcError.message);
       }
 
-      setTes(data || []);
+      const sorted = (data || []).sort((a: TEValue, b: TEValue) => (b.fdp_value || b.ktc_value) - (a.fdp_value || a.ktc_value));
+      setTes(sorted);
 
       setError(null);
     } catch (err) {
@@ -207,11 +208,13 @@ export default function KTCTERankings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {paginatedTes.map((te) => (
+              {paginatedTes.map((te, idx) => {
+                const displayRank = (currentPage - 1) * itemsPerPage + idx + 1;
+                return (
                 <tr
-                  key={`${te.full_name}-${te.position_rank}`}
+                  key={`${te.full_name}-${displayRank}`}
                   className={`transition-colors ${
-                    isPremium(te.position_rank)
+                    isPremium(displayRank)
                       ? 'bg-orange-50 hover:bg-orange-100'
                       : 'hover:bg-gray-50'
                   }`}
@@ -220,12 +223,12 @@ export default function KTCTERankings() {
                     <div className="flex items-center gap-2">
                       <div
                         className={`inline-flex items-center justify-center w-10 h-10 rounded-full border-2 font-bold ${getRankBadgeColor(
-                          te.position_rank
+                          displayRank
                         )}`}
                       >
-                        {te.position_rank}
+                        {displayRank}
                       </div>
-                      {isPremium(te.position_rank) && (
+                      {isPremium(displayRank) && (
                         <Award className="w-4 h-4 text-orange-600" />
                       )}
                     </div>
@@ -253,9 +256,9 @@ export default function KTCTERankings() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-sm font-medium ${
-                      isPremium(te.position_rank) ? 'text-orange-700' : 'text-gray-700'
+                      isPremium(displayRank) ? 'text-orange-700' : 'text-gray-700'
                     }`}>
-                      {getTierLabel(te.position_rank)}
+                      {getTierLabel(displayRank)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -264,7 +267,7 @@ export default function KTCTERankings() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>

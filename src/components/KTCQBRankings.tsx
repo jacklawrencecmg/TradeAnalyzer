@@ -46,7 +46,8 @@ export default function KTCQBRankings() {
         throw new Error(rpcError.message);
       }
 
-      setQbs(data || []);
+      const sorted = (data || []).sort((a: QBValue, b: QBValue) => (b.fdp_value || b.ktc_value) - (a.fdp_value || a.ktc_value));
+      setQbs(sorted);
 
       setError(null);
     } catch (err) {
@@ -180,16 +181,18 @@ export default function KTCQBRankings() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {paginatedQbs.map((qb) => (
+              {paginatedQbs.map((qb, idx) => {
+                const displayRank = (currentPage - 1) * itemsPerPage + idx + 1;
+                return (
                 <tr key={qb.full_name} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div
                       className={`inline-flex items-center justify-center w-10 h-10 rounded-full border-2 font-bold ${getRankBadgeColor(
-                        qb.position_rank
+                        displayRank
                       )}`}
                     >
-                      {qb.position_rank === 1 && <Award className="w-5 h-5" />}
-                      {qb.position_rank !== 1 && qb.position_rank}
+                      {displayRank === 1 && <Award className="w-5 h-5" />}
+                      {displayRank !== 1 && displayRank}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -204,7 +207,7 @@ export default function KTCQBRankings() {
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{qb.full_name}</div>
-                        <div className="text-sm text-gray-500">QB{qb.position_rank}</div>
+                        <div className="text-sm text-gray-500">QB{displayRank}</div>
                       </div>
                     </div>
                   </td>
@@ -222,7 +225,7 @@ export default function KTCQBRankings() {
                     {new Date(qb.captured_at).toLocaleDateString()}
                   </td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
