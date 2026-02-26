@@ -691,9 +691,18 @@ export function getPlayerValue(
     return 0;
   }
 
-  let baseValue = POSITION_BASE_VALUES[player.position];
-
   const isIDP = ['DL', 'LB', 'DB', 'DE', 'DT', 'CB', 'S'].includes(player.position);
+
+  if (player.position === 'QB') {
+    const playerNameLower = (player.full_name || '').toLowerCase();
+    const isKnownBackup = KNOWN_BACKUP_QBS.some(name => playerNameLower.includes(name));
+    const hasNoTeam = !player.team || player.team === 'FA';
+    if (isKnownBackup || hasNoTeam) {
+      return 50;
+    }
+  }
+
+  let baseValue = POSITION_BASE_VALUES[player.position];
 
   if (player.position === 'QB' && finalSettings.isSuperflex) {
     baseValue *= 1.8;
