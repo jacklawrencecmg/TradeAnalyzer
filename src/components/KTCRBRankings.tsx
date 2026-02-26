@@ -75,29 +75,9 @@ export default function KTCRBRankings() {
       if (data && data.length > 0) {
         const latest = new Date(data[0].captured_at);
         setLastUpdated(latest.toLocaleString());
-
-        const playerIds = data
-          .map((rb: RBValue) => rb.player_id)
-          .filter((id: string | undefined): id is string => !!id);
-
-        const { data: identities } = await supabase
-          .from('player_identity')
-          .select('player_id, headshot_url')
-          .in('player_id', playerIds);
-
-        const headshotMap = new Map(
-          (identities || []).map((identity) => [identity.player_id, identity.headshot_url])
-        );
-
-        const rbsWithHeadshots = data.map((rb: RBValue) => ({
-          ...rb,
-          headshot_url: rb.player_id ? headshotMap.get(rb.player_id) : undefined,
-        }));
-
-        setRbs(rbsWithHeadshots);
-      } else {
-        setRbs(data || []);
       }
+
+      setRbs(data || []);
 
       setError(null);
     } catch (err) {

@@ -47,29 +47,7 @@ export default function KTCWRRankings() {
         throw new Error(rpcError.message);
       }
 
-      if (data && data.length > 0) {
-        const playerIds = data
-          .map((wr: WRValue) => wr.player_id)
-          .filter((id: string | undefined): id is string => !!id);
-
-        const { data: identities } = await supabase
-          .from('player_identity')
-          .select('player_id, headshot_url')
-          .in('player_id', playerIds);
-
-        const headshotMap = new Map(
-          (identities || []).map((identity) => [identity.player_id, identity.headshot_url])
-        );
-
-        const wrsWithHeadshots = data.map((wr: WRValue) => ({
-          ...wr,
-          headshot_url: wr.player_id ? headshotMap.get(wr.player_id) : undefined,
-        }));
-
-        setWrs(wrsWithHeadshots);
-      } else {
-        setWrs(data || []);
-      }
+      setWrs(data || []);
 
       setError(null);
     } catch (err) {

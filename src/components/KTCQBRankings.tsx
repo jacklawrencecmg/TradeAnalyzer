@@ -47,29 +47,7 @@ export default function KTCQBRankings() {
         throw new Error(rpcError.message);
       }
 
-      if (data && data.length > 0) {
-        const playerIds = data
-          .map((qb: QBValue) => qb.player_id)
-          .filter((id: string | undefined): id is string => !!id);
-
-        const { data: identities } = await supabase
-          .from('player_identity')
-          .select('player_id, headshot_url')
-          .in('player_id', playerIds);
-
-        const headshotMap = new Map(
-          (identities || []).map((identity) => [identity.player_id, identity.headshot_url])
-        );
-
-        const qbsWithHeadshots = data.map((qb: QBValue) => ({
-          ...qb,
-          headshot_url: qb.player_id ? headshotMap.get(qb.player_id) : undefined,
-        }));
-
-        setQbs(qbsWithHeadshots);
-      } else {
-        setQbs(data || []);
-      }
+      setQbs(data || []);
 
       setError(null);
     } catch (err) {
