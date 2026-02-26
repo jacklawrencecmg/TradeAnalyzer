@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Users, X, ChevronLeft, ChevronRight, Calendar, DollarSign, RefreshCw } from 'lucide-react';
 import { calculatePowerRankings, type TeamRanking } from '../services/sleeperApi';
 import { syncPlayerValuesToDatabase } from '../utils/syncPlayerValues';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface PowerRankingsProps {
   leagueId: string;
@@ -287,15 +288,14 @@ export default function PowerRankings({ leagueId }: PowerRankingsProps) {
                       >
                         <div className="flex items-start gap-3 mb-3">
                           <div className="relative flex-shrink-0">
-                            <img
-                              src={`https://sleepercdn.com/content/nfl/players/thumb/${player.player_id}.jpg`}
-                              alt={player.name}
-                              className="w-16 h-16 rounded-full object-cover bg-gray-900 border-2 border-gray-700"
-                              onError={(e) => {
-                                e.currentTarget.src = `https://sleepercdn.com/images/v2/icons/player_default.webp`;
-                              }}
+                            <PlayerAvatar
+                              playerId={player.player_id}
+                              playerName={player.name}
+                              team={player.team || undefined}
+                              position={player.position}
+                              size="lg"
                             />
-                            <span className="absolute -top-1 -right-1 text-xs font-bold text-[#00d4ff] bg-gray-900 px-1.5 py-0.5 rounded-full border border-[#00d4ff]/30">
+                            <span className="absolute -top-1 -right-1 text-xs font-bold text-[#00d4ff] bg-gray-900 px-1.5 py-0.5 rounded-full border border-[#00d4ff]/30 z-10">
                               #{idx + 1}
                             </span>
                           </div>
