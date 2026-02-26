@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, TrendingUp, TrendingDown, Award } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
-import { PlayerAvatar } from './PlayerAvatar';
 import { supabase } from '../lib/supabase';
 
 interface QBValue {
@@ -195,13 +194,13 @@ export default function KTCQBRankings() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
-                      <PlayerAvatar
-                        playerId={qb.player_id}
-                        playerName={qb.full_name}
-                        team={qb.team || undefined}
-                        position="QB"
-                        size="md"
-                        headshotUrl={qb.headshot_url}
+                      <img
+                        src={`https://sleepercdn.com/content/nfl/players/thumb/${qb.player_id}.jpg`}
+                        alt={qb.full_name}
+                        className="w-12 h-12 rounded-full object-cover bg-gray-100 border-2 border-gray-200"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://sleepercdn.com/images/v2/icons/player_default.webp`;
+                        }}
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{qb.full_name}</div>

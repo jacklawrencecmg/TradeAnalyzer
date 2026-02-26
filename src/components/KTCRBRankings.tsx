@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Award, AlertTriangle } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
-import { PlayerAvatar } from './PlayerAvatar';
 import { supabase } from '../lib/supabase';
 
 interface RBValue {
@@ -242,13 +241,13 @@ export default function KTCRBRankings() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <PlayerAvatar
-                        playerId={rb.player_id}
-                        playerName={rb.full_name}
-                        team={rb.team || undefined}
-                        position="RB"
-                        size="md"
-                        headshotUrl={rb.headshot_url}
+                      <img
+                        src={`https://sleepercdn.com/content/nfl/players/thumb/${rb.player_id}.jpg`}
+                        alt={rb.full_name}
+                        className="w-12 h-12 rounded-full object-cover bg-gray-100 border-2 border-gray-200"
+                        onError={(e) => {
+                          e.currentTarget.src = `https://sleepercdn.com/images/v2/icons/player_default.webp`;
+                        }}
                       />
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2">
