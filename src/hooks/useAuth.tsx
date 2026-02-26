@@ -15,17 +15,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 function getInitialSession(): { user: User | null; session: Session | null; loading: boolean } {
   try {
-    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    if (storageKey) {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        const sess = parsed?.access_token ? parsed : null;
-        if (sess) {
-          const exp = sess.expires_at ?? 0;
-          if (exp > Date.now() / 1000) {
-            return { user: sess.user ?? null, session: sess, loading: false };
-          }
+    const raw = localStorage.getItem('fdp-auth-token');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const sess = parsed?.access_token ? parsed : null;
+      if (sess) {
+        const exp = sess.expires_at ?? 0;
+        if (exp > Date.now() / 1000) {
+          return { user: sess.user ?? null, session: sess, loading: false };
         }
       }
     }
@@ -66,43 +63,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, 'Session:', session ? 'exists' : 'null');
-
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
 
-      // Handle sign out event
       if (event === 'SIGNED_OUT') {
-        console.log('User signed out, clearing state');
         setSession(null);
         setUser(null);
         return;
       }
 
-      // If a new user just signed up, ensure they have a subscription
       if (event === 'SIGNED_IN' && session?.user) {
-        try {
-          // Check if user has a subscription, if not create one
-          const { data: existingSub } = await supabase
-            .from('user_subscriptions')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
+        (async () => {
+          try {
+            const { data: existingSub } = await supabase
+              .from('user_subscriptions')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .maybeSingle();
 
-          if (!existingSub) {
-            console.log('Creating trial subscription for new user');
-            // Call the function to create subscription
-            await supabase.rpc('create_trial_subscription', {
-              p_user_id: session.user.id
-            });
-            console.log('Trial subscription created');
+            if (!existingSub) {
+              await supabase.rpc('create_trial_subscription', {
+                p_user_id: session.user.id
+              });
+            }
+          } catch (error) {
+            console.error('Error ensuring subscription:', error);
           }
-        } catch (error) {
-          console.error('Error ensuring subscription:', error);
-          // Don't block the user if subscription creation fails
-        }
+        })();
       }
     });
 
