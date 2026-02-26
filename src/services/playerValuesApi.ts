@@ -463,32 +463,41 @@ class PlayerValuesApi {
 
   async getPlayerValues(
     position?: string,
-    limit: number = 100,
+    limit: number = 10000,
     leagueFormat: 'dynasty' | 'redraft' = 'dynasty',
     scoringFormat: 'ppr' | 'half-ppr' = 'ppr'
   ): Promise<PlayerValue[]> {
     try {
-      const format = leagueFormat === 'redraft' ? 'redraft' : 'dynasty_sf';
-      const { data, error } = await supabase.rpc('get_latest_values', {
-        p_format: format,
-        p_position: position || null,
-        p_limit: limit,
-      });
+      const format = leagueFormat === 'redraft' ? 'redraft' : 'dynasty';
+
+      let query = supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at, format, metadata')
+        .eq('format', format)
+        .order('adjusted_value', { ascending: false })
+        .limit(limit);
+
+      if (position) {
+        query = query.eq('position', position);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
       return (data || []).map((p: any) => normalizePlayerValue({
         player_id: p.player_id,
-        player_name: p.full_name || p.player_name,
-        position: p.pos,
+        player_name: p.player_name,
+        position: p.position,
         team: p.team,
-        base_value: p.ktc_value || 0,
-        adjusted_value: p.fdp_value || p.ktc_value || 0,
-        fdp_value: p.fdp_value || p.ktc_value || 0,
-        updated_at: p.captured_at,
-        last_updated: p.captured_at,
-        rank_overall: p.position_rank,
-        rank_position: p.position_rank,
+        base_value: p.base_value || 0,
+        adjusted_value: p.adjusted_value || p.base_value || 0,
+        fdp_value: p.adjusted_value || p.base_value || 0,
+        market_value: p.market_value,
+        updated_at: p.updated_at,
+        last_updated: p.updated_at,
+        rank_overall: p.rank_overall,
+        rank_position: p.rank_position,
         format: p.format,
         metadata: p.metadata,
       }));
