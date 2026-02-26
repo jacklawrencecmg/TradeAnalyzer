@@ -124,6 +124,25 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
 
     setShowAddLeague(false);
 
+    const optimisticLeague: UserLeague = {
+      id: `optimistic-${leagueId}`,
+      user_id: user.id,
+      league_id: leagueId,
+      league_name: leagueName || `League ${leagueId}`,
+      team_name: teamName,
+      is_superflex: isSuperflex,
+      is_active: true,
+      platform,
+      platform_settings: platformSettings || {},
+      created_at: new Date().toISOString(),
+    };
+
+    setLeagues(prev => {
+      const exists = prev.some(l => l.league_id === leagueId);
+      return exists ? prev : [optimisticLeague, ...prev];
+    });
+    setCurrentLeague(optimisticLeague);
+
     try {
       const { error } = await supabase.from('user_leagues')
         .upsert({
@@ -147,6 +166,8 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
     } catch (error: any) {
       console.error('Error adding league:', error);
       showToast('Failed to add league. Please try again.', 'error');
+      setLeagues(prev => prev.filter(l => l.id !== optimisticLeague.id));
+      setCurrentLeague(prev => prev?.id === optimisticLeague.id ? null : prev);
     }
   };
 
