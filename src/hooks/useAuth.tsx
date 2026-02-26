@@ -49,7 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    const timeout = setTimeout(() => finish(null), 800);
+    const timeout = setTimeout(() => {
+      if (!resolved && !initial.user) {
+        finish(null);
+      } else if (!resolved) {
+        resolved = true;
+        setLoading(false);
+      }
+    }, 2000);
 
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
@@ -58,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       .catch(() => {
         clearTimeout(timeout);
-        finish(null);
+        finish(initial.session);
       });
 
     const {
