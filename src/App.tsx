@@ -5,7 +5,6 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { RouterProvider } from './lib/seo/router';
 import SafeModeBanner from './components/SafeModeBanner';
 import { FeedbackButton } from './components/FeedbackButton';
-import { LogIn } from 'lucide-react';
 
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -39,7 +38,6 @@ function PageLoader() {
 
 function AppContent() {
   const { user, loading, isAdmin } = useAuth();
-  const [showAuth, setShowAuth] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [tradeSlug, setTradeSlug] = useState<string | null>(null);
   const [leagueSlug, setLeagueSlug] = useState<string | null>(null);
