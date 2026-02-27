@@ -1,7 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { CreditCard, CheckCircle, Clock } from 'lucide-react';
+import { CreditCard, CheckCircle, Clock, LogIn, AlertCircle } from 'lucide-react';
 
 interface SubscriptionGateProps {
   children: ReactNode;
@@ -17,10 +17,31 @@ interface SubscriptionStatus {
 }
 
 export function SubscriptionGate({ children }: SubscriptionGateProps) {
-  const { user } = useAuth();
+  const { user, signIn } = useAuth();
   const [loading, setLoading] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const stripePaymentLink = import.meta.env.VITE_STRIPE_PAYMENT_LINK;
+
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    if (!loginEmail || !loginPassword) {
+      setLoginError('Please enter your email and password');
+      return;
+    }
+    setLoginLoading(true);
+    const result = await signIn(loginEmail, loginPassword);
+    if (result.error) {
+      setLoginError(result.error);
+    }
+    setLoginLoading(false);
+  };
 
   useEffect(() => {
     if (!user) {
@@ -155,6 +176,15 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
             </div>
           )}
 
+          {user && subscriptionStatus && !subscriptionStatus.is_pro && !subscriptionStatus.is_trial && (
+            <div className="bg-fdp-neg bg-opacity-10 border border-fdp-neg rounded-lg p-4 mb-6">
+              <div className="flex items-center gap-2 text-fdp-neg">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <p className="font-semibold">Your free trial has expired.</p>
+              </div>
+            </div>
+          )}
+
           <button
             onClick={handleSubscribe}
             className="w-full bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-bold py-4 px-6 rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all text-lg"
@@ -165,6 +195,70 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
           <p className="text-center text-sm text-fdp-text-3 mt-4">
             Cancel anytime. No long-term commitments.
           </p>
+
+          <div className="mt-6 border-t border-fdp-border-1 pt-6">
+            {!showLoginForm ? (
+              <button
+                onClick={() => setShowLoginForm(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-2 rounded-lg hover:bg-fdp-border-1 transition-all font-medium"
+              >
+                <LogIn className="w-4 h-4" />
+                Already have an account? Sign in
+              </button>
+            ) : (
+              <div>
+                <h3 className="text-sm font-semibold text-fdp-text-2 mb-3 flex items-center gap-2">
+                  <LogIn className="w-4 h-4" />
+                  Sign in to your account
+                </h3>
+                <form onSubmit={handleLogin} className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-fdp-text-3 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      className="w-full px-3 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none transition-all text-sm"
+                      placeholder="your.email@example.com"
+                      disabled={loginLoading}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-fdp-text-3 mb-1">Password</label>
+                    <input
+                      type="password"
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      className="w-full px-3 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none transition-all text-sm"
+                      placeholder="Enter password"
+                      disabled={loginLoading}
+                    />
+                  </div>
+                  {loginError && (
+                    <div className="bg-fdp-neg bg-opacity-10 border border-fdp-neg text-fdp-neg px-3 py-2 rounded-lg text-sm">
+                      {loginError}
+                    </div>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={loginLoading}
+                      className="flex-1 bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-semibold py-2 px-4 rounded-lg hover:shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                    >
+                      {loginLoading ? 'Signing in...' : 'Sign In'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowLoginForm(false); setLoginError(''); }}
+                      className="px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-3 rounded-lg hover:bg-fdp-border-1 transition-all text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
