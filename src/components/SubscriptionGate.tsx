@@ -44,6 +44,13 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
   };
 
   useEffect(() => {
+    setLoading(true);
+    setSubscriptionStatus(null);
+    setShowLoginForm(false);
+    setLoginEmail('');
+    setLoginPassword('');
+    setLoginError('');
+
     if (!user) {
       setLoading(false);
       return;
@@ -69,8 +76,74 @@ export function SubscriptionGate({ children }: SubscriptionGateProps) {
     checkSubscription();
   }, [user]);
 
-  if (loading || !user) {
+  if (loading) {
     return <>{children}</>;
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <img
+                src="/FDP2.png"
+                alt="Fantasy Draft Pros Logo"
+                className="h-32 w-auto object-contain drop-shadow-lg"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
+            </div>
+            <h1 className="text-4xl font-bold text-fdp-text-1 mb-2">Fantasy Draft Pros</h1>
+            <p className="text-fdp-text-3">Professional Fantasy Football Tools</p>
+          </div>
+
+          <div className="bg-fdp-surface-1 rounded-lg shadow-xl p-8 border border-fdp-border-1">
+            <h2 className="text-xl font-bold text-fdp-text-1 mb-1 flex items-center gap-2">
+              <LogIn className="w-5 h-5 text-fdp-accent-1" />
+              Sign in to continue
+            </h2>
+            <p className="text-sm text-fdp-text-3 mb-6">Enter your account credentials below.</p>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-fdp-text-2 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none transition-all"
+                  placeholder="your.email@example.com"
+                  disabled={loginLoading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-fdp-text-2 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full px-4 py-2 bg-fdp-surface-2 border border-fdp-border-1 text-fdp-text-1 rounded-lg focus:ring-2 focus:ring-fdp-accent-1 focus:border-transparent outline-none transition-all"
+                  placeholder="Enter password"
+                  disabled={loginLoading}
+                />
+              </div>
+              {loginError && (
+                <div className="bg-fdp-neg bg-opacity-10 border border-fdp-neg text-fdp-neg px-4 py-3 rounded-lg text-sm">
+                  {loginError}
+                </div>
+              )}
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-semibold py-3 px-6 rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+              >
+                {loginLoading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (subscriptionStatus?.is_pro) {
