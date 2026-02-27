@@ -864,17 +864,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-md font-semibold text-gray-300">{teamAName}</h4>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-400">Add to:</label>
-                          <select
-                            value={tradeDirectionA}
-                            onChange={(e) => setTradeDirectionA(e.target.value as 'gives' | 'gets')}
-                            className="text-xs px-2 py-1 bg-gray-900 border border-gray-700 rounded text-white focus:outline-none focus:border-[#00d4ff]"
-                          >
-                            <option value="gives">Gives</option>
-                            <option value="gets">Gets</option>
-                          </select>
-                        </div>
                       </div>
 
                       <div className="flex gap-2 mb-3">
@@ -912,52 +901,60 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
 
                       <div className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto">
                         {assetTypeA === 'players' && (
-                          <div className="space-y-2">
+                          <div className="space-y-1">
+                            <div className="grid grid-cols-[1fr_auto_auto] gap-1 px-2 pb-1 border-b border-gray-700 mb-1">
+                              <span className="text-xs text-gray-500">Player</span>
+                              <span className="text-xs text-gray-500 w-14 text-center">Gives</span>
+                              <span className="text-xs text-gray-500 w-14 text-center">Gets</span>
+                            </div>
                             {getRosterPlayers(selectedTeamA).map((playerId) => {
                               const player = players[playerId];
                               if (!player) return null;
-                              const isSelected = tradeDirectionA === 'gives'
-                                ? teamAGives.includes(playerId)
-                                : teamAGets.includes(playerId);
+                              const inGives = teamAGives.includes(playerId);
+                              const inGets = teamAGets.includes(playerId);
 
                               return (
-                                <button
+                                <div
                                   key={playerId}
-                                  onClick={() => addRosterPlayer(playerId, tradeDirectionA)}
-                                  className={`w-full flex items-center gap-3 p-2 rounded transition-colors text-left ${
-                                    isSelected
-                                      ? 'bg-[#00d4ff]/20 border border-[#00d4ff] hover:bg-[#00d4ff]/30'
-                                      : 'hover:bg-gray-800'
+                                  className={`grid grid-cols-[1fr_auto_auto] gap-1 items-center p-1.5 rounded transition-colors ${
+                                    inGives || inGets ? 'bg-gray-800' : 'hover:bg-gray-800/50'
                                   }`}
                                 >
-                                  <div className="relative w-10 h-10 flex-shrink-0">
-                                    <img
-                                      src={getPlayerImageUrl(playerId)}
-                                      alt={player.full_name}
-                                      className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
-                                      onError={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent && player) {
-                                          const fallback = document.createElement('div');
-                                          fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
-                                          fallback.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                          parent.appendChild(fallback);
-                                        }
-                                      }}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <PlayerAvatar
+                                      playerId={playerId}
+                                      playerName={player.full_name}
+                                      team={player.team ?? undefined}
+                                      position={player.position}
+                                      size="sm"
+                                      showTeamLogo={false}
                                     />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="text-white text-sm font-medium">{player.full_name}</div>
-                                    <div className="text-xs text-gray-400">
-                                      {player.position} - {player.team || 'FA'}
+                                    <div className="min-w-0">
+                                      <div className="text-white text-xs font-medium truncate">{player.full_name}</div>
+                                      <div className="text-gray-500 text-xs">{player.position}</div>
                                     </div>
                                   </div>
-                                  {isSelected && (
-                                    <span className="text-xs text-green-400 font-medium">✓ Added</span>
-                                  )}
-                                </button>
+                                  <button
+                                    onClick={() => addRosterPlayer(playerId, 'gives')}
+                                    className={`w-14 text-xs py-1 rounded font-medium transition-all ${
+                                      inGives
+                                        ? 'bg-red-500/20 border border-red-500 text-red-400 hover:bg-red-500/30'
+                                        : 'bg-gray-700 text-gray-400 hover:bg-[#00d4ff]/20 hover:text-[#00d4ff] hover:border hover:border-[#00d4ff]'
+                                    }`}
+                                  >
+                                    {inGives ? '✓ Out' : '+ Out'}
+                                  </button>
+                                  <button
+                                    onClick={() => addRosterPlayer(playerId, 'gets')}
+                                    className={`w-14 text-xs py-1 rounded font-medium transition-all ${
+                                      inGets
+                                        ? 'bg-green-500/20 border border-green-500 text-green-400 hover:bg-green-500/30'
+                                        : 'bg-gray-700 text-gray-400 hover:bg-green-500/20 hover:text-green-400 hover:border hover:border-green-500'
+                                    }`}
+                                  >
+                                    {inGets ? '✓ In' : '+ In'}
+                                  </button>
+                                </div>
                               );
                             })}
                           </div>
@@ -1013,17 +1010,6 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
                     <div>
                       <div className="flex items-center justify-between mb-3">
                         <h4 className="text-md font-semibold text-gray-300">{teamBName}</h4>
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-400">Add to:</label>
-                          <select
-                            value={tradeDirectionB}
-                            onChange={(e) => setTradeDirectionB(e.target.value as 'gives' | 'gets')}
-                            className="text-xs px-2 py-1 bg-gray-900 border border-gray-700 rounded text-white focus:outline-none focus:border-[#00d4ff]"
-                          >
-                            <option value="gives">Gives</option>
-                            <option value="gets">Gets</option>
-                          </select>
-                        </div>
                       </div>
 
                       <div className="flex gap-2 mb-3">
@@ -1061,52 +1047,60 @@ export default function TradeAnalyzer({ leagueId, onTradeSaved, isGuest = false 
 
                       <div className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto">
                         {assetTypeB === 'players' && (
-                          <div className="space-y-2">
+                          <div className="space-y-1">
+                            <div className="grid grid-cols-[1fr_auto_auto] gap-1 px-2 pb-1 border-b border-gray-700 mb-1">
+                              <span className="text-xs text-gray-500">Player</span>
+                              <span className="text-xs text-gray-500 w-14 text-center">Gives</span>
+                              <span className="text-xs text-gray-500 w-14 text-center">Gets</span>
+                            </div>
                             {getRosterPlayers(selectedTeamB).map((playerId) => {
                               const player = players[playerId];
                               if (!player) return null;
-                              const isSelected = tradeDirectionB === 'gives'
-                                ? teamAGives.includes(playerId)
-                                : teamAGets.includes(playerId);
+                              const inGives = teamAGives.includes(playerId);
+                              const inGets = teamAGets.includes(playerId);
 
                               return (
-                                <button
+                                <div
                                   key={playerId}
-                                  onClick={() => addRosterPlayer(playerId, tradeDirectionB)}
-                                  className={`w-full flex items-center gap-3 p-2 rounded transition-colors text-left ${
-                                    isSelected
-                                      ? 'bg-[#00d4ff]/20 border border-[#00d4ff] hover:bg-[#00d4ff]/30'
-                                      : 'hover:bg-gray-800'
+                                  className={`grid grid-cols-[1fr_auto_auto] gap-1 items-center p-1.5 rounded transition-colors ${
+                                    inGives || inGets ? 'bg-gray-800' : 'hover:bg-gray-800/50'
                                   }`}
                                 >
-                                  <div className="relative w-10 h-10 flex-shrink-0">
-                                    <img
-                                      src={getPlayerImageUrl(playerId)}
-                                      alt={player.full_name}
-                                      className="w-10 h-10 rounded-full object-cover bg-gradient-to-br from-[#00d4ff] to-[#0099cc] ring-2 ring-gray-700"
-                                      onError={(e) => {
-                                        const target = e.currentTarget;
-                                        target.style.display = 'none';
-                                        const parent = target.parentElement;
-                                        if (parent && player) {
-                                          const fallback = document.createElement('div');
-                                          fallback.className = 'w-10 h-10 rounded-full bg-gradient-to-br from-[#00d4ff] to-[#0099cc] flex items-center justify-center text-white font-bold text-sm ring-2 ring-gray-700';
-                                          fallback.textContent = player.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-                                          parent.appendChild(fallback);
-                                        }
-                                      }}
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <PlayerAvatar
+                                      playerId={playerId}
+                                      playerName={player.full_name}
+                                      team={player.team ?? undefined}
+                                      position={player.position}
+                                      size="sm"
+                                      showTeamLogo={false}
                                     />
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="text-white text-sm font-medium">{player.full_name}</div>
-                                    <div className="text-xs text-gray-400">
-                                      {player.position} - {player.team || 'FA'}
+                                    <div className="min-w-0">
+                                      <div className="text-white text-xs font-medium truncate">{player.full_name}</div>
+                                      <div className="text-gray-500 text-xs">{player.position}</div>
                                     </div>
                                   </div>
-                                  {isSelected && (
-                                    <span className="text-xs text-green-400 font-medium">✓ Added</span>
-                                  )}
-                                </button>
+                                  <button
+                                    onClick={() => addRosterPlayer(playerId, 'gives')}
+                                    className={`w-14 text-xs py-1 rounded font-medium transition-all ${
+                                      inGives
+                                        ? 'bg-red-500/20 border border-red-500 text-red-400 hover:bg-red-500/30'
+                                        : 'bg-gray-700 text-gray-400 hover:bg-[#00d4ff]/20 hover:text-[#00d4ff] hover:border hover:border-[#00d4ff]'
+                                    }`}
+                                  >
+                                    {inGives ? '✓ Out' : '+ Out'}
+                                  </button>
+                                  <button
+                                    onClick={() => addRosterPlayer(playerId, 'gets')}
+                                    className={`w-14 text-xs py-1 rounded font-medium transition-all ${
+                                      inGets
+                                        ? 'bg-green-500/20 border border-green-500 text-green-400 hover:bg-green-500/30'
+                                        : 'bg-gray-700 text-gray-400 hover:bg-green-500/20 hover:text-green-400 hover:border hover:border-green-500'
+                                    }`}
+                                  >
+                                    {inGets ? '✓ In' : '+ In'}
+                                  </button>
+                                </div>
                               );
                             })}
                           </div>
