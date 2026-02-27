@@ -75,42 +75,46 @@ export default function MarketTrends({ onSelectPlayer }: MarketTrendsProps) {
     }
   };
 
-  const getTrendConfig = (tag: TrendTag) => {
-    switch (tag) {
-      case 'buy_low':
-        return {
-          label: 'Buy Low',
-          color: 'green',
-          bgGradient: 'from-green-500 to-emerald-600',
-          icon: TrendingDown,
-          description: 'Players whose values have dropped significantly',
-        };
-      case 'sell_high':
-        return {
-          label: 'Sell High',
-          color: 'red',
-          bgGradient: 'from-red-500 to-rose-600',
-          icon: TrendingUp,
-          description: 'Players whose values have spiked recently',
-        };
-      case 'rising':
-        return {
-          label: 'Rising',
-          color: 'blue',
-          bgGradient: 'from-blue-500 to-indigo-600',
-          icon: ArrowUp,
-          description: 'Players with steady upward momentum',
-        };
-      case 'falling':
-        return {
-          label: 'Falling',
-          color: 'orange',
-          bgGradient: 'from-orange-500 to-amber-600',
-          icon: ArrowDown,
-          description: 'Players with declining values',
-        };
-    }
+  const TAB_CONFIGS: Record<TrendTag, { label: string; activeBorder: string; activeBg: string; activeText: string; activeIconText: string; icon: typeof TrendingDown; description: string }> = {
+    buy_low: {
+      label: 'Buy Low',
+      activeBorder: 'border-green-600',
+      activeBg: 'bg-green-50',
+      activeText: 'text-green-700',
+      activeIconText: 'text-green-600',
+      icon: TrendingDown,
+      description: 'Players whose values have dropped significantly',
+    },
+    sell_high: {
+      label: 'Sell High',
+      activeBorder: 'border-red-600',
+      activeBg: 'bg-red-50',
+      activeText: 'text-red-700',
+      activeIconText: 'text-red-600',
+      icon: TrendingUp,
+      description: 'Players whose values have spiked recently',
+    },
+    rising: {
+      label: 'Rising',
+      activeBorder: 'border-blue-600',
+      activeBg: 'bg-blue-50',
+      activeText: 'text-blue-700',
+      activeIconText: 'text-blue-600',
+      icon: ArrowUp,
+      description: 'Players with steady upward momentum',
+    },
+    falling: {
+      label: 'Falling',
+      activeBorder: 'border-orange-600',
+      activeBg: 'bg-orange-50',
+      activeText: 'text-orange-700',
+      activeIconText: 'text-orange-600',
+      icon: ArrowDown,
+      description: 'Players with declining values',
+    },
   };
+
+  const getTrendConfig = (tag: TrendTag) => TAB_CONFIGS[tag];
 
   const filteredTrends = trends.filter(trend => {
     if (!searchQuery) return true;
@@ -161,13 +165,13 @@ export default function MarketTrends({ onSelectPlayer }: MarketTrendsProps) {
                 onClick={() => setActiveTab(tag)}
                 className={`px-6 py-4 text-center border-b-4 transition-all ${
                   isActive
-                    ? `border-${tabConfig.color}-600 bg-${tabConfig.color}-50`
+                    ? `${tabConfig.activeBorder} ${tabConfig.activeBg}`
                     : 'border-transparent hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-center gap-2 mb-1">
-                  <TabIcon className={`w-5 h-5 ${isActive ? `text-${tabConfig.color}-600` : 'text-gray-400'}`} />
-                  <span className={`font-bold ${isActive ? `text-${tabConfig.color}-700` : 'text-gray-600'}`}>
+                  <TabIcon className={`w-5 h-5 ${isActive ? tabConfig.activeIconText : 'text-gray-400'}`} />
+                  <span className={`font-bold ${isActive ? tabConfig.activeText : 'text-gray-600'}`}>
                     {tabConfig.label}
                   </span>
                 </div>

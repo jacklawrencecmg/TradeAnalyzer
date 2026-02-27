@@ -108,7 +108,7 @@ export function PlayerValuePage() {
 
       if (error) throw error;
 
-      const enriched = data.map((p: any) => ({
+      const enriched = (data || []).map((p: any) => ({
         ...p,
         fdp_value: p.fdp_value || p.base_value || 0
       }));

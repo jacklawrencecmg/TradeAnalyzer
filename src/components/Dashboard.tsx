@@ -59,6 +59,7 @@ import SubscriptionBadge from './SubscriptionBadge';
 import UsageMeter from './UsageMeter';
 import ValueFineTuner from './ValueFineTuner';
 import { useSubscription } from '../hooks/useSubscription';
+import { fetchLeagueRosters, fetchLeagueUsers } from '../services/sleeperApi';
 
 type TabType = 'trade' | 'rankings' | 'playoffs' | 'history' | 'waiver' | 'lineup' | 'trends' | 'championship' | 'tradeFinder' | 'tradeBlock' | 'counterOffer' | 'draft' | 'keeper' | 'health' | 'recap' | 'rivalry' | 'chat' | 'notifications' | 'news' | 'export' | 'values' | 'contact' | 'ktcAdmin' | 'ktcRankings' | 'ktcRBRankings' | 'ktcWRRankings' | 'ktcTERankings' | 'rbContext' | 'rbSuggestions' | 'pickValues' | 'idpRankings' | 'idpUpload' | 'ktcMultiSync' | 'unifiedRankings' | 'sleeperAnalysis' | 'teamAdvice' | 'market' | 'watchlist' | 'reports' | 'reportDetail' | 'pricing' | 'valueTuner' | 'trending' | 'adminSync' | 'headshotAdmin';
 
@@ -72,6 +73,7 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
   const { isPro } = useSubscription();
   const [leagues, setLeagues] = useState<UserLeague[]>([]);
   const [currentLeague, setCurrentLeague] = useState<UserLeague | null>(null);
+  const [currentRosterId, setCurrentRosterId] = useState<string>('1');
   const [showAddLeague, setShowAddLeague] = useState(false);
   const [showManageLeagues, setShowManageLeagues] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -86,6 +88,40 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
       loadLeagues();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (currentLeague?.league_id && currentLeague.platform !== 'espn' && currentLeague.platform !== 'yahoo') {
+      resolveUserRosterId(currentLeague);
+    }
+  }, [currentLeague?.league_id]);
+
+  const resolveUserRosterId = async (league: UserLeague) => {
+    try {
+      const [rosters, users] = await Promise.all([
+        fetchLeagueRosters(league.league_id),
+        fetchLeagueUsers(league.league_id),
+      ]);
+
+      const storedTeamName = (league.team_name || '').toLowerCase().trim();
+
+      const match = rosters.find((roster) => {
+        const user = users.find((u) => u.user_id === roster.owner_id);
+        if (!user) return false;
+        const sleeperTeamName = (
+          user.metadata?.team_name || user.display_name || user.username || ''
+        ).toLowerCase().trim();
+        return storedTeamName && sleeperTeamName === storedTeamName;
+      });
+
+      if (match) {
+        setCurrentRosterId(match.roster_id.toString());
+      } else if (rosters.length > 0) {
+        setCurrentRosterId(rosters[0].roster_id.toString());
+      }
+    } catch {
+      // silently keep default
+    }
+  };
 
   const loadLeagues = async () => {
     if (!user) return;
@@ -444,22 +480,22 @@ export function Dashboard({ onNavigate }: DashboardProps = {}) {
               {activeTab === 'playoffs' && <PlayoffSimulator leagueId={currentLeague?.league_id ?? ''} />}
               {activeTab === 'history' && <TradeHistory leagueId={currentLeague?.league_id ?? ''} />}
               {activeTab === 'values' && <PlayerValues leagueId={currentLeague?.league_id ?? ''} isSuperflex={currentLeague?.is_superflex ?? false} />}
-              {activeTab === 'waiver' && <WaiverAssistant leagueId={currentLeague?.league_id ?? ''} rosterId="1" userId={user?.id || ''} />}
-              {activeTab === 'lineup' && <LineupOptimizer leagueId={currentLeague?.league_id ?? ''} rosterId="1" />}
+              {activeTab === 'waiver' && <WaiverAssistant leagueId={currentLeague?.league_id ?? ''} rosterId={currentRosterId} userId={user?.id || ''} />}
+              {activeTab === 'lineup' && <LineupOptimizer leagueId={currentLeague?.league_id ?? ''} rosterId={currentRosterId} />}
               {activeTab === 'trends' && <ValueTrendTracker leagueId={currentLeague?.league_id ?? ''} />}
               {activeTab === 'championship' && <ChampionshipCalculator leagueId={currentLeague?.league_id ?? ''} />}
-              {activeTab === 'tradeFinder' && <TradeFinder leagueId={currentLeague?.league_id ?? ''} rosterId="1" />}
+              {activeTab === 'tradeFinder' && <TradeFinder leagueId={currentLeague?.league_id ?? ''} rosterId={currentRosterId} />}
               {activeTab === 'tradeBlock' && <TradeBlockMarketplace leagueId={currentLeague?.league_id ?? ''} userId={user?.id || ''} />}
               {activeTab === 'counterOffer' && <CounterOfferGenerator />}
               {activeTab === 'draft' && <DraftKit leagueId={currentLeague?.league_id ?? ''} userId={user?.id || ''} />}
-              {activeTab === 'keeper' && <KeeperCalculator leagueId={currentLeague?.league_id ?? ''} rosterId="1" />}
-              {activeTab === 'health' && <RosterHealth leagueId={currentLeague?.league_id ?? ''} rosterId="1" />}
+              {activeTab === 'keeper' && <KeeperCalculator leagueId={currentLeague?.league_id ?? ''} rosterId={currentRosterId} />}
+              {activeTab === 'health' && <RosterHealth leagueId={currentLeague?.league_id ?? ''} rosterId={currentRosterId} />}
               {activeTab === 'recap' && <WeeklyRecap leagueId={currentLeague?.league_id ?? ''} />}
               {activeTab === 'rivalry' && <RivalryTracker leagueId={currentLeague?.league_id ?? ''} />}
               {activeTab === 'chat' && <LeagueChat leagueId={currentLeague?.league_id || ''} userId={user?.id || ''} username={user?.email || 'User'} />}
               {activeTab === 'notifications' && <NotificationsPanel userId={user?.id || ''} leagueId={currentLeague?.league_id ?? ''} />}
               {activeTab === 'news' && <PlayerNewsFeed />}
-              {activeTab === 'export' && <ExportShare leagueId={currentLeague?.league_id || ''} rosterId="1" />}
+              {activeTab === 'export' && <ExportShare leagueId={currentLeague?.league_id || ''} rosterId={currentRosterId} />}
               {activeTab === 'contact' && <Contact />}
               {activeTab === 'adminSync' && <AdminSyncHub />}
               {activeTab === 'ktcAdmin' && <KTCAdminSync />}
