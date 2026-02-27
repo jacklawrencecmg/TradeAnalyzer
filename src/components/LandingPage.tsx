@@ -210,54 +210,58 @@ export function LandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-fdp-bg-1 to-fdp-bg-0">
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
+      <div className="container mx-auto px-4 py-6">
+
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
             <img
               src="/FDP2.png"
               alt="Fantasy Draft Pros Logo"
-              className="h-24 w-auto object-contain drop-shadow-lg"
+              className="h-12 w-auto object-contain drop-shadow-lg"
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
               }}
             />
+            <div>
+              <h1 className="text-2xl font-bold text-fdp-text-1 leading-tight">Fantasy Draft Pros</h1>
+              <p className="text-xs text-fdp-accent-1 font-semibold">World's First Offensive + IDP + FAAB + Pick Trade Analyzer</p>
+            </div>
           </div>
-          <h1 className="text-5xl font-bold text-fdp-text-1 mb-3">Fantasy Draft Pros</h1>
-          <p className="text-xl text-fdp-text-2 mb-2">
-            Dynasty Trade Analyzer & Player Values
-          </p>
-          <p className="text-lg text-fdp-accent-1 font-semibold mb-6">
-            World's First Offensive Player + IDP + FAAB + Pick - Trade Analyzer
-          </p>
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={() => {
-                setMode('signup');
-                setShowAuth(true);
-              }}
-              className="bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-bold py-3 px-8 rounded-lg hover:shadow-lg transform hover:-translate-y-0.5 transition-all"
-            >
-              <UserPlus className="inline-block w-5 h-5 mr-2" />
-              Start 7-Day Free Trial
-            </button>
+          <div className="flex gap-2">
             <button
               onClick={() => {
                 setMode('login');
                 setShowAuth(true);
               }}
-              className="bg-fdp-surface-1 text-fdp-text-1 font-semibold py-3 px-8 rounded-lg border-2 border-fdp-border-1 hover:border-fdp-accent-1 transition-all"
+              className="bg-fdp-surface-1 text-fdp-text-1 font-semibold py-2 px-5 rounded-lg border border-fdp-border-1 hover:border-fdp-accent-1 transition-all text-sm"
             >
-              <LogIn className="inline-block w-5 h-5 mr-2" />
+              <LogIn className="inline-block w-4 h-4 mr-1.5" />
               Sign In
+            </button>
+            <button
+              onClick={() => {
+                setMode('signup');
+                setShowAuth(true);
+              }}
+              className="bg-gradient-to-r from-fdp-accent-1 to-fdp-accent-2 text-fdp-bg-0 font-bold py-2 px-5 rounded-lg hover:shadow-lg transition-all text-sm"
+            >
+              <UserPlus className="inline-block w-4 h-4 mr-1.5" />
+              Free Trial
             </button>
           </div>
         </div>
 
-        <div className="max-w-6xl mx-auto mb-12">
+        <div className="max-w-6xl mx-auto mb-10">
           <div className="bg-fdp-surface-1 rounded-xl shadow-2xl p-6 border border-fdp-border-1">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-fdp-text-1">Free Trade Analyzer</h2>
-              <div className="text-sm text-fdp-text-3">Try it now - no signup required</div>
+              <div>
+                <h2 className="text-2xl font-bold text-fdp-text-1">Dynasty Trade Analyzer</h2>
+                <p className="text-sm text-fdp-text-3 mt-0.5">Free to use — no account required</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 bg-fdp-surface-2 border border-fdp-border-1 rounded-lg px-3 py-2">
+                <Zap className="w-4 h-4 text-fdp-accent-1" />
+                <span className="text-xs font-semibold text-fdp-text-2">Includes IDP, FAAB & Picks</span>
+              </div>
             </div>
             <TradeAnalyzer isGuest={true} />
           </div>
