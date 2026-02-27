@@ -509,31 +509,30 @@ class PlayerValuesApi {
 
   async getPlayerValue(playerId: string): Promise<PlayerValue | null> {
     try {
-      const { data, error } = await supabase.rpc('get_latest_values', {
-        p_format: 'dynasty_sf',
-        p_position: null,
-        p_limit: 500,
-      });
+      const { data, error } = await supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at, format, metadata')
+        .eq('player_id', playerId)
+        .maybeSingle();
 
       if (error) throw error;
-
-      const match = (data || []).find((p: any) => p.player_id === playerId);
-      if (!match) return null;
+      if (!data) return null;
 
       return normalizePlayerValue({
-        player_id: match.player_id,
-        player_name: match.full_name || match.player_name,
-        position: match.pos,
-        team: match.team,
-        base_value: match.ktc_value || 0,
-        adjusted_value: match.fdp_value || match.ktc_value || 0,
-        fdp_value: match.fdp_value || match.ktc_value || 0,
-        updated_at: match.captured_at,
-        last_updated: match.captured_at,
-        rank_overall: match.position_rank,
-        rank_position: match.position_rank,
-        format: match.format,
-        metadata: match.metadata,
+        player_id: data.player_id,
+        player_name: data.player_name,
+        position: data.position,
+        team: data.team,
+        base_value: data.base_value || 0,
+        adjusted_value: data.adjusted_value || data.base_value || 0,
+        fdp_value: data.adjusted_value || data.base_value || 0,
+        market_value: data.market_value,
+        updated_at: data.updated_at,
+        last_updated: data.updated_at,
+        rank_overall: data.rank_overall,
+        rank_position: data.rank_position,
+        format: data.format,
+        metadata: data.metadata,
       });
     } catch (error) {
       console.error('Error fetching player value:', error);

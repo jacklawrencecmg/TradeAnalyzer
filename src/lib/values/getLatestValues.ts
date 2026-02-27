@@ -29,6 +29,24 @@ export interface ValuesSummary {
   last_updated: string;
 }
 
+function mapRowToPlayerValue(row: any, format: string): PlayerValue {
+  return {
+    player_id: row.player_id,
+    external_id: row.player_id,
+    full_name: row.player_name || 'Unknown',
+    player_position: row.position || '',
+    team: row.team || null,
+    status: 'Active',
+    rookie_year: null,
+    position_rank: row.rank_position || null,
+    ktc_value: row.market_value || row.base_value || 0,
+    fdp_value: row.adjusted_value || row.base_value || 0,
+    captured_at: row.updated_at || new Date().toISOString(),
+    format,
+    snapshot_id: row.player_id,
+  };
+}
+
 export async function getLatestValuesByPosition(
   format: string,
   position: string
@@ -40,11 +58,11 @@ export async function getLatestValuesByPosition(
     async () => {
       try {
         const { data, error } = await supabase
-          .from('ktc_value_snapshots')
-          .select('id, player_id, position_rank, ktc_value, fdp_value, captured_at, position')
+          .from('latest_player_values')
+          .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at')
           .eq('format', format)
           .eq('position', position)
-          .order('captured_at', { ascending: false })
+          .order('adjusted_value', { ascending: false })
           .limit(500);
 
         if (error) {
@@ -52,56 +70,7 @@ export async function getLatestValuesByPosition(
           return [];
         }
 
-        const uniquePlayers = new Map<string, any>();
-        data?.forEach(snapshot => {
-          if (!uniquePlayers.has(snapshot.player_id)) {
-            uniquePlayers.set(snapshot.player_id, snapshot);
-          }
-        });
-
-        const playerIds = Array.from(uniquePlayers.keys());
-        const { data: players, error: playersError } = await supabase
-          .from('nfl_players')
-          .select('external_id, full_name, player_position, team, status, rookie_year')
-          .in('external_id', playerIds)
-          .in('status', ['Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR']);
-
-        if (playersError || !players) {
-          return [];
-        }
-
-        const playerMap = new Map(players.map(p => [p.external_id, p]));
-
-        const results: PlayerValue[] = [];
-        uniquePlayers.forEach((snapshot, playerId) => {
-          const player = playerMap.get(playerId);
-          if (player) {
-            results.push({
-              player_id: snapshot.player_id,
-              external_id: player.external_id,
-              full_name: player.full_name,
-              player_position: player.player_position,
-              team: player.team,
-              status: player.status,
-              rookie_year: player.rookie_year,
-              position_rank: snapshot.position_rank,
-              ktc_value: snapshot.ktc_value,
-              fdp_value: snapshot.fdp_value,
-              captured_at: snapshot.captured_at,
-              format,
-              snapshot_id: snapshot.id,
-            });
-          }
-        });
-
-        return results.sort((a, b) => {
-          if (a.position_rank !== null && b.position_rank !== null) {
-            return a.position_rank - b.position_rank;
-          }
-          if (a.position_rank !== null) return -1;
-          if (b.position_rank !== null) return 1;
-          return (b.ktc_value || 0) - (a.ktc_value || 0);
-        });
+        return (data || []).map(row => mapRowToPlayerValue(row, format));
       } catch (err) {
         console.error('Error in getLatestValuesByPosition:', err);
         return [];
@@ -121,44 +90,18 @@ export async function getLatestValueForPlayer(
     cacheKey,
     async () => {
       try {
-        const { data: snapshot, error: snapshotError } = await supabase
-          .from('ktc_value_snapshots')
-          .select('id, player_id, position_rank, ktc_value, fdp_value, captured_at, position')
+        const { data, error } = await supabase
+          .from('latest_player_values')
+          .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at')
           .eq('player_id', playerId)
           .eq('format', format)
-          .order('captured_at', { ascending: false })
-          .limit(1)
           .maybeSingle();
 
-        if (snapshotError || !snapshot) {
+        if (error || !data) {
           return null;
         }
 
-        const { data: player, error: playerError } = await supabase
-          .from('nfl_players')
-          .select('external_id, full_name, player_position, team, status, rookie_year')
-          .eq('external_id', snapshot.player_id)
-          .maybeSingle();
-
-        if (playerError || !player) {
-          return null;
-        }
-
-        return {
-          player_id: snapshot.player_id,
-          external_id: player.external_id,
-          full_name: player.full_name,
-          player_position: player.player_position,
-          team: player.team,
-          status: player.status,
-          rookie_year: player.rookie_year,
-          position_rank: snapshot.position_rank,
-          ktc_value: snapshot.ktc_value,
-          fdp_value: snapshot.fdp_value,
-          captured_at: snapshot.captured_at,
-          format,
-          snapshot_id: snapshot.id,
-        };
+        return mapRowToPlayerValue(data, format);
       } catch (err) {
         console.error('Error in getLatestValueForPlayer:', err);
         return null;
@@ -212,54 +155,19 @@ export async function getPlayerValueHistory(
 
 export async function getAllLatestValues(format: string = 'dynasty_sf'): Promise<PlayerValue[]> {
   try {
-    const { data, error } = await supabase.rpc('execute_sql', {
-      query: `
-        WITH latest_values AS (
-          SELECT DISTINCT ON (player_id)
-            player_id,
-            player_position,
-            position_rank,
-            ktc_value,
-            fdp_value,
-            captured_at,
-            format
-          FROM ktc_value_snapshots
-          WHERE format = $1
-          ORDER BY player_id, captured_at DESC
-        )
-        SELECT
-          lv.player_id,
-          np.full_name,
-          np.player_position,
-          np.team,
-          lv.position_rank,
-          lv.ktc_value,
-          lv.fdp_value,
-          lv.captured_at,
-          lv.format
-        FROM latest_values lv
-        JOIN nfl_players np ON np.id = lv.player_id
-        WHERE np.status IN ('Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR', 'Free Agent')
-        ORDER BY lv.ktc_value DESC
-      `,
-    });
+    const { data, error } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at')
+      .eq('format', format)
+      .order('adjusted_value', { ascending: false })
+      .limit(1000);
 
     if (error) {
       console.error('Error fetching all latest values:', error);
       return [];
     }
 
-    return (data || []).map((row: any) => ({
-      player_id: row.player_id,
-      full_name: row.full_name,
-      player_position: row.player_position,
-      team: row.team,
-      position_rank: row.position_rank,
-      ktc_value: row.ktc_value || 0,
-      fdp_value: row.fdp_value,
-      captured_at: row.captured_at,
-      format,
-    }));
+    return (data || []).map(row => mapRowToPlayerValue(row, format));
   } catch (err) {
     console.error('Error in getAllLatestValues:', err);
     return [];
@@ -271,52 +179,38 @@ export async function getValuesSummary(
   position?: string
 ): Promise<ValuesSummary | null> {
   try {
-    let query = `
-      WITH latest_values AS (
-        SELECT DISTINCT ON (player_id)
-          player_id,
-          player_position,
-          ktc_value,
-          fdp_value,
-          captured_at
-        FROM ktc_value_snapshots
-        WHERE format = $1
-    `;
+    let query = supabase
+      .from('latest_player_values')
+      .select('adjusted_value, updated_at')
+      .eq('format', format);
 
     if (position) {
-      query += ` AND player_position = $2`;
+      query = query.eq('position', position);
     }
 
-    query += `
-        ORDER BY player_id, captured_at DESC
-      )
-      SELECT
-        COUNT(*) as total_players,
-        AVG(ktc_value)::int as avg_value,
-        MAX(ktc_value) as max_value,
-        MIN(ktc_value) as min_value,
-        MAX(captured_at) as last_updated
-      FROM latest_values lv
-      JOIN nfl_players np ON np.id = lv.player_id
-      WHERE np.status IN ('Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR')
-    `;
-
-    const { data, error } = await supabase.rpc('execute_sql', { query });
+    const { data, error } = await query;
 
     if (error || !data || data.length === 0) {
       return null;
     }
 
-    const row = data[0];
+    const values = data.map(r => Number(r.adjusted_value) || 0);
+    const total = values.length;
+    const avg = total > 0 ? Math.round(values.reduce((a, b) => a + b, 0) / total) : 0;
+    const max = total > 0 ? Math.max(...values) : 0;
+    const min = total > 0 ? Math.min(...values) : 0;
+    const lastUpdated = data.reduce((latest, r) => {
+      return r.updated_at > latest ? r.updated_at : latest;
+    }, data[0].updated_at);
 
     return {
       format,
       position,
-      total_players: parseInt(row.total_players) || 0,
-      avg_value: parseInt(row.avg_value) || 0,
-      max_value: row.max_value || 0,
-      min_value: row.min_value || 0,
-      last_updated: row.last_updated || new Date().toISOString(),
+      total_players: total,
+      avg_value: avg,
+      max_value: max,
+      min_value: min,
+      last_updated: lastUpdated,
     };
   } catch (err) {
     console.error('Error in getValuesSummary:', err);
@@ -329,56 +223,20 @@ export async function getTopPlayers(
   limit: number = 100
 ): Promise<PlayerValue[]> {
   try {
-    const { data, error } = await supabase.rpc('execute_sql', {
-      query: `
-        WITH latest_values AS (
-          SELECT DISTINCT ON (player_id)
-            player_id,
-            player_position,
-            position_rank,
-            ktc_value,
-            fdp_value,
-            captured_at,
-            format
-          FROM ktc_value_snapshots
-          WHERE format = $1
-          ORDER BY player_id, captured_at DESC
-        )
-        SELECT
-          lv.player_id,
-          np.full_name,
-          np.player_position,
-          np.team,
-          lv.position_rank,
-          lv.ktc_value,
-          lv.fdp_value,
-          lv.captured_at,
-          lv.format
-        FROM latest_values lv
-        JOIN nfl_players np ON np.id = lv.player_id
-        WHERE np.status IN ('Active', 'Rookie', 'Practice Squad', 'Injured Reserve', 'IR')
-          AND lv.ktc_value > 0
-        ORDER BY lv.ktc_value DESC
-        LIMIT $2
-      `,
-    });
+    const { data, error } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at')
+      .eq('format', format)
+      .gt('adjusted_value', 0)
+      .order('adjusted_value', { ascending: false })
+      .limit(limit);
 
     if (error) {
       console.error('Error fetching top players:', error);
       return [];
     }
 
-    return (data || []).map((row: any) => ({
-      player_id: row.player_id,
-      full_name: row.full_name,
-      player_position: row.player_position,
-      team: row.team,
-      position_rank: row.position_rank,
-      ktc_value: row.ktc_value || 0,
-      fdp_value: row.fdp_value,
-      captured_at: row.captured_at,
-      format,
-    }));
+    return (data || []).map(row => mapRowToPlayerValue(row, format));
   } catch (err) {
     console.error('Error in getTopPlayers:', err);
     return [];
@@ -391,24 +249,20 @@ export async function searchPlayerValues(
   limit: number = 20
 ): Promise<PlayerValue[]> {
   try {
-    const { resolvePlayerId } = await import('../players/resolvePlayerId');
-    const result = await resolvePlayerId({
-      name: searchTerm,
-      autoQuarantine: false,
-    });
+    const { data, error } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at')
+      .eq('format', format)
+      .ilike('player_name', `%${searchTerm}%`)
+      .order('adjusted_value', { ascending: false })
+      .limit(limit);
 
-    if (result.success && result.player_id) {
-      const value = await getLatestValueForPlayer(result.player_id, format);
-      return value ? [value] : [];
+    if (error) {
+      console.error('Error searching player values:', error);
+      return [];
     }
 
-    if (result.suggestions && result.suggestions.length > 0) {
-      const playerIds = result.suggestions.map(s => s.player_id).slice(0, limit);
-      const settled = await Promise.all(playerIds.map(id => getLatestValueForPlayer(id, format)));
-      return settled.filter((v): v is PlayerValue => v !== null);
-    }
-
-    return [];
+    return (data || []).map(row => mapRowToPlayerValue(row, format));
   } catch (err) {
     console.error('Error in searchPlayerValues:', err);
     return [];
@@ -418,10 +272,10 @@ export async function searchPlayerValues(
 export async function getValuesLastUpdated(format: string = 'dynasty_sf'): Promise<string | null> {
   try {
     const { data, error } = await supabase
-      .from('ktc_value_snapshots')
-      .select('captured_at')
+      .from('latest_player_values')
+      .select('updated_at')
       .eq('format', format)
-      .order('captured_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -429,7 +283,7 @@ export async function getValuesLastUpdated(format: string = 'dynasty_sf'): Promi
       return null;
     }
 
-    return data.captured_at;
+    return data.updated_at;
   } catch (err) {
     console.error('Error in getValuesLastUpdated:', err);
     return null;
@@ -464,18 +318,27 @@ export async function getMultiplePlayerValues(
     return new Map();
   }
 
-  const values = await Promise.all(
-    playerIds.map(id => getLatestValueForPlayer(id, format))
-  );
+  try {
+    const { data, error } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, rank_overall, rank_position, base_value, adjusted_value, market_value, updated_at')
+      .in('player_id', playerIds)
+      .eq('format', format);
 
-  const valueMap = new Map<string, PlayerValue>();
-  values.forEach((value, index) => {
-    if (value) {
-      valueMap.set(playerIds[index], value);
+    if (error) {
+      console.error('Error fetching multiple player values:', error);
+      return new Map();
     }
-  });
 
-  return valueMap;
+    const valueMap = new Map<string, PlayerValue>();
+    (data || []).forEach(row => {
+      valueMap.set(row.player_id, mapRowToPlayerValue(row, format));
+    });
+    return valueMap;
+  } catch (err) {
+    console.error('Error in getMultiplePlayerValues:', err);
+    return new Map();
+  }
 }
 
 export function invalidateValueCaches(pattern?: string): void {
