@@ -40,7 +40,7 @@ export default function KTCQBRankings() {
       const { data, error: dbError } = await supabase
         .from('latest_player_values')
         .select('player_id, player_name, position, team, rank_position, base_value, adjusted_value, market_value, updated_at')
-        .eq('format', 'dynasty_sf')
+        .eq('format', 'dynasty')
         .eq('position', 'QB')
         .order('adjusted_value', { ascending: false })
         .limit(200);
