@@ -343,28 +343,28 @@ export async function fetchPlayerValues(
   }
 
   try {
-    const rpcFormat = leagueFormat === 'redraft' ? 'redraft' : (isSuperflex ? 'dynasty_sf' : 'dynasty');
-    const { data: rpcValues, error: rpcError } = await supabase.rpc('get_latest_values', {
-      p_format: rpcFormat,
-      p_position: null,
-      p_limit: 2000,
-    });
+    const dbFormat = leagueFormat === 'redraft' ? 'redraft' : 'dynasty';
+    const { data: canonicalValues, error: canonicalError } = await supabase
+      .from('latest_player_values')
+      .select('player_id, player_name, position, team, base_value, adjusted_value, market_value, rank_overall, rank_position, updated_at, metadata')
+      .eq('format', dbFormat)
+      .limit(2000);
 
-    if (!rpcError && rpcValues && rpcValues.length > 0) {
-      const mapped: PlayerValue[] = rpcValues.map((v: any) => ({
+    if (!canonicalError && canonicalValues && canonicalValues.length > 0) {
+      const mapped: PlayerValue[] = canonicalValues.map((v: any) => ({
         player_id: v.player_id,
-        player_name: v.full_name || v.player_name,
-        position: v.pos || v.position,
+        player_name: v.player_name,
+        position: v.position,
         team: v.team,
-        base_value: v.ktc_value || 0,
-        fdp_value: v.fdp_value || v.ktc_value || 0,
-        adjusted_value: v.fdp_value || v.ktc_value || 0,
-        market_value: v.ktc_value || 0,
-        updated_at: v.captured_at,
-        last_updated: v.captured_at,
-        rank_overall: v.position_rank,
-        rank_position: v.position_rank,
-        format: v.format,
+        base_value: v.base_value || 0,
+        fdp_value: v.adjusted_value || v.base_value || 0,
+        adjusted_value: v.adjusted_value || v.base_value || 0,
+        market_value: v.market_value || v.adjusted_value || v.base_value || 0,
+        updated_at: v.updated_at,
+        last_updated: v.updated_at,
+        rank_overall: v.rank_overall,
+        rank_position: v.rank_position,
+        format: dbFormat,
         metadata: v.metadata,
       }));
       dbPlayerValues = new Map(mapped.map(v => [v.player_id, v]));

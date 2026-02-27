@@ -46,7 +46,7 @@ export function DynastyRankingsPage() {
       const { data, error } = await supabase
         .from('latest_player_values')
         .select('player_id, player_name, position, team, adjusted_value, rank_overall, updated_at')
-        .eq('format', 'dynasty_sf')
+        .eq('format', 'dynasty')
         .in('position', ['QB', 'RB', 'WR', 'TE', 'LB', 'DL', 'DB'])
         .order('adjusted_value', { ascending: false })
         .limit(1000);

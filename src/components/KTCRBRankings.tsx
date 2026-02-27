@@ -62,24 +62,36 @@ export default function KTCRBRankings() {
   const fetchRBValues = async () => {
     try {
       setLoading(true);
-      const { data, error: rpcError } = await supabase.rpc('get_latest_values', {
-        p_format: 'dynasty_sf',
-        p_position: 'RB',
-        p_limit: null
-      });
+      const { data, error: dbError } = await supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team, rank_position, base_value, adjusted_value, market_value, updated_at, metadata')
+        .eq('format', 'dynasty')
+        .eq('position', 'RB')
+        .order('adjusted_value', { ascending: false })
+        .limit(200);
 
-      if (rpcError) {
-        throw new Error(rpcError.message);
+      if (dbError) {
+        throw new Error(dbError.message);
       }
 
-      const sorted = (data || []).sort((a: RBValue, b: RBValue) => (b.fdp_value || b.ktc_value) - (a.fdp_value || a.ktc_value));
-      if (sorted.length > 0) {
-        const latest = new Date(sorted[0].captured_at);
+      const mapped: RBValue[] = (data || []).map((p: any) => ({
+        player_id: p.player_id,
+        full_name: p.player_name || 'Unknown',
+        player_name: p.player_name || 'Unknown',
+        team: p.team || null,
+        position_rank: p.rank_position || 0,
+        ktc_value: p.market_value || p.adjusted_value || p.base_value || 0,
+        fdp_value: p.adjusted_value || p.base_value || 0,
+        captured_at: p.updated_at || new Date().toISOString(),
+        metadata: p.metadata || undefined,
+      }));
+
+      if (mapped.length > 0) {
+        const latest = new Date(mapped[0].captured_at);
         setLastUpdated(latest.toLocaleString());
       }
 
-      setRbs(sorted);
-
+      setRbs(mapped);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load RB rankings');

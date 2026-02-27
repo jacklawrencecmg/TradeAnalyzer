@@ -55,7 +55,7 @@ export default function KTCQBRankings() {
         player_name: p.player_name || 'Unknown',
         team: p.team || null,
         position_rank: p.rank_position || 0,
-        ktc_value: p.market_value || p.base_value || 0,
+        ktc_value: p.market_value || p.adjusted_value || p.base_value || 0,
         fdp_value: p.adjusted_value || p.base_value || 0,
         captured_at: p.updated_at || new Date().toISOString(),
       }));

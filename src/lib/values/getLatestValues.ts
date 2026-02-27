@@ -39,7 +39,7 @@ function mapRowToPlayerValue(row: any, format: string): PlayerValue {
     status: 'Active',
     rookie_year: null,
     position_rank: row.rank_position || null,
-    ktc_value: row.market_value || row.base_value || 0,
+    ktc_value: row.market_value || row.adjusted_value || row.base_value || 0,
     fdp_value: row.adjusted_value || row.base_value || 0,
     captured_at: row.updated_at || new Date().toISOString(),
     format,
@@ -115,7 +115,7 @@ const HISTORY_CACHE_TTL = 24 * 60 * 60 * 1000;
 
 export async function getPlayerValueHistory(
   playerId: string,
-  format: string = 'dynasty_sf',
+  format: string = 'dynasty',
   days: number = 180
 ): Promise<Array<{ captured_at: string; ktc_value: number; fdp_value: number | null }>> {
   const cacheKey = getCacheKey(['player-history', playerId, format, String(days)]);
@@ -153,7 +153,7 @@ export async function getPlayerValueHistory(
   );
 }
 
-export async function getAllLatestValues(format: string = 'dynasty_sf'): Promise<PlayerValue[]> {
+export async function getAllLatestValues(format: string = 'dynasty'): Promise<PlayerValue[]> {
   try {
     const { data, error } = await supabase
       .from('latest_player_values')
@@ -175,7 +175,7 @@ export async function getAllLatestValues(format: string = 'dynasty_sf'): Promise
 }
 
 export async function getValuesSummary(
-  format: string = 'dynasty_sf',
+  format: string = 'dynasty',
   position?: string
 ): Promise<ValuesSummary | null> {
   try {
@@ -219,7 +219,7 @@ export async function getValuesSummary(
 }
 
 export async function getTopPlayers(
-  format: string = 'dynasty_sf',
+  format: string = 'dynasty',
   limit: number = 100
 ): Promise<PlayerValue[]> {
   try {
@@ -245,7 +245,7 @@ export async function getTopPlayers(
 
 export async function searchPlayerValues(
   searchTerm: string,
-  format: string = 'dynasty_sf',
+  format: string = 'dynasty',
   limit: number = 20
 ): Promise<PlayerValue[]> {
   try {
@@ -269,7 +269,7 @@ export async function searchPlayerValues(
   }
 }
 
-export async function getValuesLastUpdated(format: string = 'dynasty_sf'): Promise<string | null> {
+export async function getValuesLastUpdated(format: string = 'dynasty'): Promise<string | null> {
   try {
     const { data, error } = await supabase
       .from('latest_player_values')

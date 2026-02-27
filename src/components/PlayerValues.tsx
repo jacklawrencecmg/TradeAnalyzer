@@ -231,7 +231,7 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
       }
     }
 
-    if (scoringFormat === 'half-ppr') {
+    if (leagueFormat === 'redraft' && scoringFormat === 'half-ppr') {
       if (player.position === 'WR' || player.position === 'RB') {
         value *= 0.93;
       } else if (player.position === 'TE') {

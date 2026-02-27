@@ -72,7 +72,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: players, error } = await supabase
       .from('player_values_canonical')
-      .select('player_id, player_name, position, team, rank_position, rank_overall, base_value, adjusted_value, updated_at')
+      .select('player_id, player_name, position, team, rank_position, rank_overall, base_value, adjusted_value, market_value, updated_at')
       .eq('position', position)
       .eq('format', canonicalFormat)
       .is('league_profile_id', null)
@@ -103,8 +103,8 @@ Deno.serve(async (req: Request) => {
       full_name: player.player_name,
       position: player.position,
       team: player.team,
-      ktc_value: Math.round(player.base_value),
-      fdp_value: Math.round(player.adjusted_value),
+      ktc_value: Math.round(player.market_value || player.adjusted_value || player.base_value),
+      fdp_value: Math.round(player.adjusted_value || player.base_value),
       captured_at: player.updated_at,
       trend: 'stable',
     }));
