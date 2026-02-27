@@ -14,6 +14,13 @@ interface PlayerIdentity {
   headshot_url: string | null;
 }
 
+interface PlayerValueRow {
+  player_id: string;
+  player_name: string;
+  position: string;
+  team: string | null;
+}
+
 interface PlayerHeadshot {
   player_id: string;
   headshot_url: string;
@@ -45,15 +52,23 @@ export default function HeadshotAdmin() {
     try {
       setLoading(true);
 
-      const { data: identities, error } = await supabase
-        .from('player_identity')
-        .select('player_id, full_name, position, team, sleeper_id, espn_id, gsis_id, headshot_url')
-        .ilike('full_name', `%${searchTerm}%`)
+      const { data: rows, error } = await supabase
+        .from('player_values')
+        .select('player_id, player_name, position, team')
+        .ilike('player_name', `%${searchTerm}%`)
+        .order('player_name')
         .limit(50);
 
       if (error) throw error;
 
-      const playerIds = (identities || []).map(p => p.player_id);
+      const seen = new Set<string>();
+      const unique = (rows || []).filter(r => {
+        if (seen.has(r.player_id)) return false;
+        seen.add(r.player_id);
+        return true;
+      });
+
+      const playerIds = unique.map(p => p.player_id);
 
       const { data: headshots } = await supabase
         .from('player_headshots')
@@ -64,9 +79,16 @@ export default function HeadshotAdmin() {
         (headshots || []).map(h => [h.player_id, h])
       );
 
-      const combined = (identities || []).map(player => ({
-        ...player,
-        canonical_headshot: headshotMap.get(player.player_id),
+      const combined = unique.map((p: PlayerValueRow) => ({
+        player_id: p.player_id,
+        full_name: p.player_name,
+        position: p.position,
+        team: p.team,
+        sleeper_id: p.player_id,
+        espn_id: null,
+        gsis_id: null,
+        headshot_url: `https://sleepercdn.com/content/nfl/players/${p.player_id}.jpg`,
+        canonical_headshot: headshotMap.get(p.player_id),
       }));
 
       setPlayers(combined);
@@ -220,15 +242,7 @@ export default function HeadshotAdmin() {
                       {player.position} {player.team && `- ${player.team}`}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      {player.sleeper_id && (
-                        <span className="text-xs text-gray-500">Sleeper: {player.sleeper_id}</span>
-                      )}
-                      {player.espn_id && (
-                        <span className="text-xs text-gray-500">ESPN: {player.espn_id}</span>
-                      )}
-                      {player.gsis_id && (
-                        <span className="text-xs text-gray-500">GSIS: {player.gsis_id}</span>
-                      )}
+                      <span className="text-xs text-gray-500">Sleeper ID: {player.player_id}</span>
                     </div>
                   </div>
                 </div>
@@ -309,18 +323,10 @@ export default function HeadshotAdmin() {
                   <div className="text-sm text-blue-900">
                     <div className="font-semibold mb-1">External IDs</div>
                     <div className="space-y-1 text-blue-800">
-                      {selectedPlayer.sleeper_id && (
-                        <div>Sleeper: <code className="bg-blue-100 px-1 rounded">{selectedPlayer.sleeper_id}</code></div>
-                      )}
-                      {selectedPlayer.espn_id && (
-                        <div>ESPN: <code className="bg-blue-100 px-1 rounded">{selectedPlayer.espn_id}</code></div>
-                      )}
-                      {selectedPlayer.gsis_id && (
-                        <div>GSIS: <code className="bg-blue-100 px-1 rounded">{selectedPlayer.gsis_id}</code></div>
-                      )}
-                      {!selectedPlayer.sleeper_id && !selectedPlayer.espn_id && !selectedPlayer.gsis_id && (
-                        <div className="text-red-600">No external IDs found</div>
-                      )}
+                      <div>Sleeper ID: <code className="bg-blue-100 px-1 rounded">{selectedPlayer.player_id}</code></div>
+                      <div className="text-blue-700 text-xs mt-1">
+                        Headshot URL: <code className="bg-blue-100 px-1 rounded break-all">{`https://sleepercdn.com/content/nfl/players/${selectedPlayer.player_id}.jpg`}</code>
+                      </div>
                     </div>
                   </div>
                 </div>
