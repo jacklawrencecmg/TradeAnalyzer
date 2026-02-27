@@ -38,7 +38,7 @@ function PageLoader() {
 }
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [tradeSlug, setTradeSlug] = useState<string | null>(null);
@@ -134,6 +134,9 @@ function AppContent() {
   }
 
   if (showDoctorAdmin) {
+    if (!isAdmin) {
+      return <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">Access denied.</div>;
+    }
     return (
       <Suspense fallback={<PageLoader />}>
         <DoctorAdmin />
@@ -143,6 +146,9 @@ function AppContent() {
   }
 
   if (showSEOAdmin) {
+    if (!isAdmin) {
+      return <div className="min-h-screen flex items-center justify-center bg-gray-950 text-gray-400">Access denied.</div>;
+    }
     return (
       <Suspense fallback={<PageLoader />}>
         <SEOAdmin />
