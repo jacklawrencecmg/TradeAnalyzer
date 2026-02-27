@@ -10,7 +10,6 @@ interface TEValue {
   player_name: string;
   player_id?: string;
   team: string | null;
-  ktc_value: number;
   fdp_value: number;
   captured_at: string;
   headshot_url?: string;
@@ -55,7 +54,6 @@ export default function KTCTERankings() {
         player_name: p.player_name || 'Unknown',
         team: p.team || null,
         position_rank: p.rank_position || 0,
-        ktc_value: p.market_value || p.adjusted_value || p.base_value || 0,
         fdp_value: p.adjusted_value || p.base_value || 0,
         captured_at: p.updated_at || new Date().toISOString(),
       }));
@@ -275,7 +273,7 @@ export default function KTCTERankings() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <span className="text-lg font-bold text-gray-900">{te.fdp_value || te.ktc_value}</span>
+                      <span className="text-lg font-bold text-gray-900">{te.fdp_value.toLocaleString()}</span>
                     </div>
                   </td>
                 </tr>

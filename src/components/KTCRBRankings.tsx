@@ -10,7 +10,6 @@ interface RBValue {
   player_name: string;
   player_id?: string;
   team: string | null;
-  ktc_value: number;
   fdp_value: number;
   captured_at: string;
   headshot_url?: string;
@@ -30,7 +29,6 @@ export default function KTCRBRankings() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [teamFilter, setTeamFilter] = useState('');
-  const [showFdpValue, setShowFdpValue] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const itemsPerPage = 25;
@@ -80,7 +78,6 @@ export default function KTCRBRankings() {
         player_name: p.player_name || 'Unknown',
         team: p.team || null,
         position_rank: p.rank_position || 0,
-        ktc_value: p.market_value || p.adjusted_value || p.base_value || 0,
         fdp_value: p.adjusted_value || p.base_value || 0,
         captured_at: p.updated_at || new Date().toISOString(),
         metadata: p.metadata || undefined,
@@ -208,15 +205,7 @@ export default function KTCRBRankings() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showFdpValue}
-                onChange={(e) => setShowFdpValue(e.target.checked)}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              <span className="text-sm text-gray-700">FDP Values (Recommended)</span>
-            </label>
+            <span className="text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded px-3 py-2">FDP Values</span>
           </div>
         </div>
 
@@ -238,7 +227,7 @@ export default function KTCRBRankings() {
                   Team
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  {showFdpValue ? 'FDP Value' : 'Base Value'}
+                  FDP Value
                 </th>
               </tr>
             </thead>
@@ -295,7 +284,7 @@ export default function KTCRBRankings() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span className="font-bold text-gray-900">
-                      {showFdpValue ? rb.fdp_value.toLocaleString() : rb.ktc_value.toLocaleString()}
+                      {rb.fdp_value.toLocaleString()}
                     </span>
                   </td>
                 </tr>

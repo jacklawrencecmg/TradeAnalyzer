@@ -12,7 +12,6 @@ interface PlayerRanking {
   full_name: string;
   position: string;
   team: string | null;
-  ktc_value: number;
   fdp_value: number;
   captured_at: string;
   trend?: 'up' | 'down' | 'stable';
@@ -103,7 +102,6 @@ Deno.serve(async (req: Request) => {
       full_name: player.player_name,
       position: player.position,
       team: player.team,
-      ktc_value: Math.round(player.market_value || player.adjusted_value || player.base_value),
       fdp_value: Math.round(player.adjusted_value || player.base_value),
       captured_at: player.updated_at,
       trend: 'stable',

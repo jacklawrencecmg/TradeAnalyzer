@@ -10,7 +10,6 @@ interface Player {
   full_name: string;
   position: string;
   team: string | null;
-  ktc_value: number;
   fdp_value: number;
   captured_at: string;
   trend?: 'up' | 'down' | 'stable';
@@ -18,7 +17,6 @@ interface Player {
 
 type Position = 'QB' | 'RB' | 'WR' | 'TE';
 type Format = 'dynasty_sf' | 'dynasty_1qb' | 'dynasty_tep';
-type ValueSource = 'fdp' | 'ktc';
 
 const POSITIONS: Position[] = ['QB', 'RB', 'WR', 'TE'];
 
@@ -28,15 +26,9 @@ const FORMAT_OPTIONS = [
   { value: 'dynasty_tep', label: 'TEP', abbr: 'TEP' },
 ];
 
-const VALUE_SOURCE_OPTIONS = [
-  { value: 'fdp', label: 'FDP Values' },
-  { value: 'ktc', label: 'FDP Values (Base)' },
-];
-
 export default function UnifiedRankings() {
   const [selectedPosition, setSelectedPosition] = useState<Position>('QB');
   const [selectedFormat, setSelectedFormat] = useState<Format>('dynasty_sf');
-  const [valueSource, setValueSource] = useState<ValueSource>('fdp');
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,26 +168,7 @@ export default function UnifiedRankings() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Value Source
-                </label>
-                <div className="flex gap-2">
-                  {VALUE_SOURCE_OPTIONS.map((source) => (
-                    <button
-                      key={source.value}
-                      onClick={() => setValueSource(source.value as ValueSource)}
-                      className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                        valueSource === source.value
-                          ? 'bg-purple-600 text-white shadow-md'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {source.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+
             </div>
 
             <div className="flex flex-wrap gap-4">
@@ -337,17 +310,10 @@ export default function UnifiedRankings() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <div className="flex items-center justify-end gap-2">
-                              {(() => {
-                                const displayValue = valueSource === 'fdp' ? player.fdp_value : player.ktc_value;
-                                return (
-                                  <>
-                                    <TrendingUp className={`w-4 h-4 ${getValueColor(displayValue)}`} />
-                                    <span className={`text-lg font-bold ${getValueColor(displayValue)}`}>
-                                      {displayValue.toLocaleString()}
-                                    </span>
-                                  </>
-                                );
-                              })()}
+                              <TrendingUp className={`w-4 h-4 ${getValueColor(player.fdp_value)}`} />
+                              <span className={`text-lg font-bold ${getValueColor(player.fdp_value)}`}>
+                                {player.fdp_value.toLocaleString()}
+                              </span>
                             </div>
                           </td>
                         </tr>
@@ -376,8 +342,8 @@ export default function UnifiedRankings() {
               <p>SF (Superflex), 1QB (Standard), TEP (TE Premium)</p>
             </div>
             <div>
-              <p className="font-medium text-gray-700 mb-1">Value Types</p>
-              <p>FDP Base and FDP (format-adjusted)</p>
+              <p className="font-medium text-gray-700 mb-1">Value Type</p>
+              <p>FDP Values (format-adjusted)</p>
             </div>
           </div>
           <div className="border-t pt-4">
