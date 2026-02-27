@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Trash2, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getPlayerValueById as getPlayerValue, fetchTradeBlockPlayers, TradeBlockPlayer } from '../services/sleeperApi';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface TradeBlockItem {
   id: string;
@@ -187,13 +188,13 @@ export default function TradeBlockMarketplace({ leagueId, userId }: TradeBlockMa
                   {sleeperPlayers.map(player => (
                     <div key={`${player.roster_id}-${player.player_id}`} className="bg-fdp-pos/10 backdrop-blur-sm rounded-lg border border-fdp-pos/30 p-4 hover:border-fdp-pos transition">
                       <div className="flex items-start gap-3">
-                        <img
-                          src={`https://sleepercdn.com/content/nfl/players/thumb/${player.player_id}.jpg`}
-                          alt={player.player_name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none';
-                          }}
+                        <PlayerAvatar
+                          playerId={player.player_id}
+                          playerName={player.player_name}
+                          team={player.team || undefined}
+                          position={player.position}
+                          size="md"
+                          showTeamLogo={false}
                         />
                         <div className="flex-1">
                           <h3 className="font-bold text-lg">{player.player_name}</h3>

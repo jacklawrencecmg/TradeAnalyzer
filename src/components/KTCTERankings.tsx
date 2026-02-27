@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, TrendingUp, Award, Zap } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
 import { supabase } from '../lib/supabase';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface TEValue {
   position_rank: number;
@@ -235,13 +236,13 @@ export default function KTCTERankings() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={`https://sleepercdn.com/content/nfl/players/thumb/${te.player_id}.jpg`}
-                        alt={te.full_name}
-                        className="w-12 h-12 rounded-full object-cover bg-gray-100 border-2 border-gray-200"
-                        onError={(e) => {
-                          e.currentTarget.src = `https://sleepercdn.com/images/v2/icons/player_default.webp`;
-                        }}
+                      <PlayerAvatar
+                        playerId={te.player_id}
+                        playerName={te.full_name}
+                        team={te.team || undefined}
+                        position="TE"
+                        size="md"
+                        showTeamLogo={false}
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{te.full_name}</div>
