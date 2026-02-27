@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { generateRankingsMetaTags, generatePlayerSlug } from '../lib/seo/meta';
 import { generateRankingsStructuredData, injectStructuredData } from '../lib/seo/structuredData';
 import { TableSkeleton } from './LoadingSkeleton';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface RankedPlayer {
   player_id: string;
@@ -199,9 +200,19 @@ export function DynastyRankingsPage() {
                     <td className="p-4">
                       <Link
                         to={`/dynasty-value/${generatePlayerSlug(player.full_name)}`}
-                        className="text-fdp-text-1 font-semibold hover:text-fdp-accent-1 transition-colors"
+                        className="flex items-center gap-3 group"
                       >
-                        {player.full_name}
+                        <PlayerAvatar
+                          playerId={player.player_id}
+                          playerName={player.full_name}
+                          team={player.team}
+                          position={player.position}
+                          size="sm"
+                          showTeamLogo={false}
+                        />
+                        <span className="text-fdp-text-1 font-semibold group-hover:text-fdp-accent-1 transition-colors">
+                          {player.full_name}
+                        </span>
                       </Link>
                     </td>
                     <td className="p-4 text-fdp-text-2">{player.team || 'FA'}</td>

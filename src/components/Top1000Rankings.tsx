@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Search, Download, Filter, TrendingUp, Users, Shield, RefreshCw, Calendar } from 'lucide-react';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface Top1000Player {
   rank: number;
@@ -367,9 +368,19 @@ export default function Top1000Rankings() {
                     #{player.rank}
                   </td>
                   <td className="px-4 py-3">
-                    <div>
-                      <div className="text-sm font-medium text-white">{player.full_name}</div>
-                      <div className="text-xs text-gray-500">{player.status}</div>
+                    <div className="flex items-center gap-3">
+                      <PlayerAvatar
+                        playerId={player.player_id}
+                        playerName={player.full_name}
+                        team={player.team || undefined}
+                        position={player.position}
+                        size="sm"
+                        showTeamLogo={false}
+                      />
+                      <div>
+                        <div className="text-sm font-medium text-white">{player.full_name}</div>
+                        <div className="text-xs text-gray-500">{player.status}</div>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3">

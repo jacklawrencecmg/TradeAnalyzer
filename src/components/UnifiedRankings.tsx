@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, TrendingDown, Minus, Search, Filter, Users, AlertCircle } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
 import PlayerDetail from './PlayerDetail';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface Player {
   player_id: string;
@@ -304,15 +305,25 @@ export default function UnifiedRankings() {
                             </span>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => setSelectedPlayer(player.player_id)}
-                                className="font-semibold text-gray-900 hover:text-blue-600 hover:underline transition-colors text-left"
-                              >
-                                {player.full_name}
-                              </button>
-                              {getTrendIcon(player.trend)}
-                            </div>
+                            <button
+                              onClick={() => setSelectedPlayer(player.player_id)}
+                              className="flex items-center gap-3 group text-left"
+                            >
+                              <PlayerAvatar
+                                playerId={player.player_id}
+                                playerName={player.full_name}
+                                team={player.team || undefined}
+                                position={player.position}
+                                size="sm"
+                                showTeamLogo={false}
+                              />
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                  {player.full_name}
+                                </span>
+                                {getTrendIcon(player.trend)}
+                              </div>
+                            </button>
                           </td>
                           <td className="px-4 py-3">
                             <span className="text-gray-600 font-medium">

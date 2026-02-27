@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ListSkeleton } from './LoadingSkeleton';
 import { useToast } from './Toast';
 import Tooltip from './Tooltip';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface PlayerValuesProps {
   leagueId: string;
@@ -596,15 +597,25 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                       className="w-full px-4 py-3 text-left hover:bg-fdp-surface-2 transition-colors border-b border-fdp-border-1 last:border-b-0 group"
                     >
                       <div className="flex items-center justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-fdp-text-1 font-medium group-hover:text-fdp-accent-2 transition-colors">
-                            {player.player_name}
-                          </div>
-                          <div className="text-fdp-text-3 text-sm flex items-center gap-2">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
-                              {player.position}
-                            </span>
-                            <span>{player.team || 'FA'}</span>
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <PlayerAvatar
+                            playerId={player.player_id}
+                            playerName={player.player_name}
+                            team={player.team || undefined}
+                            position={player.position}
+                            size="sm"
+                            showTeamLogo={false}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-fdp-text-1 font-medium group-hover:text-fdp-accent-2 transition-colors">
+                              {player.player_name}
+                            </div>
+                            <div className="text-fdp-text-3 text-sm flex items-center gap-2">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-fdp-accent-1 bg-opacity-20 text-fdp-accent-2">
+                                {player.position}
+                              </span>
+                              <span>{player.team || 'FA'}</span>
+                            </div>
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -767,7 +778,15 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                     movers.risers.map((player, index) => (
                       <div key={player.id} className="flex items-center justify-between p-3 bg-fdp-surface-1 rounded-lg border border-fdp-border-1">
                         <div className="flex items-center gap-3">
-                          <span className="text-fdp-text-3 font-bold">#{index + 1}</span>
+                          <span className="text-fdp-text-3 font-bold text-sm w-6 shrink-0">#{index + 1}</span>
+                          <PlayerAvatar
+                            playerId={player.player_id}
+                            playerName={player.player_name}
+                            team={player.team || undefined}
+                            position={player.position}
+                            size="sm"
+                            showTeamLogo={false}
+                          />
                           <div>
                             <div className="text-fdp-text-1 font-medium">{player.player_name}</div>
                             <div className="text-fdp-text-3 text-xs">{player.position} - {player.team}</div>
@@ -794,7 +813,15 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                     movers.fallers.map((player, index) => (
                       <div key={player.id} className="flex items-center justify-between p-3 bg-fdp-surface-1 rounded-lg border border-fdp-border-1">
                         <div className="flex items-center gap-3">
-                          <span className="text-fdp-text-3 font-bold">#{index + 1}</span>
+                          <span className="text-fdp-text-3 font-bold text-sm w-6 shrink-0">#{index + 1}</span>
+                          <PlayerAvatar
+                            playerId={player.player_id}
+                            playerName={player.player_name}
+                            team={player.team || undefined}
+                            position={player.position}
+                            size="sm"
+                            showTeamLogo={false}
+                          />
                           <div>
                             <div className="text-fdp-text-1 font-medium">{player.player_name}</div>
                             <div className="text-fdp-text-3 text-xs">{player.position} - {player.team}</div>
@@ -835,7 +862,15 @@ export function PlayerValues({ leagueId, isSuperflex }: PlayerValuesProps) {
                       <tr key={player.id} className="hover:bg-fdp-surface-1 transition-colors">
                         <td className="px-4 py-3 text-fdp-text-3 text-sm">{index + 1}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-3">
+                            <PlayerAvatar
+                              playerId={player.player_id}
+                              playerName={player.player_name}
+                              team={player.team || undefined}
+                              position={player.position}
+                              size="sm"
+                              showTeamLogo={false}
+                            />
                             <div className="flex-1">
                               <div className="font-medium text-fdp-text-1">{player.player_name}</div>
                               <div className="flex items-center gap-2 mt-1">
