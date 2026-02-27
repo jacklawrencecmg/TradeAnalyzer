@@ -103,7 +103,8 @@ export default function HeadshotAdmin() {
   const selectPlayer = (player: PlayerIdentity) => {
     setSelectedPlayer(player);
     const current = players.find(p => p.player_id === player.player_id);
-    setEditingUrl(current?.canonical_headshot?.headshot_url || player.headshot_url || '');
+    const overrideUrl = current?.canonical_headshot?.is_override ? current.canonical_headshot.headshot_url : '';
+    setEditingUrl(overrideUrl);
   };
 
   const saveManualOverride = async () => {
@@ -234,7 +235,6 @@ export default function HeadshotAdmin() {
                     team={player.team || undefined}
                     position={player.position}
                     size="md"
-                    headshotUrl={player.canonical_headshot?.headshot_url || player.headshot_url || undefined}
                   />
                   <div>
                     <div className="font-semibold text-gray-900">{player.full_name}</div>
@@ -294,6 +294,7 @@ export default function HeadshotAdmin() {
                     position={selectedPlayer.position}
                     size="xl"
                     headshotUrl={editingUrl || undefined}
+                    showTeamLogo={false}
                   />
                 </div>
                 <div className="flex-1">
