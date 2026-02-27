@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, TrendingUp, TrendingDown, Award } from 'lucide-react';
+import { Search, Filter, Award } from 'lucide-react';
 import { ListSkeleton } from './LoadingSkeleton';
 import { supabase } from '../lib/supabase';
+import { PlayerAvatar } from './PlayerAvatar';
 
 interface QBValue {
   position_rank: number;
   full_name: string;
   player_name: string;
-  player_id?: string;
+  player_id: string;
   team: string | null;
   ktc_value: number;
   fdp_value: number;
@@ -36,19 +37,30 @@ export default function KTCQBRankings() {
   const fetchQBValues = async () => {
     try {
       setLoading(true);
-      const { data, error: rpcError } = await supabase.rpc('get_latest_values', {
-        p_format: 'dynasty_sf',
-        p_position: 'QB',
-        p_limit: null
-      });
+      const { data, error: dbError } = await supabase
+        .from('latest_player_values')
+        .select('player_id, player_name, position, team, rank_position, base_value, adjusted_value, market_value, updated_at')
+        .eq('format', 'dynasty_sf')
+        .eq('position', 'QB')
+        .order('adjusted_value', { ascending: false })
+        .limit(200);
 
-      if (rpcError) {
-        throw new Error(rpcError.message);
+      if (dbError) {
+        throw new Error(dbError.message);
       }
 
-      const sorted = (data || []).sort((a: QBValue, b: QBValue) => (b.fdp_value || b.ktc_value) - (a.fdp_value || a.ktc_value));
-      setQbs(sorted);
+      const mapped: QBValue[] = (data || []).map((p: any) => ({
+        player_id: p.player_id,
+        full_name: p.player_name || 'Unknown',
+        player_name: p.player_name || 'Unknown',
+        team: p.team || null,
+        position_rank: p.rank_position || 0,
+        ktc_value: p.market_value || p.base_value || 0,
+        fdp_value: p.adjusted_value || p.base_value || 0,
+        captured_at: p.updated_at || new Date().toISOString(),
+      }));
 
+      setQbs(mapped);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load QB rankings');
@@ -197,13 +209,13 @@ export default function KTCQBRankings() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={`https://sleepercdn.com/content/nfl/players/thumb/${qb.player_id}.jpg`}
-                        alt={qb.full_name}
-                        className="w-12 h-12 rounded-full object-cover bg-gray-100 border-2 border-gray-200"
-                        onError={(e) => {
-                          e.currentTarget.src = `https://sleepercdn.com/images/v2/icons/player_default.webp`;
-                        }}
+                      <PlayerAvatar
+                        playerId={qb.player_id}
+                        playerName={qb.full_name}
+                        team={qb.team || undefined}
+                        position="QB"
+                        size="md"
+                        headshotUrl={qb.headshot_url}
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{qb.full_name}</div>
