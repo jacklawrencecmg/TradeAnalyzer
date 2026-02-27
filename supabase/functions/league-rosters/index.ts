@@ -10,7 +10,7 @@ const SLEEPER_BASE_URL = 'https://api.sleeper.app/v1';
 
 let sleeperPlayersCache: Record<string, any> | null = null;
 let sleeperPlayersCacheTime = 0;
-const SLEEPER_CACHE_TTL = 60 * 60 * 1000;
+const SLEEPER_CACHE_TTL = 30 * 60 * 1000;
 
 async function getSleeperPlayers(): Promise<Record<string, any>> {
   const now = Date.now();
@@ -19,13 +19,13 @@ async function getSleeperPlayers(): Promise<Record<string, any>> {
   }
   try {
     const res = await fetch(`${SLEEPER_BASE_URL}/players/nfl`);
-    if (!res.ok) return {};
+    if (!res.ok) return sleeperPlayersCache || {};
     const data = await res.json();
     sleeperPlayersCache = data;
     sleeperPlayersCacheTime = now;
     return data;
   } catch {
-    return {};
+    return sleeperPlayersCache || {};
   }
 }
 
@@ -78,9 +78,9 @@ Deno.serve(async (req: Request) => {
       getSleeperPlayers(),
     ]);
 
-    const playerMap = new Map<string, any>();
+    const dbMap = new Map<string, any>();
     for (const p of dbResult.data || []) {
-      playerMap.set(p.player_id, p);
+      dbMap.set(p.player_id, p);
     }
 
     const userMap = new Map(users.map((u: any) => [u.user_id, u]));
@@ -88,21 +88,23 @@ Deno.serve(async (req: Request) => {
     const enrichedRosters = rosters.map((roster: any) => {
       const owner = userMap.get(roster.owner_id);
       const players = (roster.players || []).map((playerId: string) => {
-        const dbPlayer = playerMap.get(playerId);
+        const sleeperPlayer = sleeperPlayers[playerId];
+        const dbPlayer = dbMap.get(playerId);
+
+        const liveTeam = sleeperPlayer?.team || null;
 
         if (dbPlayer) {
           return {
             player_id: playerId,
             name: dbPlayer.player_name,
             position: dbPlayer.position,
-            team: dbPlayer.team || null,
+            team: liveTeam ?? dbPlayer.team ?? null,
             fdp_value: dbPlayer.adjusted_value || 0,
             is_starter: (roster.starters || []).includes(playerId),
             headshot_url: `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`,
           };
         }
 
-        const sleeperPlayer = sleeperPlayers[playerId];
         if (sleeperPlayer) {
           const fullName = sleeperPlayer.full_name ||
             `${sleeperPlayer.first_name || ''} ${sleeperPlayer.last_name || ''}`.trim();
@@ -110,7 +112,7 @@ Deno.serve(async (req: Request) => {
             player_id: playerId,
             name: fullName || playerId,
             position: sleeperPlayer.position || 'N/A',
-            team: sleeperPlayer.team || null,
+            team: liveTeam,
             fdp_value: 0,
             is_starter: (roster.starters || []).includes(playerId),
             headshot_url: `https://sleepercdn.com/content/nfl/players/thumb/${playerId}.jpg`,
